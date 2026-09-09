@@ -11,7 +11,30 @@ async function reviewReport(id){showModal('Review report','<form class="form" id
 async function loadGroupRequests(){if(!db)return;try{const snap=await getDocs(query(collection(db,'groupRequests'),where('status','==','pending'),orderBy('createdAt','desc'),limit(15)));const box=$('[data-group-requests]');box.innerHTML=snap.docs.length?snap.docs.map(d=>{const r=d.data();return `<div class="moderation-item"><div><strong>${escapeHtml(r.groupName||r.groupId)}</strong><div class="small muted">Student request · ${formatDateTime(r.createdAt)}</div></div><div class="toolbar"><button class="btn sm primary" data-approve-request="${d.id}">Approve</button><button class="btn sm" data-reject-request="${d.id}">Reject</button></div></div>`}).join(''):'<div class="empty"><h3>No pending requests</h3></div>'}catch(e){toast('Could not load membership requests.','error')}}
 async function updateIssue(id){showModal('Update issue status','<form class="form" id="issueReview"><div class="field"><label>Status</label><select name="status"><option>Open</option><option>Under Review</option><option>In Progress</option><option>Resolved</option><option>Closed</option></select></div><div class="field"><label>Public response</label><textarea name="response" maxlength="1000" placeholder="What should students know?"></textarea></div><div style="text-align:right"><button class="btn primary">Update issue</button></div></form>');$('#issueReview').addEventListener('submit',async e=>{e.preventDefault();try{const fd=new FormData(e.currentTarget);await updateDoc(doc(db,'issues',id),{status:fd.get('status'),adminResponse:String(fd.get('response')||''),updatedAt:serverTimestamp()});document.querySelector('.modal-backdrop')?.remove();toast('Issue updated');loadIssues()}catch(err){toast(err.message,'error')}})}
 document.addEventListener('click',async e=>{const r=e.target.closest('[data-review-report]');if(r)reviewReport(r.dataset.reviewReport);const a=e.target.closest('[data-approve-group]');if(a){try{await updateDoc(doc(db,'groups',a.dataset.approveGroup),{status:'approved',approvedBy:adminProfile.uid,approvedAt:serverTimestamp()});toast('Group approved');loadGroups();loadStats()}catch(err){toast(err.message,'error')}}const reject=e.target.closest('[data-reject-group]');if(reject){showModal('Reject group','<form id="rejectForm" class="form"><div class="field"><label>Reason</label><textarea name="reason" required maxlength="500"></textarea></div><button class="btn danger">Reject group</button></form>');$('#rejectForm').addEventListener('submit',async ev=>{ev.preventDefault();const fd=new FormData(ev.currentTarget);try{await updateDoc(doc(db,'groups',reject.dataset.rejectGroup),{status:'rejected',rejectionReason:String(fd.get('reason')),reviewedBy:adminProfile.uid,reviewedAt:serverTimestamp()});document.querySelector('.modal-backdrop')?.remove();toast('Group rejected');loadGroups()}catch(err){toast(err.message,'error')}})}const ar=e.target.closest('[data-approve-request]');if(ar){try{await httpsCallable(getFunctions(),'reviewGroupRequest')({requestId:ar.dataset.approveRequest,decision:'approved'});toast('Request approved');loadGroupRequests()}catch(err){toast(err.message,'error')}}const rr=e.target.closest('[data-reject-request]');if(rr){try{await httpsCallable(getFunctions(),'reviewGroupRequest')({requestId:rr.dataset.rejectRequest,decision:'rejected'});toast('Request rejected');loadGroupRequests()}catch(err){toast(err.message,'error')}}const issue=e.target.closest('[data-admin-issue]');if(issue)updateIssue(issue.dataset.adminIssue)});
-subscribeAuth((u,p)=>{if(!requireAuth())return;if(!hasRole('platformAdmin','moderator')){location.href='home.html';return}adminProfile=p;loadStats();loadReports();loadGroups();loadGroupRequests();loadIssues()});
+subscribeAuth((u,p)=>{
+ if(!requireAuth())return;
+ adminProfile=p;
+ // In the unconfigured/demo build, keep the admin page reachable for UI testing
+ // instead of redirecting to Home. Real Firebase deployments remain role-gated.
+ if(!db){
+   const banner=document.createElement('div');
+   banner.className='notice warning';
+   banner.style.marginBottom='16px';
+   banner.innerHTML='<strong>Demo mode.</strong> Connect Firebase and sign in with a platformAdmin or moderator account to load live moderation data.';
+   const target=document.querySelector('.page-head');
+   target?.parentElement?.insertBefore(banner,target.nextSibling);
+   return;
+ }
+ if(!hasRole('platformAdmin','moderator')){
+   const root=document.querySelector('[data-app-main] section')||document.querySelector('main section');
+   if(root){
+     root.innerHTML='<div class="empty"><i data-lucide="shield-off"></i><h2>Admin access required</h2><p class="muted">This area is restricted to platform administrators and moderators.</p><a class="btn primary" href="home.html">Back to Home</a></div>';
+     window.lucide?.createIcons();
+   }
+   return;
+ }
+ loadStats();loadReports();loadGroups();loadGroupRequests();loadIssues();
+});
 
 export async function loadModerationQueues(){
  const [reports,groups,issues]=await Promise.all([getOpenReports(),getPendingGroups(),getOpenIssues()]);
