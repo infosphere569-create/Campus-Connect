@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+Disallow: /login.html
+Disallow: /home.html
+Disallow: /feed.html
+Disallow: /grouplist.html
+Disallow: /group.html
+Disallow: /issues.html
+Disallow: /report.html
+Disallow: /profile.html
+Disallow: /admin.html
+Disallow: /events.html
+Disallow: /notifications.html
+Sitemap: https://campus-connect.example/sitemap.xml
