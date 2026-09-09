@@ -1,14 +1,25 @@
-import {db,storage} from './firebase.js';
+import {db} from './firebase.js';
 import {collection,addDoc,setDoc,getDoc,getDocs,query,where,orderBy,limit,doc,updateDoc,deleteDoc,serverTimestamp,increment,writeBatch,startAfter} from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js';
-import {ref as storageRef,uploadBytesResumable,getDownloadURL} from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-storage.js';
+const CLOUDINARY_CLOUD_NAME='bqwj7eos';
+const CLOUDINARY_UPLOAD_PRESET='campus_connect_unsigned';
 
 export async function uploadImage(file,path,onProgress){
-  if(!storage)throw new Error('Firebase Storage is not configured.');
-  if(!file.type.startsWith('image/'))throw new Error('Please choose an image file.');
+  if(!file||!file.type?.startsWith('image/'))throw new Error('Please choose an image file.');
   if(file.size>8*1024*1024)throw new Error('Image must be smaller than 8 MB.');
-  const task=uploadBytesResumable(storage,storageRef(storage,path),file);
-  return new Promise((resolve,reject)=>{task.on('state_changed',s=>onProgress?.(Math.round(s.bytesTransferred/s.totalBytes*100)),reject,async()=>resolve(await getDownloadURL(task.snapshot.ref)))});
+  onProgress?.(5);
+  const body=new FormData();
+  body.append('file',file);
+  body.append('upload_preset',CLOUDINARY_UPLOAD_PRESET);
+  body.append('folder','campus-connect');
+  try{
+    const res=await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,{method:'POST',body});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data?.error?.message||'Cloudinary image upload failed.');
+    onProgress?.(100);
+    return data.secure_url||data.url;
+  }catch(err){throw new Error(err?.message||'Could not upload image.');}
 }
+
 export async function getLatestPosts(n=25){if(!db)return[];const snap=await getDocs(query(collection(db,'posts'),orderBy('createdAt','desc'),limit(n)));return snap.docs.map(d=>({id:d.id,...d.data()}))}
 export async function createPost(data){if(!db)throw new Error('Firebase is not configured.');const ref=await addDoc(collection(db,'posts'),{...data,likes:0,comments:0,shares:0,saves:0,reportCount:0,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});return ref.id}
 export async function togglePostLike(postId,userId){if(!db)throw new Error('Firebase is not configured.');const vote=doc(db,'postLikes',postId,'users',userId);const snap=await getDoc(vote);if(snap.exists()){await deleteDoc(vote);await updateDoc(doc(db,'posts',postId),{likes:increment(-1)});return false}await setDoc(vote,{uid:userId,postId,createdAt:serverTimestamp()});await updateDoc(doc(db,'posts',postId),{likes:increment(1)});return true}
