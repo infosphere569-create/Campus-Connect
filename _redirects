@@ -1,0 +1,8 @@
+/login /login.html 200
+/home /home.html 200
+/feed /feed.html 200
+/groups /grouplist.html 200
+/issues /issues.html 200
+/profile /profile.html 200
+/events /events.html 200
+/notifications /notifications.html 200
