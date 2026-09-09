@@ -1,0 +1,29 @@
+function clamp(n,min=0,max=1){return Math.max(min,Math.min(max,n))}
+function dateMs(date){const d=date?.toDate?date.toDate():new Date(date);return Number.isNaN(d.getTime())?Date.now():d.getTime()}
+export function recencyScore(date){const ageHours=Math.max(0,(Date.now()-dateMs(date))/3600000);return Math.exp(-ageHours/42)}
+export function engagementScore(p){const likes=Number(p.likes||0),comments=Number(p.comments||0),shares=Number(p.shares||0),saves=Number(p.saves||0);return clamp((Math.log1p(likes)*.30+Math.log1p(comments)*.35+Math.log1p(shares)*.20+Math.log1p(saves)*.15)/5)}
+export function relevanceScore(p,user={}){const hay=`${p.text||''} ${p.category||''} ${p.branch||''} ${p.tags||''}`.toLowerCase();const interests=[...(user.interests||[]),user.branch,user.course].filter(Boolean).map(String);if(!interests.length)return .25;const hits=interests.reduce((s,x)=>s+(hay.includes(x.toLowerCase())?1:0),0);return clamp(.15+hits/(Math.max(1,interests.length))*0.7)}
+export function trendScore(p){return clamp(Number(p.trendVelocity||0)/100)}
+export function qualityScore(p){const text=String(p.text||'').trim();const originality=Number(p.originalityScore ?? .5);const lengthQuality=text.length>=40?1:clamp(text.length/40);return clamp(originality*.6+lengthQuality*.4)}
+export function negativeFeedbackScore(p){return clamp((Number(p.reportCount||0)*2+Number(p.hideCount||0))*0.03)}
+export function calculateFinalFeedScore(p,user={}){return recencyScore(p.createdAt)*.30+engagementScore(p)*.23+relevanceScore(p,user)*.20+trendScore(p)*.10+qualityScore(p)*.17-negativeFeedbackScore(p)*.65}
+export function rankPosts(posts,user={}){const ranked=posts.map(p=>({...p,_score:calculateFinalFeedScore(p,user)})).sort((a,b)=>b._score-a._score);const authorUse=new Map();const topicUse=new Map();const result=[];for(const p of ranked){const author=p.authorId||p.authorName||'unknown';const topic=String(p.category||'general').toLowerCase();if((authorUse.get(author)||0)>=2)continue;if((topicUse.get(topic)||0)>=3)continue;result.push(p);authorUse.set(author,(authorUse.get(author)||0)+1);topicUse.set(topic,(topicUse.get(topic)||0)+1);if(result.length>=30)break}return result}
+
+export function freshnessDecay(timestamp,halfLifeHours=36){
+ const ms=timestamp?.toMillis?timestamp.toMillis():new Date(timestamp||0).getTime();
+ if(!ms)return 0;
+ const age=Math.max(0,(Date.now()-ms)/3600000);
+ return Math.pow(0.5,age/halfLifeHours);
+}
+export function rankForFeed(posts,context={}){
+ const now=Date.now();
+ return [...posts].map(p=>{
+  const age=Math.max(0,(now-(p.createdAt?.toMillis?.()||new Date(p.createdAt||now).getTime()))/3600000);
+  const engagement=Math.min(1,((p.likeCount||0)*1+(p.commentCount||0)*2+(p.shareCount||0)*2)/50);
+  const quality=Math.max(0,Math.min(1,Number(p.qualityScore??.5)));
+  const relevance=Math.max(0,Math.min(1,Number(p.relevanceScore??.5)));
+  const negative=Math.max(0,Math.min(1,Number(p.negativeFeedback??0)));
+  const score=.34*freshnessDecay(p.createdAt)+.24*engagement+.18*quality+.18*relevance-.18*negative;
+  return {...p,_feedScore:score};
+ }).sort((a,b)=>b._feedScore-a._feedScore);
+}

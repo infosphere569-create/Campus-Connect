@@ -1,0 +1,17 @@
+import { auth, db, isFirebaseConfigured } from './firebase.js';
+import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, signOut, updateProfile } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js';
+import { doc, getDoc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js';
+import { toast, demoProfile } from './utils.js';
+export let currentUser=null; export let currentProfile=null;
+export async function ensureProfile(user,extra={}){if(!user)return null;if(!db){currentProfile={...demoProfile(),...extra,uid:user.uid||'demo-user',displayName:user.displayName||extra.displayName||demoProfile().displayName};return currentProfile}const ref=doc(db,'users',user.uid);const snap=await getDoc(ref);if(snap.exists()){currentProfile={uid:user.uid,...snap.data()};return currentProfile}currentProfile={uid:user.uid,displayName:user.displayName||extra.displayName||'',photoURL:user.photoURL||'',role:'student',isActive:true,...extra};await setDoc(ref,{...currentProfile,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});return currentProfile}
+export function profileNeedsOnboarding(profile){return Boolean(profile && profile.uid!=='demo-user' && (!profile.course || !profile.branch || !profile.year || !profile.college));}
+export function subscribeAuth(cb){if(!isFirebaseConfigured||!auth){currentUser={uid:'demo-user',displayName:demoProfile().displayName};currentProfile=demoProfile();document.documentElement.dataset.firebaseReady='false';queueMicrotask(()=>cb(currentUser,currentProfile));return()=>{}}document.documentElement.dataset.firebaseReady='true';return onAuthStateChanged(auth,async user=>{currentUser=user;currentProfile=user?await ensureProfile(user):null;const page=document.body.dataset.page;if(user && profileNeedsOnboarding(currentProfile) && page!=='onboarding'){location.href='onboarding.html';return;}cb(user,currentProfile)})}
+export async function login(email,password){if(!auth)throw new Error('Firebase is not configured. Demo mode is available for UI testing.');return signInWithEmailAndPassword(auth,email,password)}
+export async function register({email,password,displayName,profile={}}){if(!auth)throw new Error('Firebase is not configured.');const cred=await createUserWithEmailAndPassword(auth,email,password);await updateProfile(cred.user,{displayName});await ensureProfile(cred.user,{displayName,...profile});return cred.user}
+export async function googleLogin(){if(!auth)throw new Error('Firebase is not configured.');return signInWithPopup(auth,new GoogleAuthProvider())}
+export async function resetPassword(email){if(!auth)throw new Error('Firebase is not configured.');return sendPasswordResetEmail(auth,email)}
+export async function logout(){if(auth)await signOut(auth);sessionStorage.removeItem('cc-demo');location.href='index.html'}
+export function requireAuth(){if(!currentUser){location.href='login.html';return false}if(currentProfile?.isActive===false){toast('Your account is currently inactive.','error');logout();return false}return true}
+export function hasRole(...roles){return Boolean(currentProfile?.role&&roles.includes(currentProfile.role))}
+export function demoLogin(){currentUser={uid:'demo-user',displayName:'Ayush Kumar'};currentProfile=demoProfile();sessionStorage.setItem('cc-demo','1');location.href='home.html'}
+document.addEventListener('click',e=>{if(e.target.closest('[data-logout]'))logout()});
