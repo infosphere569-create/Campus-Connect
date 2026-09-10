@@ -5,7 +5,7 @@ export async function getOpenReports(max=50){
  return s.docs.map(d=>({id:d.id,...d.data()}));
 }
 export async function getPendingGroups(max=50){
- const s=await getDocs(query(collection(db,"groups"),where("approvalStatus","==","pending"),orderBy("createdAt","desc"),limit(max)));
+ const s=await getDocs(query(collection(db,"groups"),where("status","==","pending"),orderBy("createdAt","desc"),limit(max)));
  return s.docs.map(d=>({id:d.id,...d.data()}));
 }
 export async function getOpenIssues(max=50){

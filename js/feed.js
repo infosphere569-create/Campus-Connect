@@ -6,7 +6,12 @@ import { $, $$, escapeHtml, initials, timeAgo, toast, showModal, isDemo } from '
 import {rankPosts} from './algorithm.js';
 let profile;
 function postTemplate(p){const liked=Boolean(p._liked),saved=Boolean(p._saved);return `<article class="card post-card" data-post-id="${escapeHtml(p.id||'')}"><div class="post-head"><div class="avatar">${p.photoURL?`<img src="${escapeHtml(p.photoURL)}" alt="">`:initials(p.authorName)}</div><div class="post-meta"><strong>${escapeHtml(p.authorName||'Campus Student')}${p.role==='platformAdmin'?` <span class="badge primary">Official</span>`:''}</strong><span>${escapeHtml(p.branch||'Student')} · ${timeAgo(p.createdAt)}</span></div><button class="btn icon ghost" data-post-menu aria-label="More post actions"><i data-lucide="more-horizontal"></i></button></div><div class="post-text">${escapeHtml(p.text||'')}</div>${p.imageURL?`<img class="post-media" src="${escapeHtml(p.imageURL)}" alt="Post image">`:''}<div class="post-actions"><button class="action ${liked?'active':''}" data-like><i data-lucide="heart"></i><span>${p.likes||0}</span></button><button class="action" data-comment><i data-lucide="message-circle"></i><span>${p.comments||0}</span></button><button class="action" data-share><i data-lucide="share-2"></i>Share</button><button class="action ${saved?'active':''}" data-save><i data-lucide="bookmark"></i><span>${saved?'Saved':'Save'}</span></button></div></article>`}
-async function loadPosts(){const box=$('[data-feed]');let posts=[];if(db){try{posts=await getLatestPosts(40)}catch(e){toast('Could not load the live feed.','error')}}if(!posts.length)posts=[{id:'demo-1',authorName:'Campus Connect',branch:'Community',text:'Start the conversation. Share a campus update, useful opportunity, question or idea.',likes:24,comments:7,createdAt:new Date(),category:'community',originalityScore:.9},{id:'demo-2',authorName:'Student Community',branch:'CSE',text:'Placement prep, clubs, events and study groups can live in one place.',likes:15,comments:3,createdAt:new Date(Date.now()-3600000),category:'CSE',originalityScore:.8}];posts=rankPosts(posts,profile||{});box.innerHTML=posts.map(postTemplate).join('');$('#feedEmpty')?.classList.toggle('hidden',posts.length>0);window.lucide?.createIcons()}
+function emptyState(icon,title,body){return `<div class="card empty" id="feedEmpty"><i data-lucide="${icon}"></i><h3>${title}</h3><p class="muted">${body}</p></div>`}
+async function loadPosts(){const box=$('[data-feed]');
+ if(!db){box.innerHTML=emptyState('rss','Feed not connected','Connect Firebase to see real posts from your campus community.');window.lucide?.createIcons();return}
+ let posts=[];try{posts=await getLatestPosts(40)}catch(e){toast('Could not load the live feed.','error');box.innerHTML=emptyState('wifi-off','Could not load the feed','Check your connection and try again.');window.lucide?.createIcons();return}
+ if(!posts.length){box.innerHTML=emptyState('pen-line','No posts yet','Be the first to share an update, question or idea with your campus.');window.lucide?.createIcons();return}
+ posts=rankPosts(posts,profile||{});box.innerHTML=posts.map(postTemplate).join('');window.lucide?.createIcons()}
 function composer(){showModal('Create a post','<form class="form" id="postForm"><div class="composer-row"><div class="avatar">'+initials(profile?.displayName)+'</div><textarea name="text" id="postText" required maxlength="2000" placeholder="Share an update, ask a question or start a discussion..."></textarea></div><label class="upload-box"><input id="postImage" type="file" accept="image/*" hidden><i data-lucide="image"></i><span>Add a photo</span></label><div id="uploadStatus" class="small muted"></div><div class="notice small">Keep posts useful and respectful. Report content that breaks the community rules.</div><div class="toolbar" style="justify-content:flex-end"><button class="btn primary" type="submit"><i data-lucide="send"></i>Publish post</button></div></form>',{wide:true});window.lucide?.createIcons();$('#postForm').addEventListener('submit',async e=>{e.preventDefault();const fd=new FormData(e.currentTarget),text=String(fd.get('text')||'').trim(),file=$('#postImage').files[0];if(!text)return;try{let imageURL='';if(file){imageURL=await uploadImage(file,`posts/${currentUser.uid}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`,pct=>$('#uploadStatus').textContent=`Uploading image… ${pct}%`)}if(!db){toast('Demo mode: connect Firebase to publish.','warning');return}await createPost({text,imageURL,authorId:currentUser.uid,authorName:profile.displayName,photoURL:profile.photoURL||'',branch:profile.branch||'',category:profile.branch||'community',originalityScore:.65});document.querySelector('.modal-backdrop')?.remove();toast('Post published');loadPosts()}catch(err){toast(err.message||'Could not publish post.','error')}})}
 async function comments(postId){let comments=[];if(db){try{comments=await getPostComments(postId)}catch(e){toast('Could not load comments.','error')}}showModal('Comments',`<div class="comment-list">${comments.length?comments.map(c=>`<div class="comment"><div class="avatar sm">${initials(c.authorName)}</div><div><strong>${escapeHtml(c.authorName)}</strong><div>${escapeHtml(c.text)}</div><span class="small muted">${timeAgo(c.createdAt)}</span></div></div>`).join(''):'<div class="empty"><i data-lucide="message-circle"></i><h3>No comments yet</h3><p>Start the conversation.</p></div>'}</div><form id="commentForm" class="form" style="margin-top:15px"><div class="field"><label for="commentText">Add a comment</label><textarea id="commentText" maxlength="800" required placeholder="Write something useful..."></textarea></div><div style="text-align:right"><button class="btn primary">Comment</button></div></form>`);window.lucide?.createIcons();$('#commentForm').addEventListener('submit',async e=>{e.preventDefault();if(!db){toast('Connect Firebase to comment.','warning');return}try{await addComment(postId,{authorId:currentUser.uid,authorName:profile.displayName,photoURL:profile.photoURL||'',text:$('#commentText').value.trim()});toast('Comment added');document.querySelector('.modal-backdrop')?.remove();await loadPosts()}catch(err){toast(err.message,'error')}})}
 async function moreMenu(post){const id=post.dataset.postId;if(id.startsWith('demo')){toast('Demo post cannot be modified.','warning');return}showModal('Post actions',`<div class="stack"><a class="btn" href="report.html?type=post&targetId=${encodeURIComponent(id)}"><i data-lucide="flag"></i>Report post</a>${post.querySelector('.post-meta strong')?.textContent?.startsWith(profile.displayName)?'<button class="btn danger" id="deletePost"><i data-lucide="trash-2"></i>Delete post</button>':''}</div>`);window.lucide?.createIcons();$('#deletePost')?.addEventListener('click',async()=>{try{await import('https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js').then(({deleteDoc,doc})=>deleteDoc(doc(db,'posts',id)));document.querySelector('.modal-backdrop')?.remove();toast('Post deleted');loadPosts()}catch(e){toast('Could not delete this post.','error')}})}
@@ -14,20 +19,27 @@ document.addEventListener('click',async e=>{if(e.target.closest('[data-create-po
 subscribeAuth((u,p)=>{if(!requireAuth())return;profile=p;loadPosts()});
 
 import {paginatePosts} from "./content-actions.js";
-let feedCursor=null, feedLoading=false;
+// This used to build its own crude markup (no like/comment/save buttons, wrong
+// container selector so it never actually appeared) instead of reusing postTemplate.
+// Fixed to append into the real feed container with the same card the initial
+// load uses, so Load More posts behave identically to the rest of the feed.
+let feedCursor=null, feedLoading=false, feedExhausted=false;
 export async function loadMoreFeed(){
- if(feedLoading)return;
+ if(feedLoading||feedExhausted||!db)return;
  feedLoading=true;
+ const btn=document.getElementById('loadMoreFeed');
+ if(btn){btn.disabled=true;btn.textContent='Loading…'}
  try{
   const page=await paginatePosts(20,feedCursor); feedCursor=page.lastDoc;
-  const host=document.querySelector("[data-feed-list],#feedList,.feed-list");
-  if(host){
-   for(const p of page.items){
-    const el=document.createElement("article");el.className="post-card";
-    el.dataset.postId=p.id;
-    el.innerHTML=`<div class="post-body"><strong>${String(p.authorName||"Campus Student").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}</strong><p>${String(p.text||"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}</p></div>`;
-    host.appendChild(el);
-   }
+  const host=document.querySelector('[data-feed]');
+  if(host&&page.items.length){
+   const frag=document.createElement('div');
+   frag.innerHTML=page.items.map(postTemplate).join('');
+   while(frag.firstChild)host.appendChild(frag.firstChild);
+   window.lucide?.createIcons();
   }
- }finally{feedLoading=false;}
+  if(!page.hasMore){feedExhausted=true;if(btn){btn.textContent='No more posts';btn.disabled=true}}
+  else if(btn){btn.disabled=false;btn.textContent='Load more'}
+ }catch(e){toast('Could not load more posts.','error');if(btn){btn.disabled=false;btn.textContent='Load more'}}
+ finally{feedLoading=false}
 }
