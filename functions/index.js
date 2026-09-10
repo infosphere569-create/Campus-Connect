@@ -82,7 +82,9 @@ exports.setUserRole=onCall(async(request)=>{
 exports.approveGroup=onCall(async(request)=>{
   const {uid:actor}=await requireStaff(request), d=request.data||{}, id=String(d.groupId||"");
   if(!id) throw new HttpsError("invalid-argument","Group id required.");
-  await db.collection("groups").doc(id).set({approvalStatus:"approved",moderatedBy:actor,moderatedAt:admin.firestore.FieldValue.serverTimestamp()},{merge:true});
+  // groups.js's public list and admin.js's own approve button both key off "status", not
+  // "approvalStatus" -- this used to write a field nothing ever read.
+  await db.collection("groups").doc(id).set({status:"approved",moderatedBy:actor,moderatedAt:admin.firestore.FieldValue.serverTimestamp()},{merge:true});
   await db.collection("auditLogs").add({action:"approve_group",targetId:id,actorUid:actor,createdAt:admin.firestore.FieldValue.serverTimestamp()});
   return {ok:true};
 });
@@ -102,37 +104,12 @@ exports.reviewGroupRequest=onCall(async(request)=>{
  if(decision==="approved"){ const member=db.collection("groupMembers").doc(`${r.groupId}_${r.uid}`); await member.set({groupId:r.groupId,uid:r.uid,role:"member",joinedAt:admin.firestore.FieldValue.serverTimestamp()},{merge:true}); await db.collection("notifications").add({uid:r.uid,type:"group",title:"Group request approved",body:"Your membership request was approved.",targetId:r.groupId,read:false,createdAt:admin.firestore.FieldValue.serverTimestamp()}); }
  return {ok:true,decision};
 });
-
-const groupAdminRole = async (uid, groupId) => {
-  const userSnap = await db.doc(`users/${uid}`).get();
-  const role = userSnap.exists ? userSnap.data().role : null;
-  if (role === "platformAdmin") return true;
-  const member = await db.doc(`groups/${groupId}/members/${uid}`).get();
-  return member.exists && ["owner","admin","moderator"].includes(member.data().role);
-};
-exports.approveGroupMember = onCall(async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated","Sign in required.");
-  const {groupId, uid} = request.data || {};
-  if (!groupId || !uid) throw new HttpsError("invalid-argument","groupId and uid are required.");
-  if (!(await groupAdminRole(request.auth.uid, groupId))) throw new HttpsError("permission-denied","Group admin access required.");
-  await db.doc(`groups/${groupId}/members/${uid}`).set({uid,role:"member",joinedAt:FieldValue.serverTimestamp()},{merge:true});
-  await db.doc(`groups/${groupId}/joinRequests/${uid}`).delete();
-  await db.collection("notifications").add({uid,type:"group_request_approved",groupId,createdAt:FieldValue.serverTimestamp(),read:false});
-  return {ok:true};
-});
-exports.rejectGroupMember = onCall(async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated","Sign in required.");
-  const {groupId, uid} = request.data || {};
-  if (!groupId || !uid) throw new HttpsError("invalid-argument","groupId and uid are required.");
-  if (!(await groupAdminRole(request.auth.uid, groupId))) throw new HttpsError("permission-denied","Group admin access required.");
-  await db.doc(`groups/${groupId}/joinRequests/${uid}`).delete();
-  return {ok:true};
-});
-exports.removeGroupMember = onCall(async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated","Sign in required.");
-  const {groupId, uid} = request.data || {};
-  if (!groupId || !uid) throw new HttpsError("invalid-argument","groupId and uid are required.");
-  if (!(await groupAdminRole(request.auth.uid, groupId))) throw new HttpsError("permission-denied","Group admin access required.");
-  await db.doc(`groups/${groupId}/members/${uid}`).delete();
-  return {ok:true};
-});
+// NOTE: this file used to also export approveGroupMember/rejectGroupMember/removeGroupMember,
+// a SECOND, entirely different group-membership system built on groups/{id}/members/{uid} and
+// groups/{id}/joinRequests/{uid} subcollections. It was never called from any page (group.html /
+// admin.html only ever use groupRequests + groupMembers, above), it also referenced an undefined
+// `FieldValue` (would have crashed at runtime instead of the imported `admin.firestore.FieldValue`),
+// and it disagreed with firestore.rules and every client query about where membership data lives.
+// Removed rather than fixed, per "do not maintain two competing systems": groupRequests +
+// groupMembers (flat top-level collections, reviewed via reviewGroupRequest above) is the one
+// architecture every page, the rules, and this file now agree on.
