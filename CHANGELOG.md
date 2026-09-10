@@ -1,3 +1,13 @@
+# v1.8.1-FIXED — Cloudflare routing & admin access patch
+
+- Removed the conflicting Cloudflare Pages `/route -> route.html` proxy rules that caused `ERR_TOO_MANY_REDIRECTS`.
+- Kept `_redirects` as comments only so it cannot recreate the rewrite loop.
+- Removed the duplicate admin dashboard bootstrap from `admin.html`.
+- Admin demo mode no longer redirects to `/home`; it now shows a clear Firebase/admin-role notice.
+- Real Firebase deployments remain role-gated for `platformAdmin` and `moderator`.
+- Re-checked all JavaScript with Node syntax validation: PASS.
+- Re-checked local HTML links: PASS.
+
 # Changelog
 ## v0.3.0
 - Centralized Firestore collection/status constants.
@@ -73,3 +83,8 @@
 - Fixed admin role operator precedence bug.
 - Added deployment and final QA checklists.
 - Preserved all previous v0.1 → v1.7 cumulative files and functionality.
+
+## v1.8.2 — Cloudinary image uploads
+- Replaced Firebase Storage uploads with Cloudinary unsigned browser uploads.
+- Post and profile image uploads now use Cloudinary cloud `bqwj7eos` and preset `campus_connect_unsigned`.
+- Firebase Storage is no longer required for image uploads.
