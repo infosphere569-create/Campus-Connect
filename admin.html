@@ -11,37 +11,37 @@
   <button class="tab" data-tab="audit">Audit Log</button>
 </div>
 
-<div data-admin-panel="overview" class="admin-panel">
+<div id="admin-overview" data-admin-panel="overview" class="admin-panel">
   <div class="admin-section"><div class="section-title"><div><div class="kicker">Trust &amp; safety</div><h2>Moderation queue</h2></div></div><div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Type</th><th>Reason</th><th>Status</th><th>Created</th><th></th></tr></thead><tbody data-report-rows><tr><td colspan="5" class="muted">Loading moderation queue…</td></tr></tbody></table></div></div></div>
 </div>
 
-<div data-admin-panel="users" class="admin-panel" hidden>
-  <div class="admin-section"><div class="section-title"><div><div class="kicker">Community</div><h2>Users</h2></div></div><div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Student</th><th>Academic</th><th>College</th><th>Role</th><th>Status</th><th>Joined</th><th></th></tr></thead><tbody data-user-rows><tr><td colspan="7" class="muted">Loading users…</td></tr></tbody></table></div></div></div>
+<div id="admin-users" data-admin-panel="users" class="admin-panel">
+  <div class="admin-section"><div class="section-title"><div><div class="kicker">Community</div><h2>Users</h2></div></div><div class="card"><div class="search-card" style="margin-bottom:12px"><i data-lucide="search"></i><input id="userSearch" placeholder="Search users by name or email..."></div><div class="table-wrap"><table class="table"><thead><tr><th>Student</th><th>Academic</th><th>College</th><th>Role</th><th>Status</th><th>Joined</th><th></th></tr></thead><tbody data-user-rows><tr><td colspan="7" class="muted">Loading users…</td></tr></tbody></table></div><button class="btn" id="loadMoreUsers" style="width:100%;margin-top:12px">Load more users</button></div></div>
 </div>
 
-<div data-admin-panel="posts" class="admin-panel" hidden>
+<div id="admin-posts" data-admin-panel="posts" class="admin-panel">
   <div class="admin-section"><div class="section-title"><div><div class="kicker">Content moderation</div><h2>Posts</h2></div></div><div class="card stack" data-admin-posts><div class="skeleton" style="height:100px"></div></div></div>
 </div>
 
-<div data-admin-panel="groups" class="admin-panel" hidden>
+<div id="admin-groups" data-admin-panel="groups" class="admin-panel">
   <div class="admin-section"><div class="section-title"><div><div class="kicker">Community governance</div><h2>Groups awaiting approval</h2></div></div><div class="card stack" data-pending-groups><div class="skeleton" style="height:100px"></div></div></div>
-  <div class="admin-section"><div class="section-title"><div><div class="kicker">Community governance</div><h2>All groups</h2></div></div><div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Name</th><th>Category</th><th>Members</th><th>Status</th><th>Created</th></tr></thead><tbody data-group-rows><tr><td colspan="5" class="muted">Loading groups…</td></tr></tbody></table></div></div></div>
+  <div class="admin-section"><div class="section-title"><div><div class="kicker">Community governance</div><h2>All groups</h2></div></div><div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Name</th><th>Category</th><th>Members</th><th>Status</th><th>Created</th><th></th></tr></thead><tbody data-group-rows><tr><td colspan="6" class="muted">Loading groups…</td></tr></tbody></table></div></div></div>
 </div>
 
-<div data-admin-panel="requests" class="admin-panel" hidden>
+<div id="admin-requests" data-admin-panel="requests" class="admin-panel">
   <div class="admin-section"><div class="section-title"><div><div class="kicker">Membership</div><h2>Pending group requests</h2></div></div><div class="card stack" data-group-requests><div class="skeleton" style="height:90px"></div></div></div>
 </div>
 
-<div data-admin-panel="issues" class="admin-panel" hidden>
+<div id="admin-issues" data-admin-panel="issues" class="admin-panel">
   <div class="admin-section"><div class="section-title"><div><div class="kicker">Campus support</div><h2>Recent issues</h2></div></div><div class="card stack" data-admin-issues><div class="skeleton" style="height:90px"></div></div></div>
 </div>
 
-<div data-admin-panel="events" class="admin-panel" hidden>
+<div id="admin-events" data-admin-panel="events" class="admin-panel">
   <div class="admin-section"><div class="section-title"><div><div class="kicker">Campus calendar</div><h2>Create an event</h2></div></div><div class="card"><form class="form" id="adminEventForm"><div class="grid grid-2"><div class="field"><label>Title</label><input name="title" required maxlength="140" placeholder="e.g. Campus Hacknight"></div><div class="field"><label>Organizer</label><input name="organizer" maxlength="100" placeholder="e.g. Coding Community"></div></div><div class="grid grid-2"><div class="field"><label>Date &amp; time</label><input name="date" type="datetime-local" required></div><div class="field"><label>Venue</label><input name="venue" maxlength="120" placeholder="e.g. Main Auditorium"></div></div><div class="field"><label>Description</label><textarea name="description" maxlength="1000" placeholder="What is this event about?"></textarea></div><div style="text-align:right"><button class="btn primary" type="submit"><i data-lucide="calendar-plus"></i>Create event</button></div></form></div></div>
   <div class="admin-section"><div class="section-title"><div><div class="kicker">Campus calendar</div><h2>Events</h2></div></div><div class="card stack" data-admin-events><div class="skeleton" style="height:90px"></div></div></div>
 </div>
 
-<div data-admin-panel="audit" class="admin-panel" hidden>
+<div id="admin-audit" data-admin-panel="audit" class="admin-panel">
   <div class="admin-section"><div class="section-title"><div><div class="kicker">Accountability</div><h2>Audit log</h2></div></div><div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Action</th><th>Admin</th><th>Target</th><th>When</th></tr></thead><tbody data-audit-rows><tr><td colspan="4" class="muted">Loading audit log…</td></tr></tbody></table></div></div></div>
 </div>
 
