@@ -26,13 +26,16 @@ export async function createPost(data){if(!db)throw new Error('Firebase is not c
   // Both fields are written with the same value so either rule version is satisfied.
   // Normalize both so a post always carries the field the rules check.
   const authorId=data.authorId||data.authorUid;
-  const ref=await addDoc(collection(db,'posts'),{...data,authorId,authorUid:authorId,likes:0,comments:0,shares:0,saves:0,reportCount:0,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});return ref.id}
+  const searchText=String(data.text||'').trim().toLowerCase();const ref=await addDoc(collection(db,'posts'),{...data,authorId,authorUid:authorId,searchText,likes:0,comments:0,shares:0,saves:0,reportCount:0,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});return ref.id}
 export async function togglePostLike(postId,userId){if(!db)throw new Error('Firebase is not configured.');const vote=doc(db,'postLikes',postId,'users',userId);const snap=await getDoc(vote);if(snap.exists()){await deleteDoc(vote);await updateDoc(doc(db,'posts',postId),{likes:increment(-1)});return false}await setDoc(vote,{uid:userId,postId,createdAt:serverTimestamp()});await updateDoc(doc(db,'posts',postId),{likes:increment(1)});return true}
-export async function getPostComments(postId,n=20){if(!db)return[];const snap=await getDocs(query(collection(db,'comments'),where('postId','==',postId),orderBy('createdAt','asc'),limit(n)));return snap.docs.map(d=>({id:d.id,...d.data()}))}
+// firestore.rules puts comments at posts/{postId}/comments/{commentId} -- a
+// SUBCOLLECTION, not a flat top-level "comments" collection. Reading/writing
+// the flat collection (the old code below) is denied outright by the rules'
+// default-deny catch-all, which is exactly why comments never loaded.
+export async function getPostComments(postId,n=20){if(!db)return[];const snap=await getDocs(query(collection(db,'posts',postId,'comments'),orderBy('createdAt','asc'),limit(n)));return snap.docs.map(d=>({id:d.id,...d.data()}))}
 export async function addComment(postId,data){if(!db)throw new Error('Firebase is not configured.');
-  // Same dual-field approach as createPost -- keeps both rule versions satisfied.
   const authorId=data.authorId||data.authorUid;
-  const id=await addDoc(collection(db,'comments'),{postId,...data,authorId,authorUid:authorId,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});await updateDoc(doc(db,'posts',postId),{comments:increment(1)});return id.id}
+  const id=await addDoc(collection(db,'posts',postId,'comments'),{...data,authorId,authorUid:authorId,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});await updateDoc(doc(db,'posts',postId),{comments:increment(1)});return id.id}
 export async function toggleSave(postId,userId){if(!db)throw new Error('Firebase is not configured.');const ref=doc(db,'savedPosts',userId,'items',postId);const snap=await getDoc(ref);if(snap.exists()){await deleteDoc(ref);return false}await setDoc(ref,{postId,createdAt:serverTimestamp()});await updateDoc(doc(db,'posts',postId),{saves:increment(1)});return true}
 export async function requestMembership(groupId,userId){if(!db)throw new Error('Firebase is not configured.');
   // firestore.rules requires field "uid" on groupRequests create (and the

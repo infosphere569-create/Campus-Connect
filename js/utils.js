@@ -1,6 +1,22 @@
 export const $=(s,r=document)=>r.querySelector(s);
 export const $$=(s,r=document)=>[...r.querySelectorAll(s)];
 export function escapeHtml(v=''){return String(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+// Turns plain URLs in user text into safe clickable links, and renders a
+// direct image URL (ending .jpg/.png/.gif/.webp etc) as an inline image
+// instead of just a link -- used anywhere user-typed text is shown (posts,
+// comments, event descriptions, issue descriptions).
+const URL_RE=/(https?:\/\/[^\s<>"']+)/gi;
+const IMAGE_EXT_RE=/\.(png|jpe?g|gif|webp|avif)(\?[^\s<>"']*)?$/i;
+export function linkifyHtml(text=''){
+ const escaped=escapeHtml(text);
+ return escaped.replace(URL_RE,(url)=>{
+  // escapeHtml already turned raw & into &amp; inside URLs picked up by the regex; fine for href use.
+  if(IMAGE_EXT_RE.test(url)){
+   return `<a href="${url}" target="_blank" rel="noopener noreferrer"><img src="${url}" alt="Shared image" style="max-width:100%;border-radius:12px;margin-top:6px;display:block"></a>`;
+  }
+  return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+ });
+}
 export function formatDate(value){const d=value?.toDate?value.toDate():new Date(value);return Number.isNaN(d.getTime())?'Just now':new Intl.DateTimeFormat(undefined,{month:'short',day:'numeric',year:'numeric'}).format(d)}
 export function formatDateTime(value){const d=value?.toDate?value.toDate():new Date(value);return Number.isNaN(d.getTime())?'Just now':new Intl.DateTimeFormat(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(d)}
 export function timeAgo(value){const d=value?.toDate?value.toDate():new Date(value);const s=Math.floor((Date.now()-d.getTime())/1000);if(!Number.isFinite(s)||s<0)return'Just now';if(s<60)return `${s}s`;if(s<3600)return `${Math.floor(s/60)}m`;if(s<86400)return `${Math.floor(s/3600)}h`;if(s<604800)return `${Math.floor(s/86400)}d`;return formatDate(d)}

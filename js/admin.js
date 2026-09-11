@@ -1,6 +1,6 @@
 import {setUserSuspension,setUserRole} from "./admin-control.js";
 import {listAuditLogs} from "./admin-data.js";
-import './theme.js';import {db} from './firebase.js';import {subscribeAuth,requireAuth,hasRole} from './auth.js';import {collection,getDocs,getCountFromServer,query,orderBy,limit,startAfter,where,updateDoc,doc,deleteDoc,addDoc,serverTimestamp} from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js';
+import './theme.js';import {db} from './firebase.js';import {subscribeAuth,requireAuth,hasRole} from './auth.js';import {collection,collectionGroup,getDocs,getCountFromServer,query,orderBy,limit,startAfter,where,updateDoc,doc,deleteDoc,addDoc,serverTimestamp} from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js';
 import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-functions.js';import { $, escapeHtml, formatDateTime, timeAgo, toast, showModal, initials } from './utils.js';
 let adminProfile;
 // Every loader below renders its own error text INSIDE its box (not just a toast)
@@ -15,7 +15,10 @@ async function loadStats(){
  const jobs=[
   ['users',count('users')],
   ['posts',count('posts')],
-  ['comments',count('comments')],
+  // comments now live under posts/{postId}/comments (a subcollection per the
+  // updated rules), so a total count needs a collectionGroup query, not a
+  // flat top-level collection() query.
+  ['comments',count('comments',collectionGroup(db,'comments'))],
   ['groups',count('groups')],
   ['groupRequests',count('groupRequests',query(collection(db,'groupRequests'),where('status','==','pending')))],
   ['issues',count('issues',query(collection(db,'issues'),where('status','in',['Open','Under Review','In Progress'])))],
@@ -83,10 +86,17 @@ async function loadPosts(){if(!db)return;const box=$('[data-admin-posts]');try{
  window.lucide?.createIcons();
 }catch(e){box.innerHTML=errorBox(e.message||'Could not load posts.')}}
 
-async function loadEvents(){if(!db)return;const box=$('[data-admin-events]');try{
+async function loadEvents(){if(!db)return;
+ const pendingBox=$('[data-pending-events]');
+ if(pendingBox){try{
+  const psnap=await getDocs(query(collection(db,'events'),where('status','==','pending'),orderBy('createdAt','desc'),limit(20)));
+  pendingBox.innerHTML=psnap.docs.length?psnap.docs.map(d=>{const ev=d.data();return `<div class="moderation-item"><div><strong>${escapeHtml(ev.title||'Untitled event')}</strong><div class="small muted">${escapeHtml(ev.organizer||'')} · ${formatDateTime(ev.date)} · ${escapeHtml(ev.venue||'')}</div></div><div class="toolbar"><button class="btn sm primary" data-approve-event="${d.id}">Approve</button><button class="btn sm danger" data-reject-event="${d.id}">Reject</button></div></div>`}).join(''):'<div class="empty"><i data-lucide="inbox"></i><h3>Nothing awaiting approval</h3></div>';
+  window.lucide?.createIcons();
+ }catch(e){pendingBox.innerHTML=errorBox(e.message||'Could not load pending events.')}}
+ const box=$('[data-admin-events]');try{
  const snap=await getDocs(query(collection(db,'events'),orderBy('date','asc'),limit(30)));
  const rows=snap.docs.map(d=>({id:d.id,...d.data()}));
- box.innerHTML=rows.length?rows.map(ev=>`<div class="moderation-item"><div><strong>${escapeHtml(ev.title||'Untitled event')}</strong><div class="small muted">${escapeHtml(ev.organizer||'')} · ${formatDateTime(ev.date)} · ${escapeHtml(ev.venue||'')}</div></div><div class="toolbar"><span class="badge">${Number(ev.interestedCount||0)} interested</span><button class="btn sm danger" data-remove-event="${ev.id}">Remove</button></div></div>`).join(''):'<div class="empty"><i data-lucide="calendar-days"></i><h3>No events yet</h3></div>';
+ box.innerHTML=rows.length?rows.map(ev=>`<div class="moderation-item"><div><strong>${escapeHtml(ev.title||'Untitled event')}</strong> <span class="badge ${ev.status==='approved'?'success':ev.status==='rejected'?'danger':'warning'}">${escapeHtml(ev.status||'pending')}</span><div class="small muted">${escapeHtml(ev.organizer||'')} · ${formatDateTime(ev.date)} · ${escapeHtml(ev.venue||'')}</div></div><div class="toolbar"><span class="badge">${Number(ev.interestedCount||0)} interested</span><button class="btn sm danger" data-remove-event="${ev.id}">Remove</button></div></div>`).join(''):'<div class="empty"><i data-lucide="calendar-days"></i><h3>No events yet</h3></div>';
  window.lucide?.createIcons();
 }catch(e){box.innerHTML=errorBox(e.message||'Could not load events.')}}
 
@@ -145,6 +155,20 @@ document.addEventListener('click',async e=>{
   return;
  }
 
+ const approveEvent=e.target.closest('[data-approve-event]');if(approveEvent){
+  approveEvent.disabled=true;
+  try{await updateDoc(doc(db,'events',approveEvent.dataset.approveEvent),{status:'approved',approvedBy:adminProfile.uid,approvedAt:serverTimestamp()});toast('Event approved');loadEvents();loadStats()}
+  catch(err){toast(err.message||'Could not approve event.','error');approveEvent.disabled=false}
+  return;
+ }
+
+ const rejectEvent=e.target.closest('[data-reject-event]');if(rejectEvent){
+  rejectEvent.disabled=true;
+  try{await updateDoc(doc(db,'events',rejectEvent.dataset.rejectEvent),{status:'rejected',reviewedBy:adminProfile.uid,reviewedAt:serverTimestamp()});toast('Event rejected');loadEvents()}
+  catch(err){toast(err.message||'Could not reject event.','error');rejectEvent.disabled=false}
+  return;
+ }
+
  if(e.target.id==='loadMoreUsers'){e.target.disabled=true;await loadUsers(false);e.target.disabled=false;return}
 });
 document.addEventListener('input',e=>{if(e.target.id==='userSearch')renderUsers()});
@@ -173,8 +197,11 @@ document.addEventListener('submit',async e=>{
  if(!dateVal)return toast('Pick a date and time.','error');
  submitBtn.disabled=true;
  try{
+  const titleVal=String(fd.get('title')||'').trim();
   await addDoc(collection(db,'events'),{
-   title:String(fd.get('title')||'').trim(),
+   title:titleVal,
+   searchName:titleVal.toLowerCase(),
+   status:'approved',
    organizer:String(fd.get('organizer')||'').trim(),
    venue:String(fd.get('venue')||'').trim(),
    description:String(fd.get('description')||'').trim(),

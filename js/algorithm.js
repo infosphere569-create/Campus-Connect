@@ -6,5 +6,15 @@ export function relevanceScore(p,user={}){const hay=`${p.text||''} ${p.category|
 export function trendScore(p){return clamp(Number(p.trendVelocity||0)/100)}
 export function qualityScore(p){const text=String(p.text||'').trim();const originality=Number(p.originalityScore ?? .5);const lengthQuality=text.length>=40?1:clamp(text.length/40);return clamp(originality*.6+lengthQuality*.4)}
 export function negativeFeedbackScore(p){return clamp((Number(p.reportCount||0)*2+Number(p.hideCount||0))*0.03)}
-export function calculateFinalFeedScore(p,user={}){return recencyScore(p.createdAt)*.30+engagementScore(p)*.23+relevanceScore(p,user)*.20+trendScore(p)*.10+qualityScore(p)*.17-negativeFeedbackScore(p)*.65}
+// Boosts posts from the viewer's own college so the feed feels like your campus,
+// not one mixed pool of every college on the platform. Neutral (no boost, no
+// penalty) when either side hasn't set a college yet, so this never blanks out
+// the whole feed for someone who skipped that onboarding field.
+export function collegeMatchScore(p,user={}){
+ const postCollege=String(p.college||'').trim().toLowerCase();
+ const userCollege=String(user.college||'').trim().toLowerCase();
+ if(!postCollege||!userCollege)return .5;
+ return postCollege===userCollege?1:.12;
+}
+export function calculateFinalFeedScore(p,user={}){return recencyScore(p.createdAt)*.27+engagementScore(p)*.20+relevanceScore(p,user)*.15+trendScore(p)*.08+qualityScore(p)*.15+collegeMatchScore(p,user)*.25-negativeFeedbackScore(p)*.65}
 export function rankPosts(posts,user={}){const ranked=posts.map(p=>({...p,_score:calculateFinalFeedScore(p,user)})).sort((a,b)=>b._score-a._score);const authorUse=new Map();const topicUse=new Map();const result=[];for(const p of ranked){const author=p.authorId||p.authorName||'unknown';const topic=String(p.category||'general').toLowerCase();if((authorUse.get(author)||0)>=2)continue;if((topicUse.get(topic)||0)>=3)continue;result.push(p);authorUse.set(author,(authorUse.get(author)||0)+1);topicUse.set(topic,(topicUse.get(topic)||0)+1);if(result.length>=30)break}return result}

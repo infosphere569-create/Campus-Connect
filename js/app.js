@@ -10,7 +10,42 @@ export function renderShell(profile){const page=document.body.dataset.page;const
  // more than once) never destroys it and never leaves a stray duplicate.
  const mainContent=document.querySelector('[data-app-main]');
  if(mainContent&&mainContent.parentNode)mainContent.parentNode.removeChild(mainContent);
- const shell=`<div class="app-shell"><aside class="sidebar"><div class="side-nav">${desktop}${admin}</div><div class="sidebar-footer"><button class="nav-item" style="width:100%" data-logout><i data-lucide="log-out"></i><span>Logout</span></button></div></aside><main class="main" data-shell-slot></main></div><nav class="bottom-nav">${mobile}</nav>`;const root=$('[data-app-root]');if(root){root.innerHTML=top+shell;const slot=root.querySelector('[data-shell-slot]');if(mainContent&&slot)slot.appendChild(mainContent);}window.lucide?.createIcons();import('./services.js').then(({getNotifications})=>getNotifications(8).then(ns=>{const dot=document.querySelector('[data-unread-dot]');if(dot)dot.hidden=!ns.some(n=>!n.read)}).catch(()=>{}));document.querySelector('[data-open-search]')?.addEventListener('click',()=>{const panel=document.createElement('div');panel.className='search-overlay';panel.innerHTML='<div class="search-dialog"><div class="split"><h2>Search Campus Connect</h2><button class="btn icon ghost" data-close><i data-lucide="x"></i></button></div><input id="mobileSearch" placeholder="Search people, groups, posts, events or issues..."><div class="small muted">Search across your campus community.</div></div>';document.body.appendChild(panel);window.lucide?.createIcons();panel.addEventListener('click',e=>{if(e.target===panel||e.target.closest('[data-close]'))panel.remove()});panel.querySelector('input').focus()})}
+ const shell=`<div class="app-shell"><aside class="sidebar"><div class="side-nav">${desktop}${admin}</div><div class="sidebar-footer"><button class="nav-item" style="width:100%" data-logout><i data-lucide="log-out"></i><span>Logout</span></button></div></aside><main class="main" data-shell-slot></main></div><nav class="bottom-nav">${mobile}</nav>`;const root=$('[data-app-root]');if(root){root.innerHTML=top+shell;const slot=root.querySelector('[data-shell-slot]');if(mainContent&&slot)slot.appendChild(mainContent);}window.lucide?.createIcons();import('./services.js').then(({getNotifications})=>getNotifications(8).then(ns=>{const dot=document.querySelector('[data-unread-dot]');if(dot)dot.hidden=!ns.some(n=>!n.read)}).catch(()=>{}));document.querySelector('[data-open-search]')?.addEventListener('click',()=>{const panel=document.createElement('div');panel.className='search-overlay';panel.innerHTML='<div class="search-dialog"><div class="split"><h2>Search Campus Connect</h2><button class="btn icon ghost" data-close><i data-lucide="x"></i></button></div><input id="mobileSearch" placeholder="Search people, groups, posts or events..."><div id="mobileSearchResults" class="search-results"></div></div>';document.body.appendChild(panel);window.lucide?.createIcons();panel.addEventListener('click',e=>{if(e.target===panel||e.target.closest('[data-close]'))panel.remove()});panel.querySelector('input').focus();wireSearch('mobileSearch','mobileSearchResults')});
+// Both search boxes existed in the markup with zero listeners attached -- typing
+// into either one did nothing. Wired here, plus a dropdown result panel is
+// inserted next to the desktop search box since it never had one.
+const topSearchLabel=document.querySelector('.top-search');
+if(topSearchLabel&&!document.getElementById('globalSearchResults')){
+ const box=document.createElement('div');box.id='globalSearchResults';box.className='search-results search-results-floating';
+ topSearchLabel.parentElement?.style && (topSearchLabel.style.position='relative');
+ topSearchLabel.appendChild(box);
+}
+wireSearch('globalSearch','globalSearchResults');
+function wireSearch(inputId,resultsId){
+ const input=document.getElementById(inputId), box=document.getElementById(resultsId);
+ if(!input||!box||input.dataset.wired)return; input.dataset.wired='1';
+ let timer=null;
+ const iconFor=t=>({users:'user-round',groups:'users-round',events:'calendar-days',posts:'file-text'}[t]||'search');
+ const hrefFor=r=>({users:`profile.html`,groups:`group.html?id=${encodeURIComponent(r.id)}`,events:`events.html`,posts:`feed.html?post=${encodeURIComponent(r.id)}`}[r.type]||'#');
+ const labelFor=r=>r.type==='posts'?(r.text||'').slice(0,60):(r.displayName||r.name||r.title||'Untitled');
+ input.addEventListener('input',()=>{
+  const term=input.value.trim();
+  clearTimeout(timer);
+  if(term.length<2){box.innerHTML='';box.hidden=true;return}
+  box.hidden=false;box.innerHTML='<div class="small muted" style="padding:10px">Searching…</div>';
+  timer=setTimeout(async()=>{
+   try{
+    const {globalSearch}=await import('./search.js');
+    const results=await globalSearch(term);
+    box.innerHTML=results.length?results.map(r=>`<a class="search-result-row" href="${hrefFor(r)}"><i data-lucide="${iconFor(r.type)}"></i><span>${(labelFor(r)||'').toString().replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</span><span class="small muted" style="margin-left:auto;text-transform:capitalize">${r.type}</span></a>`).join(''):'<div class="small muted" style="padding:10px">No results found.</div>';
+    window.lucide?.createIcons();
+   }catch(e){box.innerHTML='<div class="small muted" style="padding:10px">Search is unavailable right now.</div>'}
+  },300);
+ });
+ input.addEventListener('blur',()=>setTimeout(()=>{box.hidden=true},200));
+ input.addEventListener('focus',()=>{if(input.value.trim().length>=2)box.hidden=false});
+}
+}
 subscribeAuth((u,p)=>{if($('[data-app-root]'))renderShell(p)});
 
 function mountNotificationBadge(){
