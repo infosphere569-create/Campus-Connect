@@ -3,15 +3,66 @@
 <meta charset="utf-8"><script>(function(){try{var v=localStorage.getItem("cc-theme")||"system";var r=v==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):v;document.documentElement.dataset.theme=r;document.documentElement.dataset.themePreference=v;}catch(e){}})();</script><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>Complete profile · Campus Connect</title>
 <link rel="stylesheet" href="css/global.css"><link rel="stylesheet" href="css/components.css">
-<link rel="icon" type="image/png" href="icon.png"><link rel="apple-touch-icon" href="icon.png"><meta property="og:type" content="website"><meta property="og:site_name" content="Campus Connect"><meta property="og:title" content="Complete profile · Campus Connect"><meta property="og:description" content="Set up your Campus Connect profile to get started."><meta property="og:image" content="icon.png"><meta name="twitter:card" content="summary"><meta name="twitter:title" content="Complete profile · Campus Connect"><meta name="twitter:description" content="Set up your Campus Connect profile to get started."><meta name="twitter:image" content="icon.png"><link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icons/icon-180.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Campus Connect"></head><body data-page="onboarding"><main class="page-shell"><section class="auth-card">
-<div class="eyebrow">Campus Connect</div><h1>Complete your profile</h1><p class="muted">A few details help personalize your campus community.</p>
-<form id="onboardingForm" class="stack">
-<label>Full name<input id="fullName" required maxlength="80"></label>
-<label>Course<input id="course" maxlength="80" placeholder="B.Tech"></label>
-<label>Branch<input id="branch" maxlength="80" placeholder="CSE"></label>
-<label>Year<select id="year"><option value="">Select year</option><option>1st Year</option><option>2nd Year</option><option>3rd Year</option><option>4th Year</option></select></label>
-<label>Section<input id="section" maxlength="20"></label>
-<label>College<input id="college" maxlength="120"></label>
-<label>Bio<textarea id="bio" maxlength="240" rows="3"></textarea></label>
-<button class="btn btn-primary" type="submit">Save profile</button><p id="status" class="muted"></p>
-</form></section></main><script type="module" src="js/onboarding.js"></script><script type="module" src="js/performance.js"></script><script src="js/pwa-install.js"></script></body></html>
+<link rel="icon" type="image/png" href="icon.png"><link rel="apple-touch-icon" href="icon.png"><meta property="og:type" content="website"><meta property="og:site_name" content="Campus Connect"><meta property="og:title" content="Complete profile · Campus Connect"><meta property="og:description" content="Set up your Campus Connect profile to get started."><meta property="og:image" content="icon.png"><meta name="twitter:card" content="summary"><meta name="twitter:title" content="Complete profile · Campus Connect"><meta name="twitter:description" content="Set up your Campus Connect profile to get started."><meta name="twitter:image" content="icon.png"><link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icons/icon-180.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Campus Connect">
+<style>
+.onb-wrap{max-width:520px;margin:0 auto;padding:32px 18px 60px}
+.onb-head{text-align:center;margin-bottom:22px}
+.onb-head .brand-mark{width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,var(--primary),#8b7bff);display:grid;place-items:center;margin:0 auto 14px;box-shadow:0 12px 30px color-mix(in srgb,var(--primary) 35%,transparent)}
+.onb-head .brand-mark i{width:26px;height:26px;color:#fff}
+.onb-head h1{margin:0 0 6px;font-size:1.5rem}
+.onb-avatar-picker{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:24px}
+.onb-avatar-picker .avatar-xl{width:88px;height:88px;border-radius:50%;overflow:hidden;background:var(--surface-2);display:grid;place-items:center;font-size:1.6rem;font-weight:800;color:var(--muted);border:2px dashed var(--border);position:relative;cursor:pointer}
+.onb-avatar-picker .avatar-xl img{width:100%;height:100%;object-fit:cover}
+.onb-avatar-picker .avatar-xl .cam-badge{position:absolute;bottom:-2px;right:-2px;width:28px;height:28px;border-radius:50%;background:var(--primary);display:grid;place-items:center;border:3px solid var(--bg)}
+.onb-avatar-picker .avatar-xl .cam-badge i{width:14px;height:14px;color:#fff}
+.onb-section{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;margin-bottom:14px}
+.onb-section .onb-section-title{font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:12px}
+.onb-section .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.onb-progress{height:4px;border-radius:99px;background:var(--surface-2);overflow:hidden;margin-bottom:26px}
+.onb-progress span{display:block;height:100%;width:35%;background:linear-gradient(90deg,var(--primary),#8b7bff);border-radius:99px;transition:width .3s ease}
+</style>
+</head><body data-page="onboarding"><main class="onb-wrap">
+
+<div class="onb-progress"><span id="onbProgress"></span></div>
+<div class="onb-head">
+  <div class="brand-mark"><i data-lucide="sparkles"></i></div>
+  <h1>Set up your profile</h1>
+  <p class="muted">A few details help us personalize your campus feed and connect you with the right people.</p>
+</div>
+
+<form id="onboardingForm">
+  <div class="onb-avatar-picker">
+    <label class="avatar-xl" id="avatarPreviewWrap">
+      <span id="avatarInitials">+</span>
+      <span class="cam-badge"><i data-lucide="camera"></i></span>
+      <input id="avatarInput" type="file" accept="image/*" hidden>
+    </label>
+    <span class="small muted">Add a profile photo (optional)</span>
+  </div>
+
+  <div class="onb-section">
+    <div class="onb-section-title">About you</div>
+    <label>Full name<input id="fullName" required maxlength="80" placeholder="Your name"></label>
+    <label>Bio<textarea id="bio" maxlength="240" rows="2" placeholder="A short line about yourself"></textarea></label>
+  </div>
+
+  <div class="onb-section">
+    <div class="onb-section-title">Academic details</div>
+    <div class="grid-2">
+      <label>Course<input id="course" maxlength="80" placeholder="B.Tech"></label>
+      <label>Branch<input id="branch" maxlength="80" placeholder="CSE"></label>
+      <label>Year<select id="year"><option value="">Select year</option><option>1st Year</option><option>2nd Year</option><option>3rd Year</option><option>4th Year</option></select></label>
+      <label>Section<input id="section" maxlength="20" placeholder="A"></label>
+    </div>
+  </div>
+
+  <div class="onb-section">
+    <div class="onb-section-title">Your campus</div>
+    <label>College<input id="college" required maxlength="120" placeholder="Type your college's full name"></label>
+    <p class="small muted" style="margin:8px 0 0">This matters — your feed and recommended groups are built around students from your own college first.</p>
+  </div>
+
+  <button class="btn btn-primary" style="width:100%" type="submit">Finish setup</button>
+  <p id="status" class="muted small" style="text-align:center;margin-top:12px"></p>
+</form>
+</main><script type="module" src="js/onboarding.js"></script><script type="module" src="js/performance.js"></script><script src="js/pwa-install.js"></script></body></html>
