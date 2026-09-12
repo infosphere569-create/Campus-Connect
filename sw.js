@@ -1,6 +1,6 @@
 // Campus Connect service worker.
 // Bump this on every deploy so old clients pick up new files instead of stale cache.
-const CACHE_VERSION = 'cc-v1';
+const CACHE_VERSION = 'cc-v2';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
