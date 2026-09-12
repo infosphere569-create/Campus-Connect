@@ -3,7 +3,7 @@ import {db} from './firebase.js';
 import {subscribeAuth,requireAuth,currentProfile,currentUser} from './auth.js';
 import {getLatestPosts,createPost,togglePostLike,getPostComments,addComment,toggleSave,uploadImage} from './services.js';
 import {paginatePosts} from './content-actions.js';
-import { $, $$, escapeHtml, initials, timeAgo, toast, showModal, isDemo } from './utils.js';
+import { $, $$, escapeHtml, linkifyHtml, initials, timeAgo, toast, showModal, isDemo } from './utils.js';
 import {rankPosts} from './algorithm.js';
 let profile;
 let feedCursor=null, feedLoading=false, feedExhausted=false;

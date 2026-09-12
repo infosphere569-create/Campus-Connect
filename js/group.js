@@ -1,5 +1,5 @@
 import {isGroupMember,hasGroupRequest} from "./data-layer.js";
-import './theme.js';import {db} from './firebase.js';import {subscribeAuth,requireAuth,currentProfile,currentUser} from './auth.js';import {doc,getDoc,setDoc,updateDoc,collection,getDocs,query,where,limit,addDoc,serverTimestamp,increment} from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js';import { $, getQuery, escapeHtml, initials, toast } from './utils.js';import {uploadImage} from './services.js';
+import './theme.js';import {db} from './firebase.js';import {subscribeAuth,requireAuth,currentProfile,currentUser} from './auth.js';import {doc,getDoc,setDoc,updateDoc,collection,getDocs,query,where,limit,addDoc,serverTimestamp,increment} from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js';import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-functions.js';import { $, getQuery, escapeHtml, initials, toast } from './utils.js';import {uploadImage} from './services.js';
 let group=null;
 
 async function load(){
@@ -59,7 +59,17 @@ function renderGroup(){
  const isLeader=db&&group.id!=='demo'&&group.createdBy===currentUser?.uid;
  const coverLabel=document.getElementById('coverUploadLabel');if(coverLabel)coverLabel.hidden=!isLeader;
  const inviteBtn=document.querySelector('[data-group-invite]');if(inviteBtn)inviteBtn.hidden=!isLeader;
+ const requestsBox=document.getElementById('leaderRequestsBox');if(requestsBox){requestsBox.hidden=!isLeader;if(isLeader)loadLeaderRequests()}
  loadGroupPosts();loadMembers();refreshJoinButton();
+}
+
+async function loadLeaderRequests(){
+ const box=document.querySelector('[data-group-pending-requests]');if(!box)return;
+ try{
+  const snap=await getDocs(query(collection(db,'groupRequests'),where('groupId','==',group.id),where('status','==','pending'),limit(20)));
+  box.innerHTML=snap.docs.length?snap.docs.map(d=>{const r=d.data();return `<div class="moderation-item"><div><strong>${escapeHtml(r.displayName||'A student')}</strong><div class="small muted">Requested to join</div></div><div class="toolbar"><button class="btn sm primary" data-approve-req="${d.id}">Approve</button><button class="btn sm" data-reject-req="${d.id}">Reject</button></div></div>`}).join(''):'<div class="empty"><h3>No pending requests</h3></div>';
+  window.lucide?.createIcons();
+ }catch(e){box.innerHTML=`<div class="empty"><i data-lucide="alert-triangle"></i><h3>Could not load requests</h3><p class="muted">${escapeHtml(e.message||'')}</p></div>`;window.lucide?.createIcons()}
 }
 
 async function loadGroupPosts(){const box=document.querySelector('[data-group-posts]');
@@ -91,7 +101,24 @@ document.addEventListener('click',async e=>{
  if(e.target.closest('[data-group-join]')){
   if(!db||group.id==='demo')return toast('Connect Firebase to persist membership.','warning');
   const btn=e.target.closest('[data-group-join]');btn.disabled=true;
-  try{await addDoc(collection(db,'groupRequests'),{groupId:group.id,groupName:group.name,uid:currentUser.uid,status:'pending',createdAt:serverTimestamp()});toast('Membership request sent');refreshJoinButton()}
+  try{
+   // Public groups (the default) auto-join immediately -- only groups explicitly
+   // created with "Request to join" privacy go through the request/approval flow.
+   // This used to always create a pending request regardless of the group's
+   // own privacy setting, so joining a public group still needed manual approval.
+   if(group.privacy==='approval'){
+    await addDoc(collection(db,'groupRequests'),{groupId:group.id,groupName:group.name,uid:currentUser.uid,displayName:currentProfile?.displayName||'',status:'pending',createdAt:serverTimestamp()});
+    toast('Membership request sent');
+   }else{
+    await setDoc(doc(db,'groupMembers',`${group.id}_${currentUser.uid}`),{groupId:group.id,uid:currentUser.uid,displayName:currentProfile?.displayName||'',role:'member',joinedAt:serverTimestamp()});
+    await updateDoc(doc(db,'groups',group.id),{memberCount:increment(1)});
+    group.memberCount=(group.memberCount||0)+1;
+    document.querySelector('[data-member-count]').textContent=`${group.memberCount} members`;
+    toast('Joined the group');
+    loadMembers();
+   }
+   refreshJoinButton();
+  }
   catch(err){toast(err.message,'error');btn.disabled=false}
   return;
  }
@@ -109,6 +136,19 @@ document.addEventListener('click',async e=>{
  }
 
  if(e.target.closest('[data-group-post]')){if(!db||group.id==='demo')return toast('Connect Firebase to post in this demo group.','warning');}
+
+ const approveReq=e.target.closest('[data-approve-req]');if(approveReq){
+  approveReq.disabled=true;
+  try{await httpsCallable(getFunctions(),'reviewGroupRequest')({requestId:approveReq.dataset.approveReq,decision:'approved'});toast('Request approved');loadLeaderRequests();loadMembers();const s=await getDoc(doc(db,'groups',group.id));if(s.exists()){group=({id:s.id,...s.data()});document.querySelector('[data-member-count]').textContent=`${group.memberCount||0} members`}}
+  catch(err){toast(err.message||'Could not approve. Is reviewGroupRequest deployed?','error');approveReq.disabled=false}
+  return;
+ }
+ const rejectReq=e.target.closest('[data-reject-req]');if(rejectReq){
+  rejectReq.disabled=true;
+  try{await httpsCallable(getFunctions(),'reviewGroupRequest')({requestId:rejectReq.dataset.rejectReq,decision:'rejected'});toast('Request rejected');loadLeaderRequests()}
+  catch(err){toast(err.message||'Could not reject. Is reviewGroupRequest deployed?','error');rejectReq.disabled=false}
+  return;
+ }
 });
 
 document.getElementById('coverInput')?.addEventListener('change',async e=>{
