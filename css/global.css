@@ -58,3 +58,8 @@ h1,h2,h3{font-weight:800;letter-spacing:-.02em}
 .search-result-row i{width:16px;height:16px;color:var(--muted);flex:0 0 auto}
 #mobileSearchResults{margin-top:10px;max-height:50vh;overflow:auto;border-radius:12px}
 #mobileSearchResults .search-result-row{border-radius:10px;border-bottom:0;margin-bottom:4px;background:var(--surface-2)}
+/* v2.5 home composer prompt -- Facebook/LinkedIn-style "what's on your mind" entry point */
+.composer-prompt{display:flex;align-items:center;gap:12px;padding:14px 16px;margin:14px 0;text-decoration:none;color:var(--text)}
+.composer-prompt-text{flex:1;color:var(--muted);font-size:.94rem}
+.composer-prompt-icon{width:20px;height:20px;color:var(--primary);flex:0 0 auto}
+.composer-prompt:hover{border-color:var(--primary)}
