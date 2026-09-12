@@ -121,6 +121,31 @@ exports.reviewGroupRequest=onCall({cors:true,invoker:"public"},safe(async(reques
  if(decision==="approved"){ const member=db.collection("groupMembers").doc(`${r.groupId}_${r.uid}`); await member.set({groupId:r.groupId,uid:r.uid,role:"member",joinedAt:admin.firestore.FieldValue.serverTimestamp()},{merge:true}); await db.collection("groups").doc(r.groupId).update({memberCount:admin.firestore.FieldValue.increment(1)}).catch(()=>{}); await db.collection("notifications").add({uid:r.uid,type:"group",title:"Group request approved",body:"Your membership request was approved.",targetId:r.groupId,read:false,createdAt:admin.firestore.FieldValue.serverTimestamp()}); }
  return {ok:true,decision};
 }));
+exports.broadcastGroupMessage=onCall({cors:true,invoker:"public"},safe(async(request)=>{
+ if(!request.auth) throw new HttpsError("unauthenticated","Sign in required.");
+ const d=request.data||{}, groupId=String(d.groupId||""), text=String(d.text||"").trim().slice(0,2000);
+ if(!groupId||!text) throw new HttpsError("invalid-argument","Group id and message are required.");
+ const groupSnap=await db.collection("groups").doc(groupId).get();
+ if(!groupSnap.exists) throw new HttpsError("not-found","Group not found.");
+ const role=await actorRole(request.auth.uid);
+ const isLeader=groupSnap.data().createdBy===request.auth.uid;
+ if(!isLeader && !["moderator","platformAdmin"].includes(role)) throw new HttpsError("permission-denied","Only the group leader or staff can broadcast to all members.");
+ const userSnap=await db.collection("users").doc(request.auth.uid).get();
+ const authorName=userSnap.exists ? (userSnap.data().displayName||"Group leader") : "Group leader";
+ const now=admin.firestore.FieldValue.serverTimestamp();
+ const msgRef=db.collection("groups").doc(groupId).collection("messages").doc();
+ await msgRef.set({text,authorId:request.auth.uid,authorName,broadcast:true,pinned:false,createdAt:now});
+ const members=await db.collection("groupMembers").where("groupId","==",groupId).get();
+ const batch=db.batch();
+ members.forEach(m=>{
+  const uid=m.data().uid; if(!uid||uid===request.auth.uid) return;
+  const ref=db.collection("notifications").doc();
+  batch.set(ref,{uid,type:"group_broadcast",title:`Announcement in ${groupSnap.data().name||"your group"}`,body:text.slice(0,140),targetId:groupId,read:false,createdAt:now});
+ });
+ if(!members.empty) await batch.commit();
+ return {ok:true,id:msgRef.id};
+}));
+
 // NOTE: this file used to also export approveGroupMember/rejectGroupMember/removeGroupMember,
 // a SECOND, entirely different group-membership system built on groups/{id}/members/{uid} and
 // groups/{id}/joinRequests/{uid} subcollections. It was never called from any page (group.html /
