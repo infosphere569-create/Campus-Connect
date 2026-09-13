@@ -3,7 +3,7 @@
   "name": "Campus Connect",
   "short_name": "Campus Connect",
   "description": "Your Campus. Your Community.",
-  "start_url": "home.html",
+  "start_url": "index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
