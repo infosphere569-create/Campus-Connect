@@ -1,4 +1,5 @@
 import {getSavedPosts,getMyGroups,getMyEventInterest} from "./data-layer.js";
+import {getMyReposts} from "./services.js";
 import './theme.js';import {db,storage} from './firebase.js';import {subscribeAuth,requireAuth,currentProfile,currentUser} from './auth.js';import {doc,updateDoc,serverTimestamp,collection,getDocs,query,where,orderBy,limit} from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js';import { $, escapeHtml, linkifyHtml, initials, timeAgo, toast, showModal } from './utils.js';import {uploadImage} from './services.js';
 let profile;
 
@@ -13,10 +14,14 @@ async function loadPosts(){
  const box=$('[data-ptab-panel="posts"]');
  if(!db){box.innerHTML=empty('wifi-off','Not connected','Connect Firebase to see your posts.');window.lucide?.createIcons();return}
  try{
-  const snap=await getDocs(query(collection(db,'posts'),where('authorId','==',currentUser.uid),orderBy('createdAt','desc'),limit(30)));
+  const [snap,reposts]=await Promise.all([
+   getDocs(query(collection(db,'posts'),where('authorId','==',currentUser.uid),orderBy('createdAt','desc'),limit(30))),
+   getMyReposts(currentUser.uid).catch(()=>[])
+  ]);
   const posts=snap.docs.map(d=>({id:d.id,...d.data()}));
   $('[data-stat-posts]').textContent=posts.length;
-  box.innerHTML=posts.length?posts.map(p=>`<article class="card post-card"><div class="post-text">${linkifyHtml(p.text||'')}</div>${p.imageURL?`<img class="post-media" src="${escapeHtml(p.imageURL)}" alt="Post image">`:''}<div class="small muted" style="margin-top:8px">${timeAgo(p.createdAt)} · ${p.likes||0} likes · ${p.comments||0} comments</div></article>`).join(''):empty('pen-line','No posts yet','Share your first update with your campus.');
+  const combined=[...posts,...reposts].sort((a,b)=>(b.createdAt?.toMillis?.()||0)-(a.createdAt?.toMillis?.()||0));
+  box.innerHTML=combined.length?combined.map(p=>`<article class="card post-card">${p._reposted?`<div class="small muted row" style="gap:4px;margin-bottom:6px"><i data-lucide="repeat-2"></i>You reposted</div>`:''}<div class="post-text">${linkifyHtml(p.text||'')}</div>${p.imageURL?`<img class="post-media" src="${escapeHtml(p.imageURL)}" alt="Post image">`:''}<div class="small muted" style="margin-top:8px">${timeAgo(p.createdAt)} · ${p.likes||0} likes · ${p.comments||0} comments</div></article>`).join(''):empty('pen-line','No posts yet','Share your first update with your campus.');
   window.lucide?.createIcons();
  }catch(e){box.innerHTML=errorState(e.message);$('[data-stat-posts]').textContent='—';window.lucide?.createIcons()}
 }

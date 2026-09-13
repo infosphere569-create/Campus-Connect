@@ -26,7 +26,7 @@ export async function createPost(data){if(!db)throw new Error('Firebase is not c
   // Both fields are written with the same value so either rule version is satisfied.
   // Normalize both so a post always carries the field the rules check.
   const authorId=data.authorId||data.authorUid;
-  const searchText=String(data.text||'').trim().toLowerCase();const ref=await addDoc(collection(db,'posts'),{...data,authorId,authorUid:authorId,searchText,likes:0,comments:0,shares:0,saves:0,reportCount:0,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});return ref.id}
+  const searchText=String(data.text||'').trim().toLowerCase();const ref=await addDoc(collection(db,'posts'),{...data,authorId,authorUid:authorId,searchText,likes:0,comments:0,shares:0,saves:0,reposts:0,reportCount:0,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});return ref.id}
 export async function togglePostLike(postId,userId){if(!db)throw new Error('Firebase is not configured.');const vote=doc(db,'postLikes',postId,'users',userId);const snap=await getDoc(vote);if(snap.exists()){await deleteDoc(vote);await updateDoc(doc(db,'posts',postId),{likes:increment(-1)});return false}await setDoc(vote,{uid:userId,postId,createdAt:serverTimestamp()});await updateDoc(doc(db,'posts',postId),{likes:increment(1)});return true}
 // firestore.rules puts comments at posts/{postId}/comments/{commentId} -- a
 // SUBCOLLECTION, not a flat top-level "comments" collection. Reading/writing
@@ -37,6 +37,12 @@ export async function addComment(postId,data){if(!db)throw new Error('Firebase i
   const authorId=data.authorId||data.authorUid;
   const id=await addDoc(collection(db,'posts',postId,'comments'),{...data,authorId,authorUid:authorId,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});await updateDoc(doc(db,'posts',postId),{comments:increment(1)});return id.id}
 export async function toggleSave(postId,userId){if(!db)throw new Error('Firebase is not configured.');const ref=doc(db,'savedPosts',userId,'items',postId);const snap=await getDoc(ref);if(snap.exists()){await deleteDoc(ref);return false}await setDoc(ref,{postId,createdAt:serverTimestamp()});await updateDoc(doc(db,'posts',postId),{saves:increment(1)});return true}
+// Twitter/Instagram-style repost: creates a lightweight pointer doc back to
+// the original post (not a copy) so it can show up on the reposter's own
+// profile, and keeps a count on the original. Toggling again removes it.
+export async function toggleRepost(postId,userId,authorName){if(!db)throw new Error('Firebase is not configured.');const ref=doc(db,'reposts',`${postId}_${userId}`);const snap=await getDoc(ref);if(snap.exists()){await deleteDoc(ref);await updateDoc(doc(db,'posts',postId),{reposts:increment(-1)});return false}await setDoc(ref,{postId,uid:userId,authorName:authorName||'',createdAt:serverTimestamp()});await updateDoc(doc(db,'posts',postId),{reposts:increment(1)});return true}
+export async function getMyReposts(userId,max=30){if(!db)return[];const snap=await getDocs(query(collection(db,'reposts'),where('uid','==',userId),orderBy('createdAt','desc'),limit(max)));const postIds=snap.docs.map(d=>d.data().postId);const posts=await Promise.all(postIds.map(async id=>{const p=await getDoc(doc(db,'posts',id));return p.exists()?{id:p.id,...p.data(),_reposted:true}:null}));return posts.filter(Boolean)}
+export async function isReposted(postId,userId){if(!db||!userId)return false;const s=await getDoc(doc(db,'reposts',`${postId}_${userId}`));return s.exists()}
 export async function requestMembership(groupId,userId){if(!db)throw new Error('Firebase is not configured.');
   // firestore.rules requires field "uid" on groupRequests create (and the
   // reviewGroupRequest Cloud Function reads r.uid to build the membership doc).

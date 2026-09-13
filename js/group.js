@@ -1,5 +1,5 @@
 import {isGroupMember,hasGroupRequest} from "./data-layer.js";
-import './theme.js';import {db} from './firebase.js';import {subscribeAuth,requireAuth,currentProfile,currentUser} from './auth.js';import {doc,getDoc,setDoc,updateDoc,collection,getDocs,query,where,limit,addDoc,serverTimestamp,increment} from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js';import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-functions.js';import { $, getQuery, escapeHtml, initials, toast } from './utils.js';import {uploadImage} from './services.js';
+import './theme.js';import {db} from './firebase.js';import {subscribeAuth,requireAuth,currentProfile,currentUser} from './auth.js';import {doc,getDoc,setDoc,updateDoc,collection,getDocs,query,where,limit,addDoc,serverTimestamp,increment} from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js';import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-functions.js';import { $, getQuery, escapeHtml, linkifyHtml, initials, toast, showModal } from './utils.js';import {uploadImage} from './services.js';
 let group=null;
 
 async function load(){
@@ -76,7 +76,7 @@ async function loadGroupPosts(){const box=document.querySelector('[data-group-po
  if(!db||group.id==='demo'){box.innerHTML='<div class="card empty"><i data-lucide="wifi-off"></i><h3>Not connected</h3><p class="muted">Connect Firebase to see this group\u2019s posts.</p></div>';window.lucide?.createIcons();return}
  let posts=[];try{const snap=await getDocs(query(collection(db,'posts'),where('groupId','==',group.id),limit(15)));posts=snap.docs.map(d=>({id:d.id,...d.data()}))}catch{}
  if(!posts.length){box.innerHTML='<div class="card empty"><i data-lucide="message-circle"></i><h3>No posts yet</h3><p class="muted">Share the first update, question or resource with this group.</p></div>';window.lucide?.createIcons();return}
- box.innerHTML=posts.map(p=>`<article class="card post-card"><div class="post-head"><div class="avatar">${initials(p.authorName)}</div><div class="post-meta"><strong>${escapeHtml(p.authorName)}</strong><span>${escapeHtml(p.branch||'Student')} · ${p.createdAt?.toDate?p.createdAt.toDate().toLocaleString(): 'Just now'}</span></div></div><div class="post-text">${escapeHtml(p.text)}</div><div class="post-actions"><button class="action"><i data-lucide="heart"></i>${p.likes||0}</button><button class="action"><i data-lucide="message-circle"></i>${p.comments||0}</button></div></article>`).join('');window.lucide?.createIcons()}
+ box.innerHTML=posts.map(p=>`<article class="card post-card"><div class="post-head"><div class="avatar">${initials(p.authorName)}</div><div class="post-meta"><strong>${escapeHtml(p.authorName)}</strong><span>${escapeHtml(p.branch||'Student')} · ${p.createdAt?.toDate?p.createdAt.toDate().toLocaleString(): 'Just now'}</span></div></div><div class="post-text">${linkifyHtml(p.text)}</div><div class="post-actions"><button class="action"><i data-lucide="heart"></i>${p.likes||0}</button><button class="action"><i data-lucide="message-circle"></i>${p.comments||0}</button></div></article>`).join('');window.lucide?.createIcons()}
 
 async function loadMembers(){
  const targets=[document.querySelector('[data-members]'),document.querySelector('[data-members-main]')].filter(Boolean);
@@ -135,7 +135,23 @@ document.addEventListener('click',async e=>{
   return;
  }
 
- if(e.target.closest('[data-group-post]')){if(!db||group.id==='demo')return toast('Connect Firebase to post in this demo group.','warning');}
+ if(e.target.closest('[data-group-post]')){
+  if(!db||group.id==='demo')return toast('Connect Firebase to post in this demo group.','warning');
+  showModal('Post in '+group.name,'<form class="form" id="groupPostForm"><div class="field"><textarea id="groupPostText" rows="5" maxlength="2000" required placeholder="Share something with this group..."></textarea></div><div id="groupPostError" class="small" style="color:var(--danger)"></div><div style="text-align:right"><button class="btn primary" type="submit">Post</button></div></form>');
+  window.lucide?.createIcons();
+  document.getElementById('groupPostForm').addEventListener('submit',async ev=>{
+   ev.preventDefault();
+   const text=document.getElementById('groupPostText').value.trim();if(!text)return;
+   const btn=ev.currentTarget.querySelector('button[type="submit"]');btn.disabled=true;
+   try{
+    await addDoc(collection(db,'posts'),{text,authorId:currentUser.uid,authorUid:currentUser.uid,authorName:currentProfile?.displayName||'Student',photoURL:currentProfile?.photoURL||'',branch:currentProfile?.branch||'',college:currentProfile?.college||'',groupId:group.id,category:'group',searchText:text.toLowerCase(),likes:0,comments:0,shares:0,saves:0,reportCount:0,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});
+    document.querySelector('.modal-backdrop')?.remove();
+    toast('Posted to the group');
+    loadGroupPosts();
+   }catch(err){document.getElementById('groupPostError').textContent=err.message||'Could not post.';btn.disabled=false}
+  });
+  return;
+ }
 
  const approveReq=e.target.closest('[data-approve-req]');if(approveReq){
   approveReq.disabled=true;

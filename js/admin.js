@@ -32,7 +32,7 @@ async function loadReports(){if(!db)return;try{const snap=await getDocs(query(co
 
 async function loadGroups(){if(!db)return;const box=$('[data-pending-groups]');try{const snap=await getDocs(query(collection(db,'groups'),where('status','==','pending'),orderBy('createdAt','desc'),limit(15)));box.innerHTML=snap.docs.length?snap.docs.map(d=>{const g=d.data();return `<div class="moderation-item"><div><strong>${escapeHtml(g.name)}</strong><div class="small muted">${escapeHtml(g.category||'Community')} · ${formatDateTime(g.createdAt)}</div><p class="small muted">${escapeHtml(g.description||'')}</p></div><div class="toolbar"><a class="btn sm" href="group.html?id=${encodeURIComponent(d.id)}">View</a><button class="btn sm primary" data-approve-group="${d.id}">Approve</button><button class="btn sm" data-reject-group="${d.id}">Reject</button></div></div>`}).join(''):'<div class="empty"><i data-lucide="inbox"></i><h3>Nothing awaiting approval</h3></div>';window.lucide?.createIcons()}catch(e){box.innerHTML=errorBox(e.message||'Could not load group approvals.')}}
 
-async function loadGroupsTable(){if(!db)return;try{const snap=await getDocs(query(collection(db,'groups'),orderBy('createdAt','desc'),limit(50)));const rows=snap.docs.map(d=>({id:d.id,...d.data()}));$('[data-group-rows]').innerHTML=rows.length?rows.map(g=>`<tr data-group-row="${g.id}"><td>${escapeHtml(g.name||'')}</td><td>${escapeHtml(g.category||'')}</td><td>${Number(g.memberCount||0)}</td><td><span class="badge ${g.status==='approved'?'success':g.status==='rejected'?'danger':'warning'}">${escapeHtml(g.status||'pending')}</span></td><td>${formatDateTime(g.createdAt)}</td><td><div class="toolbar"><a class="btn sm" href="group.html?id=${encodeURIComponent(g.id)}">View</a><button class="btn sm" data-manage-members="${g.id}">Members</button>${g.status==='pending'?`<button class="btn sm primary" data-approve-group="${g.id}">Approve</button><button class="btn sm" data-reject-group="${g.id}">Reject</button>`:''}</div></td></tr>`).join(''):'<tr><td colspan="6" class="muted">No groups yet.</td></tr>'}catch(e){$('[data-group-rows]').innerHTML=errorRow(6,e.message||'Could not load groups.')}}
+async function loadGroupsTable(){if(!db)return;try{const snap=await getDocs(query(collection(db,'groups'),orderBy('createdAt','desc'),limit(50)));const rows=snap.docs.map(d=>({id:d.id,...d.data()}));$('[data-group-rows]').innerHTML=rows.length?rows.map(g=>`<tr data-group-row="${g.id}"><td>${escapeHtml(g.name||'')}</td><td>${escapeHtml(g.category||'')}</td><td>${Number(g.memberCount||0)}</td><td><span class="badge ${g.status==='approved'?'success':g.status==='rejected'||g.status==='banned'?'danger':'warning'}">${escapeHtml(g.status||'pending')}</span></td><td>${formatDateTime(g.createdAt)}</td><td><div class="toolbar"><a class="btn sm" href="group.html?id=${encodeURIComponent(g.id)}">View</a><button class="btn sm" data-manage-members="${g.id}">Members</button>${g.status==='pending'?`<button class="btn sm primary" data-approve-group="${g.id}">Approve</button><button class="btn sm" data-reject-group="${g.id}">Reject</button>`:g.status==='banned'?`<button class="btn sm primary" data-unban-group="${g.id}">Unban</button>`:`<button class="btn sm danger" data-ban-group="${g.id}">Ban</button>`}</div></td></tr>`).join(''):'<tr><td colspan="6" class="muted">No groups yet.</td></tr>'}catch(e){$('[data-group-rows]').innerHTML=errorRow(6,e.message||'Could not load groups.')}}
 
 async function manageMembers(groupId){
  showModal('Manage group members','<div class="stack" id="memberList"><div class="skeleton" style="height:60px"></div></div>');
@@ -126,6 +126,20 @@ document.addEventListener('click',async e=>{
  const reject=e.target.closest('[data-reject-group]');if(reject){showModal('Reject group','<form id="rejectForm" class="form"><div class="field"><label>Reason</label><textarea name="reason" required maxlength="500"></textarea></div><button class="btn danger" type="submit">Reject group</button></form>');$('#rejectForm').addEventListener('submit',async ev=>{ev.preventDefault();const fd=new FormData(ev.currentTarget);try{await updateDoc(doc(db,'groups',reject.dataset.rejectGroup),{status:'rejected',rejectionReason:String(fd.get('reason')),reviewedBy:adminProfile.uid,reviewedAt:serverTimestamp()});document.querySelector('.modal-backdrop')?.remove();toast('Group rejected');loadGroups();loadGroupsTable()}catch(err){toast(err.message,'error')}});return}
 
  const manage=e.target.closest('[data-manage-members]');if(manage)return manageMembers(manage.dataset.manageMembers);
+
+ const banGroup=e.target.closest('[data-ban-group]');if(banGroup){
+  if(!confirm('Ban this group? It will be hidden from the group list immediately.'))return;
+  banGroup.disabled=true;
+  try{await updateDoc(doc(db,'groups',banGroup.dataset.banGroup),{status:'banned',bannedBy:adminProfile.uid,bannedAt:serverTimestamp()});toast('Group banned');loadGroupsTable();loadStats()}
+  catch(err){toast(err.message||'Could not ban group.','error');banGroup.disabled=false}
+  return;
+ }
+ const unbanGroup=e.target.closest('[data-unban-group]');if(unbanGroup){
+  unbanGroup.disabled=true;
+  try{await updateDoc(doc(db,'groups',unbanGroup.dataset.unbanGroup),{status:'approved',bannedBy:null,bannedAt:null});toast('Group unbanned');loadGroupsTable();loadStats()}
+  catch(err){toast(err.message||'Could not unban group.','error');unbanGroup.disabled=false}
+  return;
+ }
 
  const ar=e.target.closest('[data-approve-request]');if(ar){ar.disabled=true;try{await httpsCallable(getFunctions(),'reviewGroupRequest')({requestId:ar.dataset.approveRequest,decision:'approved'});toast('Request approved');loadGroupRequests();loadStats()}catch(err){toast(err.message||'Could not approve. Is reviewGroupRequest deployed?','error');ar.disabled=false}return}
 
