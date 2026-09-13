@@ -7,7 +7,7 @@
 import './theme.js';
 import {db} from './firebase.js';
 import {subscribeAuth,requireAuth,currentUser,currentProfile} from './auth.js';
-import {collection,addDoc,doc,getDoc,updateDoc,onSnapshot,query,orderBy,limit,serverTimestamp} from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js';
+import {collection,addDoc,doc,getDoc,updateDoc,deleteDoc,onSnapshot,query,orderBy,limit,serverTimestamp} from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js';
 import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-functions.js';
 import { getQuery, escapeHtml, linkifyHtml, initials, timeAgo, toast } from './utils.js';
 
@@ -17,14 +17,17 @@ function bubble(m){
  const mine=m.authorId===currentUser?.uid;
  const pinned=m.pinned?'<div class="chat-pinned-tag"><i data-lucide="pin"></i>Pinned</div>':'';
  const broadcastTag=m.broadcast?'<div class="chat-broadcast-tag"><i data-lucide="megaphone"></i>Announcement</div>':'';
- return `<div class="chat-row ${mine?'mine':''}" data-msg-id="${escapeHtml(m.id)}">
+ return `<div class="chat-row ${mine?'mine':''}" data-msg-id="${escapeHtml(m.id)}" data-raw="${escapeHtml(m.text||'')}">
   ${mine?'':`<div class="avatar sm">${initials(m.authorName)}</div>`}
   <div class="chat-bubble ${m.broadcast?'chat-bubble-broadcast':''}">
    ${broadcastTag}${pinned}
    ${mine?'':`<div class="chat-author">${escapeHtml(m.authorName||'Student')}</div>`}
    <div class="chat-text">${linkifyHtml(m.text||'')}</div>
-   <div class="chat-time">${timeAgo(m.createdAt)}</div>
-   ${isLeader?`<button class="chat-pin-btn" data-toggle-pin="${escapeHtml(m.id)}" title="${m.pinned?'Unpin':'Pin'}"><i data-lucide="pin"></i></button>`:''}
+   <div class="chat-time">${timeAgo(m.createdAt)}${m.edited?' · edited':''}</div>
+   <div class="chat-bubble-actions">
+   ${isLeader&&!mine?`<button class="chat-pin-btn" data-toggle-pin="${escapeHtml(m.id)}" title="${m.pinned?'Unpin':'Pin'}"><i data-lucide="pin"></i></button>`:''}
+   ${mine?`<button class="chat-pin-btn" data-edit-msg="${escapeHtml(m.id)}" title="Edit"><i data-lucide="pencil"></i></button><button class="chat-pin-btn" data-delete-msg="${escapeHtml(m.id)}" title="Delete"><i data-lucide="trash-2"></i></button>${isLeader?`<button class="chat-pin-btn" data-toggle-pin="${escapeHtml(m.id)}" title="${m.pinned?'Unpin':'Pin'}"><i data-lucide="pin"></i></button>`:''}`:''}
+   </div>
   </div>
  </div>`;
 }
@@ -97,6 +100,32 @@ document.addEventListener('click',async e=>{
   const currentlyPinned=row?.querySelector('.chat-pinned-tag');
   try{await updateDoc(doc(db,'groups',groupId,'messages',id),{pinned:!currentlyPinned})}
   catch(err){toast(err.message||'Could not update pin.','error')}
+  return;
+ }
+
+ const editBtn=e.target.closest('[data-edit-msg]');
+ if(editBtn&&groupId){
+  const row=editBtn.closest('[data-msg-id]');
+  const id=row.dataset.msgId;
+  const raw=row.dataset.raw||'';
+  const textEl=row.querySelector('.chat-text');
+  textEl.innerHTML=`<form data-inline-edit style="display:flex;gap:6px;align-items:center"><input value="${escapeHtml(raw)}" maxlength="2000" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text)"><button type="submit" class="btn sm primary" style="padding:6px 10px">Save</button><button type="button" data-cancel-msg-edit class="btn sm" style="padding:6px 10px">Cancel</button></form>`;
+  textEl.querySelector('[data-cancel-msg-edit]').addEventListener('click',()=>{textEl.innerHTML=linkifyHtml(raw)});
+  textEl.querySelector('[data-inline-edit]').addEventListener('submit',async ev=>{
+   ev.preventDefault();
+   const newText=ev.currentTarget.querySelector('input').value.trim();if(!newText)return;
+   try{await updateDoc(doc(db,'groups',groupId,'messages',id),{text:newText,edited:true});row.dataset.raw=newText}
+   catch(err){toast(err.message||'Could not edit message.','error');textEl.innerHTML=linkifyHtml(raw)}
+  });
+  return;
+ }
+
+ const delBtn=e.target.closest('[data-delete-msg]');
+ if(delBtn&&groupId){
+  if(!confirm('Delete this message?'))return;
+  const id=delBtn.closest('[data-msg-id]').dataset.msgId;
+  try{await deleteDoc(doc(db,'groups',groupId,'messages',id))}
+  catch(err){toast(err.message||'Could not delete message.','error')}
  }
 });
 

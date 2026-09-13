@@ -36,6 +36,8 @@ export async function getPostComments(postId,n=20){if(!db)return[];const snap=aw
 export async function addComment(postId,data){if(!db)throw new Error('Firebase is not configured.');
   const authorId=data.authorId||data.authorUid;
   const id=await addDoc(collection(db,'posts',postId,'comments'),{...data,authorId,authorUid:authorId,createdAt:serverTimestamp(),updatedAt:serverTimestamp()});await updateDoc(doc(db,'posts',postId),{comments:increment(1)});return id.id}
+export async function editComment(postId,commentId,text){if(!db)throw new Error('Firebase is not configured.');await updateDoc(doc(db,'posts',postId,'comments',commentId),{text,edited:true,updatedAt:serverTimestamp()})}
+export async function deleteComment(postId,commentId){if(!db)throw new Error('Firebase is not configured.');await deleteDoc(doc(db,'posts',postId,'comments',commentId));await updateDoc(doc(db,'posts',postId),{comments:increment(-1)})}
 export async function toggleSave(postId,userId){if(!db)throw new Error('Firebase is not configured.');const ref=doc(db,'savedPosts',userId,'items',postId);const snap=await getDoc(ref);if(snap.exists()){await deleteDoc(ref);return false}await setDoc(ref,{postId,createdAt:serverTimestamp()});await updateDoc(doc(db,'posts',postId),{saves:increment(1)});return true}
 // Twitter/Instagram-style repost: creates a lightweight pointer doc back to
 // the original post (not a copy) so it can show up on the reposter's own

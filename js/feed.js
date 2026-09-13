@@ -1,14 +1,14 @@
 import './theme.js';
 import {db} from './firebase.js';
-import {doc,updateDoc,increment} from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js';
+import {doc,updateDoc,deleteDoc,increment,serverTimestamp} from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js';
 import {subscribeAuth,requireAuth,currentProfile,currentUser} from './auth.js';
-import {getLatestPosts,createPost,togglePostLike,getPostComments,addComment,toggleSave,toggleRepost,uploadImage} from './services.js';
+import {getLatestPosts,createPost,togglePostLike,getPostComments,addComment,editComment,deleteComment,toggleSave,toggleRepost,uploadImage} from './services.js';
 import {paginatePosts} from './content-actions.js';
 import { $, $$, escapeHtml, linkifyHtml, initials, timeAgo, toast, showModal, isDemo } from './utils.js';
 import {rankPosts} from './algorithm.js';
 let profile;
 let feedCursor=null, feedLoading=false, feedExhausted=false;
-function postTemplate(p){const liked=Boolean(p._liked),saved=Boolean(p._saved),reposted=Boolean(p._reposted);const sameCollege=p.college&&profile?.college&&String(p.college).toLowerCase()===String(profile.college).toLowerCase();return `<article class="card post-card" data-post-id="${escapeHtml(p.id||'')}"><div class="post-head"><div class="avatar">${p.photoURL?`<img src="${escapeHtml(p.photoURL)}" alt="">`:initials(p.authorName)}</div><div class="post-meta"><strong>${escapeHtml(p.authorName||'Campus Student')}${p.role==='platformAdmin'?` <span class="badge primary">Official</span>`:''}</strong><span>${escapeHtml(p.branch||'Student')}${p.college?` · ${escapeHtml(p.college)}`:''} · ${timeAgo(p.createdAt)}</span></div>${sameCollege?'<span class="badge success" style="flex:0 0 auto">Your campus</span>':''}<button class="btn icon ghost" data-post-menu aria-label="More post actions"><i data-lucide="more-horizontal"></i></button></div><div class="post-text">${linkifyHtml(p.text||'')}</div>${p.imageURL?`<img class="post-media" src="${escapeHtml(p.imageURL)}" alt="Post image">`:''}<div class="post-actions"><button class="action ${liked?'active':''}" data-like><i data-lucide="heart"></i><span>${p.likes||0}</span></button><button class="action" data-comment><i data-lucide="message-circle"></i><span>${p.comments||0}</span></button><button class="action ${reposted?'active':''}" data-repost><i data-lucide="repeat-2"></i><span>${p.reposts||0}</span></button><button class="action" data-share><i data-lucide="share-2"></i>Share</button><button class="action ${saved?'active':''}" data-save><i data-lucide="bookmark"></i><span>${saved?'Saved':'Save'}</span></button></div></article>`}
+function postTemplate(p){const liked=Boolean(p._liked),saved=Boolean(p._saved),reposted=Boolean(p._reposted);const sameCollege=p.college&&profile?.college&&String(p.college).toLowerCase()===String(profile.college).toLowerCase();return `<article class="card post-card" data-post-id="${escapeHtml(p.id||'')}" data-author-id="${escapeHtml(p.authorId||'')}"><div class="post-head"><div class="avatar">${p.photoURL?`<img src="${escapeHtml(p.photoURL)}" alt="">`:initials(p.authorName)}</div><div class="post-meta"><strong>${escapeHtml(p.authorName||'Campus Student')}${p.role==='platformAdmin'?` <span class="badge primary">Official</span>`:''}</strong><span>${escapeHtml(p.branch||'Student')}${p.college?` · ${escapeHtml(p.college)}`:''} · ${timeAgo(p.createdAt)}</span></div>${sameCollege?'<span class="badge success" style="flex:0 0 auto">Your campus</span>':''}<button class="btn icon ghost" data-post-menu aria-label="More post actions"><i data-lucide="more-horizontal"></i></button></div><div class="post-text" data-raw="${escapeHtml(p.text||'')}">${linkifyHtml(p.text||'')}</div>${p.imageURL?`<img class="post-media" src="${escapeHtml(p.imageURL)}" alt="Post image">`:''}<div class="post-actions"><button class="action ${liked?'active':''}" data-like><i data-lucide="heart"></i><span>${p.likes||0}</span></button><button class="action" data-comment><i data-lucide="message-circle"></i><span>${p.comments||0}</span></button><button class="action ${reposted?'active':''}" data-repost><i data-lucide="repeat-2"></i><span>${p.reposts||0}</span></button><button class="action" data-share><i data-lucide="share-2"></i>Share</button><button class="action ${saved?'active':''}" data-save><i data-lucide="bookmark"></i><span>${saved?'Saved':'Save'}</span></button></div></article>`}
 function emptyState(icon,title,body){return `<div class="card empty" id="feedEmpty"><i data-lucide="${icon}"></i><h3>${title}</h3><p class="muted">${body}</p></div>`}
 async function loadPosts(){const box=$('[data-feed]');
  // loadPosts() and "Load more" used to run two completely separate, uncoordinated
@@ -38,7 +38,9 @@ function composer(){showModal('Create a post','<form class="form" id="postForm">
  $('#postForm').addEventListener('submit',async e=>{e.preventDefault();const fd=new FormData(e.currentTarget),text=String(fd.get('text')||'').trim(),file=$('#postImage').files[0];if(!text)return;const submitBtn=e.currentTarget.querySelector('button[type="submit"]');submitBtn.disabled=true;try{let imageURL='';if(file){$('#uploadStatus').textContent='Uploading image… 0%';imageURL=await uploadImage(file,`posts/${currentUser.uid}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`,pct=>$('#uploadStatus').textContent=`Uploading image… ${pct}%`);$('#uploadStatus').innerHTML=`<span style="color:var(--success)">\u2713 Uploaded ${escapeHtml(file.name)}</span>`}if(!db){toast('Demo mode: connect Firebase to publish.','warning');submitBtn.disabled=false;return}await createPost({text,imageURL,authorId:currentUser.uid,authorName:profile.displayName,photoURL:profile.photoURL||'',branch:profile.branch||'',college:profile.college||'',category:profile.branch||'community',originalityScore:.65});document.querySelector('.modal-backdrop')?.remove();toast('Post published');loadPosts()}catch(err){submitBtn.disabled=false;toast(err.message||'Could not publish post.','error')}})}
 function commentNode(c,depth){
  const indent=depth>0?`style="margin-left:${Math.min(depth,3)*28}px"`:'';
- return `<div class="comment" ${indent} data-comment-id="${escapeHtml(c.id)}"><div class="avatar sm">${initials(c.authorName)}</div><div style="flex:1"><strong>${escapeHtml(c.authorName)}</strong><div>${linkifyHtml(c.text)}</div><div class="row small muted" style="gap:10px"><span>${timeAgo(c.createdAt)}</span><button class="muted-link" data-reply-to="${escapeHtml(c.id)}" data-reply-name="${escapeHtml(c.authorName)}" style="background:none;border:0;padding:0;cursor:pointer;font:inherit;color:inherit">Reply</button></div></div></div>`;
+ const isMine=currentUser&&c.authorId===currentUser.uid;
+ const ownActions=isMine?`<button class="muted-link" data-edit-comment="${escapeHtml(c.id)}" style="background:none;border:0;padding:0;cursor:pointer;font:inherit;color:inherit">Edit</button><button class="muted-link" data-delete-comment="${escapeHtml(c.id)}" style="background:none;border:0;padding:0;cursor:pointer;font:inherit;color:var(--danger)">Delete</button>`:'';
+ return `<div class="comment" ${indent} data-comment-id="${escapeHtml(c.id)}" data-raw="${escapeHtml(c.text)}"><div class="avatar sm">${initials(c.authorName)}</div><div style="flex:1"><strong>${escapeHtml(c.authorName)}</strong><div class="comment-text-body">${linkifyHtml(c.text)}</div><div class="row small muted" style="gap:10px"><span>${timeAgo(c.createdAt)}${c.edited?' · edited':''}</span><button class="muted-link" data-reply-to="${escapeHtml(c.id)}" data-reply-name="${escapeHtml(c.authorName)}" style="background:none;border:0;padding:0;cursor:pointer;font:inherit;color:inherit">Reply</button>${ownActions}</div></div></div>`;
 }
 function renderCommentTree(comments){
  const byParent=new Map();
@@ -49,23 +51,81 @@ function renderCommentTree(comments){
  })('_root',0);
  return html;
 }
-async function comments(postId){let comments=[],loadFailed=false;if(db){try{comments=await getPostComments(postId)}catch(e){loadFailed=true}}
+async function openComments(postId){let commentList=[],loadFailed=false;if(db){try{commentList=await getPostComments(postId)}catch(e){loadFailed=true}}
  const body=loadFailed
   ?'<div class="empty"><i data-lucide="wifi-off"></i><h3>Couldn\u2019t load comments</h3><p>Check your connection and reopen this post.</p></div>'
-  :(comments.length?renderCommentTree(comments):'<div class="empty"><i data-lucide="message-circle"></i><h3>No comments yet</h3><p>Start the conversation.</p></div>');
+  :(commentList.length?renderCommentTree(commentList):'<div class="empty"><i data-lucide="message-circle"></i><h3>No comments yet</h3><p>Start the conversation.</p></div>');
  showModal('Comments',`<div class="comment-list">${body}</div><form id="commentForm" class="form" style="margin-top:15px"><div id="replyingBanner" class="small muted" hidden style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span></span><button type="button" id="cancelReply" class="muted-link" style="background:none;border:0;cursor:pointer">Cancel</button></div><div class="field"><label for="commentText">Add a comment</label><textarea id="commentText" maxlength="800" required placeholder="Write something useful..."></textarea></div><div style="text-align:right"><button class="btn primary" type="submit">Comment</button></div></form>`);
  window.lucide?.createIcons();
  let replyTo=null;
- $('.comment-list').addEventListener('click',e=>{
-  const r=e.target.closest('[data-reply-to]');if(!r)return;
-  replyTo=r.dataset.replyTo;
-  const banner=document.getElementById('replyingBanner');
-  banner.hidden=false;banner.querySelector('span').textContent=`Replying to ${r.dataset.replyName}`;
-  document.getElementById('commentText').focus();
+ $('.comment-list').addEventListener('click',async e=>{
+  const r=e.target.closest('[data-reply-to]');
+  if(r){
+   replyTo=r.dataset.replyTo;
+   const banner=document.getElementById('replyingBanner');
+   banner.hidden=false;banner.querySelector('span').textContent=`Replying to ${r.dataset.replyName}`;
+   document.getElementById('commentText').focus();
+   return;
+  }
+  const editBtn=e.target.closest('[data-edit-comment]');
+  if(editBtn){
+   const row=editBtn.closest('[data-comment-id]');
+   const commentId=row.dataset.commentId;
+   const textBody=row.querySelector('.comment-text-body');
+   const raw=row.dataset.raw||'';
+   textBody.innerHTML=`<form class="form" data-inline-edit style="margin-top:4px"><textarea rows="3" maxlength="800" required>${escapeHtml(raw)}</textarea><div class="toolbar" style="justify-content:flex-end;margin-top:6px"><button type="button" class="btn sm" data-cancel-edit>Cancel</button><button type="submit" class="btn sm primary">Save</button></div></form>`;
+   row.querySelector('[data-cancel-edit]').addEventListener('click',()=>{textBody.innerHTML=linkifyHtml(raw)});
+   row.querySelector('[data-inline-edit]').addEventListener('submit',async ev=>{
+    ev.preventDefault();
+    const newText=ev.currentTarget.querySelector('textarea').value.trim();if(!newText)return;
+    try{await editComment(postId,commentId,newText);row.dataset.raw=newText;textBody.innerHTML=linkifyHtml(newText);toast('Comment updated')}
+    catch(err){toast(err.message||'Could not update comment.','error')}
+   });
+   return;
+  }
+  const delBtn=e.target.closest('[data-delete-comment]');
+  if(delBtn){
+   if(!confirm('Delete this comment?'))return;
+   const commentId=delBtn.closest('[data-comment-id]').dataset.commentId;
+   try{await deleteComment(postId,commentId);toast('Comment deleted');document.querySelector('.modal-backdrop')?.remove();await loadPosts();await openComments(postId)}
+   catch(err){toast(err.message||'Could not delete comment.','error')}
+  }
  });
  document.getElementById('cancelReply').addEventListener('click',()=>{replyTo=null;document.getElementById('replyingBanner').hidden=true});
  $('#commentForm').addEventListener('submit',async e=>{e.preventDefault();if(!db){toast('Connect Firebase to comment.','warning');return}const btn=e.currentTarget.querySelector('button[type="submit"]');if(btn)btn.disabled=true;try{await addComment(postId,{authorId:currentUser.uid,authorName:profile.displayName,photoURL:profile.photoURL||'',parentId:replyTo||null,text:$('#commentText').value.trim()});toast(replyTo?'Reply added':'Comment added');document.querySelector('.modal-backdrop')?.remove();await loadPosts()}catch(err){toast(err.message,'error');if(btn)btn.disabled=false}})}
-async function moreMenu(post){const id=post.dataset.postId;if(id.startsWith('demo')){toast('Demo post cannot be modified.','warning');return}showModal('Post actions',`<div class="stack"><a class="btn" href="report.html?type=post&targetId=${encodeURIComponent(id)}"><i data-lucide="flag"></i>Report post</a>${post.querySelector('.post-meta strong')?.textContent?.startsWith(profile.displayName)?'<button class="btn danger" id="deletePost"><i data-lucide="trash-2"></i>Delete post</button>':''}</div>`);window.lucide?.createIcons();$('#deletePost')?.addEventListener('click',async()=>{try{await import('https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js').then(({deleteDoc,doc})=>deleteDoc(doc(db,'posts',id)));document.querySelector('.modal-backdrop')?.remove();toast('Post deleted');loadPosts()}catch(e){toast('Could not delete this post.','error')}})}
+async function moreMenu(post){
+ const id=post.dataset.postId;
+ if(id.startsWith('demo')){toast('Demo post cannot be modified.','warning');return}
+ // Ownership used to be guessed by comparing displayed name TEXT, which is
+ // fragile (two people can share a first name, and the "Official" badge text
+ // gets appended to the same element) -- now compares the actual authorId
+ // stored on the card.
+ const isMine=post.dataset.authorId&&currentUser&&post.dataset.authorId===currentUser.uid;
+ showModal('Post actions',`<div class="stack"><a class="btn" href="report.html?type=post&targetId=${encodeURIComponent(id)}"><i data-lucide="flag"></i>Report post</a>${isMine?'<button class="btn" id="editPost"><i data-lucide="pencil"></i>Edit post</button><button class="btn danger" id="deletePost"><i data-lucide="trash-2"></i>Delete post</button>':''}</div>`);
+ window.lucide?.createIcons();
+ $('#deletePost')?.addEventListener('click',async()=>{
+  if(!confirm('Delete this post? This cannot be undone.'))return;
+  try{await deleteDoc(doc(db,'posts',id));document.querySelector('.modal-backdrop')?.remove();toast('Post deleted');loadPosts()}
+  catch(e){toast(e.message||'Could not delete this post.','error')}
+ });
+ $('#editPost')?.addEventListener('click',()=>{
+  document.querySelector('.modal-backdrop')?.remove();
+  const currentText=post.querySelector('.post-text')?.dataset.raw||post.querySelector('.post-text')?.textContent||'';
+  showModal('Edit post',`<form class="form" id="editPostForm"><div class="field"><textarea id="editPostText" rows="6" maxlength="2000" required>${escapeHtml(currentText)}</textarea></div><div id="editPostError" class="small" style="color:var(--danger)"></div><div style="text-align:right"><button class="btn primary" type="submit">Save changes</button></div></form>`);
+  window.lucide?.createIcons();
+  document.getElementById('editPostForm').addEventListener('submit',async ev=>{
+   ev.preventDefault();
+   const text=document.getElementById('editPostText').value.trim();if(!text)return;
+   const btn=ev.currentTarget.querySelector('button[type="submit"]');btn.disabled=true;
+   try{
+    await updateDoc(doc(db,'posts',id),{text,searchText:text.toLowerCase(),edited:true,updatedAt:serverTimestamp()});
+    document.querySelector('.modal-backdrop')?.remove();
+    toast('Post updated');
+    loadPosts();
+   }catch(err){document.getElementById('editPostError').textContent=err.message||'Could not update this post.';btn.disabled=false}
+  });
+ });
+}
 document.addEventListener('click',async e=>{
  if(e.target.closest('[data-create-post]'))return composer();
  const post=e.target.closest('[data-post-id]');if(!post)return;const id=post.dataset.postId;
@@ -77,7 +137,7 @@ document.addEventListener('click',async e=>{
   catch(err){toast(err.message||'Could not like this post.','error')}
   return;
  }
- if(e.target.closest('[data-comment]'))return comments(id);
+ if(e.target.closest('[data-comment]'))return openComments(id);
  if(e.target.closest('[data-repost]')){
   if(isDemo()||id.startsWith('demo'))return toast('Connect Firebase to repost.','warning');
   const btn=e.target.closest('[data-repost]'),span=btn.querySelector('span'),n=Number(span.textContent||0);
