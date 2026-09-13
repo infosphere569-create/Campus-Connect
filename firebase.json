@@ -1,1 +1,22 @@
-{"firestore":{"rules":"firebase/firestore.rules","indexes":"firestore.indexes.json"},"storage":{"rules":"firebase/storage.rules"},"hosting":{"public":".","ignore":["firebase.json","**/.*","**/node_modules/**"]}}
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "functions": {
+    "source": "server-functions",
+    "runtime": "nodejs20"
+  },
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "server-functions/**",
+      "**/.*",
+      "**/node_modules/**"
+    ]
+  }
+}
