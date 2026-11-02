@@ -11,12 +11,15 @@ export function respectReducedMotion(){
 }
 
 export function initSmoothNavigation(){
- if(matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+ const clearNavState=()=>{
+  if(document.body) document.body.classList.remove('cc-navigating');
+ };
 
- window.addEventListener('pageshow', () => {
-  document.body.classList.remove('cc-navigating');
- });
+ window.addEventListener('pageshow', clearNavState);
+ window.addEventListener('DOMContentLoaded', clearNavState);
+ window.addEventListener('load', clearNavState);
 
+ // Auto-clear safety timeout
  document.addEventListener('click', (e) => {
   if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
   const a = e.target.closest('a');
@@ -26,26 +29,16 @@ export function initSmoothNavigation(){
    const url = new URL(a.href, window.location.href);
    if (url.origin !== window.location.origin) return;
 
-   // Same page hash navigation - skip fade
-   if (url.pathname === window.location.pathname && url.search === window.location.search) {
-    if (url.hash) return;
-   }
-
+   // Same-page or hash jump or tab click: never trigger navigating state
+   if (url.pathname === window.location.pathname && url.search === window.location.search) return;
    if (!url.protocol.startsWith('http')) return;
 
-   e.preventDefault();
+   // Subtle visual hint without event hijacking or blocking clicks
    document.body.classList.add('cc-navigating');
-
-   if (document.startViewTransition) {
-    document.startViewTransition(() => {
-     window.location.href = url.href;
-    });
-   } else {
-    setTimeout(() => {
-     window.location.href = url.href;
-    }, 110);
-   }
-  } catch(err) {}
+   setTimeout(clearNavState, 400);
+  } catch(err) {
+   clearNavState();
+  }
  });
 }
 
