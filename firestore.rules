@@ -1,0 +1,90 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    // Posts collection & comments
+    match /posts/{postId} {
+      allow read, write: if isSignedIn();
+      
+      match /comments/{commentId} {
+        allow read, write: if isSignedIn();
+      }
+    }
+    
+    match /postLikes/{postId}/users/{userId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    match /savedPosts/{userId}/items/{postId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    match /reposts/{repostId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    // Campus Issues
+    match /issues/{issueId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+    
+    match /issueVotes/{voteId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    match /issuePrivate/{privateId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    // Groups
+    match /groups/{groupId} {
+      allow read, write: if isSignedIn();
+      
+      match /members/{memberId} {
+        allow read, write: if isSignedIn();
+      }
+      
+      match /messages/{messageId} {
+        allow read, write: if isSignedIn();
+      }
+    }
+    
+    match /groupRequests/{requestId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    // Events
+    match /events/{eventId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    match /eventRsvps/{rsvpId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    // Notifications
+    match /notifications/{notifId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    // Reports & Audit logs
+    match /reports/{reportId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    match /auditLogs/{logId} {
+      allow read, write: if isSignedIn();
+    }
+  }
+}

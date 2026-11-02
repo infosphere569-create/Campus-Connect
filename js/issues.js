@@ -132,22 +132,17 @@ async function raise(){
           const result=await call({title,description,category,severity,location});
           createdId = result.data.id;
         }catch(fnErr){
-          // Cloud function fallback to direct client-side Firestore batch write
           console.warn('submitAnonymousIssue function fallback:', fnErr);
-          const issueRef = doc(collection(db, 'issues'));
-          const privateRef = doc(db, 'issuePrivate', issueRef.id);
           const now = serverTimestamp();
-          const batch = writeBatch(db);
-          batch.set(issueRef, {
+          const docRef = await addDoc(collection(db, 'issues'), {
             title, description, category, severity, location,
-            status: 'Open', supportCount: 0, createdAt: now, updatedAt: now,
-            displayName: 'Anonymous Student', isAnonymous: true
+            status: 'Open', supportCount: 0,
+            displayName: 'Anonymous Student', isAnonymous: true,
+            authorUid: currentUser?.uid || 'anon',
+            authorId: currentUser?.uid || 'anon',
+            createdAt: now, updatedAt: now
           });
-          batch.set(privateRef, {
-            issueId: issueRef.id, authorUid: currentUser?.uid || 'anon', createdAt: now
-          });
-          await batch.commit();
-          createdId = issueRef.id;
+          createdId = docRef.id;
         }
       } else {
         createdId = `local-iss-${Date.now()}`;

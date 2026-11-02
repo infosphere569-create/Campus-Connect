@@ -12,7 +12,7 @@ export function linkifyHtml(text=''){
  return escaped.replace(URL_RE,(url)=>{
   // escapeHtml already turned raw & into &amp; inside URLs picked up by the regex; fine for href use.
   if(IMAGE_EXT_RE.test(url)){
-   return `<a href="${url}" target="_blank" rel="noopener noreferrer"><img src="${url}" alt="Shared image" style="max-width:100%;border-radius:12px;margin-top:6px;display:block"></a>`;
+   return `<a href="${url}" target="_blank" rel="noopener noreferrer"><img src="${url}" alt="Shared image" style="max-width:100%;max-height:220px;object-fit:cover;border-radius:12px;margin-top:6px;display:block"></a>`;
   }
   return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
  });
