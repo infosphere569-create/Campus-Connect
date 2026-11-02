@@ -1,0 +1,6 @@
+{
+  "name": "Campus Connect",
+  "description": "A modern student community platform for discovering campus communities, sharing ideas, joining groups, finding events and raising campus issues.",
+  "permissions": [],
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
