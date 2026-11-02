@@ -9,6 +9,10 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const HOST = '0.0.0.0';
 
+// Aliases for icons directory to guarantee icons resolve whether requested as /icon/* or /icons/*
+app.use('/icons', express.static(path.join(__dirname, 'icon')));
+app.use('/icon', express.static(path.join(__dirname, 'icon')));
+
 // Serve static files with html extension support
 app.use(express.static(__dirname, {
   extensions: ['html'],

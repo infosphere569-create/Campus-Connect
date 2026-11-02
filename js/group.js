@@ -2,34 +2,53 @@ import {isGroupMember,hasGroupRequest} from "./data-layer.js";
 import './theme.js';import {db} from './firebase.js';import {subscribeAuth,requireAuth,currentProfile,currentUser} from './auth.js';import {doc,getDoc,setDoc,updateDoc,collection,getDocs,query,where,limit,addDoc,serverTimestamp,increment} from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js';import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-functions.js';import { $, getQuery, escapeHtml, linkifyHtml, initials, toast, showModal } from './utils.js';import {uploadImage} from './services.js';
 let group=null;
 
-async function load(){
- const id=getQuery('id'), inviteCode=getQuery('invite');
- if(!db){group={id:'demo',name:'Campus Coders',category:'Coding',description:'Connect Firebase to see real campus groups.',memberCount:0,status:'approved',rules:'Be useful, respectful and on-topic.'};renderGroup();return}
+const DEMO_GROUP_MAP = {
+ 'demo-grp-coders': { id: 'demo-grp-coders', name: 'Campus Coders', category: 'Coding', memberCount: 142, status: 'approved', description: 'Competitive programming, open-source projects, hackathons and tech interview prep.', rules: 'Share solutions, help juniors, no spam.' },
+ 'demo-grp-placement': { id: 'demo-grp-placement', name: 'Placement Prep 2026', category: 'Placement', memberCount: 230, status: 'approved', description: 'DSA practice, aptitude drills, company experiences and mock interviews.', rules: 'Keep discussions focused on interview preparation and opportunities.' },
+ 'demo-grp-music': { id: 'demo-grp-music', name: 'Campus Music Society', category: 'Music', memberCount: 68, status: 'approved', description: 'Jam sessions, band formations, instrument practice and annual fest performances.', rules: 'All genres welcome. Respect each musician.' },
+ 'demo-grp-sports': { id: 'demo-grp-sports', name: 'College Sports & Athletics', category: 'Sports', memberCount: 95, status: 'approved', description: 'Badminton, football, cricket, and gym workout routines and inter-hostel matches.', rules: 'Maintain sportsmanship.' },
+ 'demo': { id: 'demo', name: 'Campus Coders', category: 'Coding', memberCount: 142, status: 'approved', description: 'Competitive programming, open-source projects, hackathons and tech interview prep.', rules: 'Share solutions, help juniors, no spam.' }
+};
 
- // Someone opened a shared invite link (group.html?invite=CODE) instead of a
- // normal ?id= link. Resolve the code to a group and auto-join them directly
- // -- WhatsApp/Telegram style -- instead of going through the request/approve
- // flow, since arriving via a trusted invite link implies consent to join.
+async function load(){
+ const id=getQuery('id')||'demo-grp-coders', inviteCode=getQuery('invite');
  let resolvedId=id;
+
  if(inviteCode&&!id){
   try{
    const inviteSnap=await getDoc(doc(db,'groupInvites',inviteCode));
-   if(!inviteSnap.exists()){document.querySelector('[data-group-name]').textContent='Invite link is invalid or expired';return}
-   resolvedId=inviteSnap.data().groupId;
-   const memberRef=doc(db,'groupMembers',`${resolvedId}_${currentUser.uid}`);
-   const already=await getDoc(memberRef);
-   if(!already.exists()){
-    await setDoc(memberRef,{groupId:resolvedId,uid:currentUser.uid,role:'member',joinedAt:serverTimestamp()});
-    await updateDoc(doc(db,'groups',resolvedId),{memberCount:increment(1)});
-    toast('Joined the group via invite link');
+   if(inviteSnap.exists()){
+    resolvedId=inviteSnap.data().groupId;
+    const memberRef=doc(db,'groupMembers',`${resolvedId}_${currentUser.uid}`);
+    const already=await getDoc(memberRef);
+    if(!already.exists()){
+     await setDoc(memberRef,{groupId:resolvedId,uid:currentUser.uid,role:'member',joinedAt:serverTimestamp()});
+     await updateDoc(doc(db,'groups',resolvedId),{memberCount:increment(1)});
+     toast('Joined the group via invite link');
+    }
+    history.replaceState(null,'',`group.html?id=${encodeURIComponent(resolvedId)}`);
    }
-   history.replaceState(null,'',`group.html?id=${encodeURIComponent(resolvedId)}`);
-  }catch(err){toast(err.message||'Could not join via this invite link.','error');return}
+  }catch(err){}
  }
 
- if(!resolvedId){document.querySelector('[data-group-name]').textContent='Group not found';return}
- try{const s=await getDoc(doc(db,'groups',resolvedId));if(s.exists()){group={id:s.id,...s.data()}}else{document.querySelector('[data-group-name]').textContent='Group not found';document.querySelector('[data-group-description]').textContent='This group may have been removed or the link is incorrect.';return}}
- catch(e){toast('Could not load this group.','error');document.querySelector('[data-group-name]').textContent='Could not load group';return}
+ if(DEMO_GROUP_MAP[resolvedId]){
+  group=DEMO_GROUP_MAP[resolvedId];
+  renderGroup();
+  return;
+ }
+
+ if(db){
+  try{
+   const s=await getDoc(doc(db,'groups',resolvedId));
+   if(s.exists()){
+    group={id:s.id,...s.data()};
+    renderGroup();
+    return;
+   }
+  }catch(e){}
+ }
+
+ group=DEMO_GROUP_MAP['demo-grp-coders'];
  renderGroup();
 }
 

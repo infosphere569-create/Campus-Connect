@@ -17,3 +17,167 @@
 .loading-state,.empty-state{padding:28px;text-align:center}
 @media(max-width:900px){.metric-grid{grid-template-columns:repeat(3,1fr)}.admin-columns{grid-template-columns:1fr}}
 @media(max-width:520px){.metric-grid{grid-template-columns:repeat(2,1fr)}.metric-card{padding:13px}.admin-row{align-items:flex-start}}
+
+/* ========== PWA Native App Feel & Open Logo Animation ========== */
+.cc-pwa-splash-screen{
+  position:fixed;
+  inset:0;
+  z-index:999999;
+  background:#090c12;
+  background:radial-gradient(circle at 50% 40%, #161a29 0%, #090c12 75%);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  user-select:none;
+  transition:opacity .42s cubic-bezier(.16,1,.3,1), transform .42s cubic-bezier(.16,1,.3,1);
+  will-change:opacity, transform;
+}
+.cc-pwa-splash-screen.cc-splash-hide{
+  opacity:0;
+  transform:scale(1.04);
+  pointer-events:none;
+}
+.cc-splash-content{
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  text-align:center;
+  padding:24px;
+}
+.cc-splash-glow{
+  position:absolute;
+  top:50%;
+  left:50%;
+  width:220px;
+  height:220px;
+  transform:translate(-50%,-50%);
+  background:radial-gradient(circle, rgba(91,92,240,.35) 0%, transparent 70%);
+  filter:blur(24px);
+  pointer-events:none;
+  animation:ccGlowPulse 2.4s ease-in-out infinite alternate;
+}
+.cc-splash-logo-wrap{
+  position:relative;
+  width:88px;
+  height:88px;
+  display:grid;
+  place-items:center;
+  margin-bottom:18px;
+  animation:ccLogoPop .65s cubic-bezier(.22,1,.36,1) forwards;
+}
+.cc-splash-ring{
+  position:absolute;
+  inset:-8px;
+  border-radius:26px;
+  border:2px solid rgba(91,92,240,.35);
+  animation:ccRingPulse 2s ease-in-out infinite;
+}
+.cc-splash-logo{
+  width:88px;
+  height:88px;
+  border-radius:22px;
+  box-shadow:0 14px 40px rgba(91,92,240,.45);
+  display:block;
+  object-fit:cover;
+}
+.cc-splash-title{
+  color:#ffffff;
+  font-size:1.6rem;
+  font-weight:900;
+  letter-spacing:-.03em;
+  margin-bottom:4px;
+  animation:ccFadeUp .6s cubic-bezier(.22,1,.36,1) .12s both;
+}
+.cc-splash-sub{
+  color:#94a3b8;
+  font-size:.92rem;
+  font-weight:600;
+  letter-spacing:.02em;
+  margin-bottom:28px;
+  animation:ccFadeUp .6s cubic-bezier(.22,1,.36,1) .22s both;
+}
+.cc-splash-loader{
+  width:120px;
+  height:3px;
+  background:rgba(255,255,255,.1);
+  border-radius:99px;
+  overflow:hidden;
+  position:relative;
+  animation:ccFadeUp .6s cubic-bezier(.22,1,.36,1) .3s both;
+}
+.cc-splash-bar{
+  width:45%;
+  height:100%;
+  background:linear-gradient(90deg, #5b5cf0, #8b7cf6, #38bdf8);
+  border-radius:99px;
+  animation:ccBarSlide 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes ccLogoPop{
+  0%{transform:scale(.72);opacity:0}
+  60%{transform:scale(1.06);opacity:1}
+  100%{transform:scale(1);opacity:1}
+}
+@keyframes ccRingPulse{
+  0%,100%{transform:scale(1);opacity:.4}
+  50%{transform:scale(1.12);opacity:.85;border-color:rgba(139,124,246,.7)}
+}
+@keyframes ccGlowPulse{
+  from{opacity:.4;transform:translate(-50%,-50%) scale(.9)}
+  to{opacity:.85;transform:translate(-50%,-50%) scale(1.15)}
+}
+@keyframes ccFadeUp{
+  from{transform:translateY(8px);opacity:0}
+  to{transform:translateY(0);opacity:1}
+}
+@keyframes ccBarSlide{
+  0%{transform:translateX(-40%)}
+  100%{transform:translateX(160%)}
+}
+
+/* Standalone PWA feel enhancements */
+html[data-is-pwa="true"] body,
+.is-pwa-app body{
+  -webkit-touch-callout:none;
+  -webkit-tap-highlight-color:transparent;
+  overscroll-behavior-y:contain;
+}
+html[data-is-pwa="true"] .topbar,
+.is-pwa-app .topbar{
+  padding-top:env(safe-area-inset-top, 0px);
+  height:calc(var(--header) + env(safe-area-inset-top, 0px));
+}
+html[data-is-pwa="true"] .bottom-nav,
+.is-pwa-app .bottom-nav{
+  bottom:max(10px, env(safe-area-inset-bottom, 10px));
+}
+
+/* Offline connectivity pill */
+.cc-offline-badge{
+  position:fixed;
+  bottom:calc(max(8px, env(safe-area-inset-bottom, 8px)) + 64px);
+  left:50%;
+  transform:translateX(-50%);
+  background:#d97706;
+  color:#ffffff;
+  padding:8px 16px;
+  border-radius:999px;
+  font-size:.82rem;
+  font-weight:700;
+  box-shadow:0 10px 25px rgba(217,119,6,.35);
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  z-index:9999;
+  animation:ccFadeUp .3s ease forwards;
+}
+.cc-offline-dot{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:#fff;
+  animation:ccRingPulse 1.2s infinite;
+}
+

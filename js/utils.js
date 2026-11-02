@@ -27,5 +27,6 @@ export function showModal(title,content,options={}){const back=document.createEl
 export function getQuery(name){return new URLSearchParams(location.search).get(name)}
 export function setPageMeta(title,description='Campus Connect — Your Campus. Your Community.'){document.title=title;const m=document.querySelector('meta[name="description"]');if(m)m.content=description}
 export function demoProfile(){return {uid:'demo-user',displayName:'Ayush Kumar',photoURL:'',course:'B.Tech',branch:'CSE',year:'1st Year',section:'A',college:'NITRA Technical Campus',role:'student',interests:['CSE','coding','placement'],isActive:true}}
-export function isDemo(){return !document.documentElement.dataset.firebaseReady}
+export function isDemo(){return document.documentElement.dataset.firebaseReady !== 'true' || sessionStorage.getItem('cc-demo') === '1' || localStorage.getItem('cc-demo') === '1';}
 export function safeNumber(v){const n=Number(v);return Number.isFinite(n)?n:0}
+

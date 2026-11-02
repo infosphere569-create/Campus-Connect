@@ -10,7 +10,7 @@ export function renderShell(profile){const page=document.body.dataset.page;const
  // more than once) never destroys it and never leaves a stray duplicate.
  const mainContent=document.querySelector('[data-app-main]');
  if(mainContent&&mainContent.parentNode)mainContent.parentNode.removeChild(mainContent);
- const shell=`<div class="app-shell"><aside class="sidebar"><div class="side-nav">${desktop}${admin}</div><div class="sidebar-footer"><button class="nav-item" style="width:100%" data-logout><i data-lucide="log-out"></i><span>Logout</span></button></div></aside><main class="main" data-shell-slot></main></div><nav class="bottom-nav">${mobile}</nav>`;const root=$('[data-app-root]');if(root){root.innerHTML=top+shell;const slot=root.querySelector('[data-shell-slot]');if(mainContent&&slot)slot.appendChild(mainContent);}window.lucide?.createIcons();import('./services.js').then(({getNotifications})=>getNotifications(8).then(ns=>{const dot=document.querySelector('[data-unread-dot]');if(dot)dot.hidden=!ns.some(n=>!n.read)}).catch(()=>{}));document.querySelector('[data-open-search]')?.addEventListener('click',()=>{const panel=document.createElement('div');panel.className='search-overlay';panel.innerHTML='<div class="search-dialog"><div class="split"><h2>Search Campus Connect</h2><button class="btn icon ghost" data-close><i data-lucide="x"></i></button></div><input id="mobileSearch" autocomplete="off" placeholder="Search people, groups, posts or events..."><div id="mobileSearchResults" class="search-results"></div></div>';document.body.appendChild(panel);window.lucide?.createIcons();panel.addEventListener('click',e=>{if(e.target===panel||e.target.closest('[data-close]'))panel.remove()});panel.querySelector('input').focus();wireSearch('mobileSearch','mobileSearchResults')});
+  const shell=`<div class="app-shell"><aside class="sidebar"><div class="side-nav">${desktop}${admin}</div><div class="sidebar-footer"><button class="nav-item" style="width:100%" data-logout><i data-lucide="log-out"></i><span>Logout</span></button></div></aside><main class="main" data-shell-slot></main></div><nav class="bottom-nav">${mobile}</nav>`;const root=$('[data-app-root]');if(root){root.innerHTML=top+shell;const slot=root.querySelector('[data-shell-slot]');if(mainContent&&slot)slot.appendChild(mainContent);}window.lucide?.createIcons();if(profile?.uid){import('./services.js').then(({getNotifications})=>getNotifications(profile.uid,8).then(ns=>{const dot=document.querySelector('[data-unread-dot]');if(dot)dot.hidden=!ns.some(n=>!n.read)}).catch(()=>{}));}document.querySelector('[data-open-search]')?.addEventListener('click',()=>{const panel=document.createElement('div');panel.className='search-overlay';panel.innerHTML='<div class="search-dialog"><div class="split"><h2>Search Campus Connect</h2><button class="btn icon ghost" data-close><i data-lucide="x"></i></button></div><input id="mobileSearch" autocomplete="off" placeholder="Search people, groups, posts or events..."><div id="mobileSearchResults" class="search-results"></div></div>';document.body.appendChild(panel);window.lucide?.createIcons();panel.addEventListener('click',e=>{if(e.target===panel||e.target.closest('[data-close]'))panel.remove()});const escHandler=e=>{if(e.key==='Escape'){panel.remove();document.removeEventListener('keydown',escHandler)}};document.addEventListener('keydown',escHandler);panel.querySelector('input').focus();wireSearch('mobileSearch','mobileSearchResults')});
 // Both search boxes existed in the markup with zero listeners attached -- typing
 // into either one did nothing. Wired here, plus a dropdown result panel is
 // inserted next to the desktop search box since it never had one.
@@ -42,11 +42,11 @@ function wireSearch(inputId,resultsId){
    }catch(e){box.innerHTML='<div class="small muted" style="padding:10px">Search is unavailable right now.</div>'}
   },300);
  });
- input.addEventListener('blur',()=>setTimeout(()=>{box.hidden=true},200));
+ input.addEventListener('blur',()=>setTimeout(()=>{box.hidden=true},250));
  input.addEventListener('focus',()=>{if(input.value.trim().length>=2)box.hidden=false});
 }
 }
-subscribeAuth((u,p)=>{if($('[data-app-root]'))renderShell(p)});
+subscribeAuth((u,p)=>{if($('[data-app-root]'))renderShell(p);mountNotificationBadge()});
 
 function mountNotificationBadge(){
  const links=[...document.querySelectorAll('a[href*="notifications.html"]')];
@@ -55,6 +55,10 @@ function mountNotificationBadge(){
    let b=a.querySelector(".nav-badge");
    if(!b){b=document.createElement("span");b.className="nav-badge";a.appendChild(b);}
    b.textContent=count>99?"99+":String(count);b.hidden=count===0;
+   const dot=document.querySelector('[data-unread-dot]');
+   if(dot)dot.hidden=count===0;
  }));
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",mountNotificationBadge);else mountNotificationBadge();
+import('./pwa.js').catch(()=>{});
+
