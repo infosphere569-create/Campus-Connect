@@ -1,5 +1,5 @@
 // Campus Connect PWA Controller
-// Handles PWA detection, native app feel, login-first gating, and PWA-only animated splash
+// Handles PWA detection, native app feel, login-first gating, and PWA-only animated splash with Welcome Back greeting
 
 export function isPWAMode() {
   const standalone =
@@ -21,10 +21,11 @@ export function initPWA() {
   const page = document.body?.dataset?.page || '';
   const isLanding = document.body?.hasAttribute('data-landing') || location.pathname.endsWith('index.html') || location.pathname === '/';
 
-  // 1. PWA Route Gating: Skip marketing page in PWA, go straight to dashboard if logged in, or login if not
+  // 1. PWA Route Gating: Skip marketing landing page in PWA.
+  // Go straight to dashboard IF logged in, or login if NOT logged in.
   if (pwa && isLanding) {
     import('./auth.js').then(({ currentUser }) => {
-      const demoAuth = sessionStorage.getItem('cc-demo') === '1';
+      const demoAuth = sessionStorage.getItem('cc-demo') === '1' || localStorage.getItem('cc-demo') === '1';
       if (currentUser || demoAuth) {
         location.replace('home.html?pwa=1');
       } else {
@@ -36,11 +37,15 @@ export function initPWA() {
     return;
   }
 
-  // 2. Open Logo Animation ONLY in PWA App
+  // 2. Open Logo & Welcome Back Animation ONLY in PWA App
   if (pwa) {
     const splashAlreadyShown = sessionStorage.getItem('cc-pwa-splash-shown') === '1';
     if (!splashAlreadyShown && !document.getElementById('cc-pwa-splash')) {
-      showPWASplash();
+      import('./auth.js').then(({ currentProfile, currentUser }) => {
+        showPWASplash(currentProfile || currentUser);
+      }).catch(() => {
+        showPWASplash(null);
+      });
     }
   }
 
@@ -70,8 +75,24 @@ export function initPWA() {
   });
 }
 
-function showPWASplash() {
+export function showPWASplash(profile) {
   sessionStorage.setItem('cc-pwa-splash-shown', '1');
+
+  const name = profile?.displayName || profile?.name || '';
+  let titleText = 'Campus Connect';
+  let subText = 'Your Campus. Your Community.';
+
+  if (name) {
+    const isNew = sessionStorage.getItem('cc-just-registered') === '1';
+    if (isNew) {
+      sessionStorage.removeItem('cc-just-registered');
+      titleText = `Welcome, ${name.split(' ')[0]}!`;
+      subText = 'Your campus profile is ready 🎉';
+    } else {
+      titleText = `Welcome Back!`;
+      subText = `Glad to see you again, ${name.split(' ')[0]} 👋`;
+    }
+  }
 
   const splash = document.createElement('div');
   splash.id = 'cc-pwa-splash';
@@ -83,8 +104,8 @@ function showPWASplash() {
         <div class="cc-splash-ring"></div>
         <img class="cc-splash-logo" src="icon.png" alt="Campus Connect">
       </div>
-      <div class="cc-splash-title">Campus Connect</div>
-      <div class="cc-splash-sub">Your Campus. Your Community.</div>
+      <div class="cc-splash-title">${titleText}</div>
+      <div class="cc-splash-sub">${subText}</div>
       <div class="cc-splash-loader">
         <div class="cc-splash-bar"></div>
       </div>
@@ -98,7 +119,7 @@ function showPWASplash() {
     setTimeout(() => {
       splash.remove();
     }, 450);
-  }, 1250);
+  }, 1400);
 }
 
 // Auto-run on script execution
