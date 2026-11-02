@@ -587,6 +587,8 @@ document.addEventListener('submit',async e=>{
     loadEvents();loadStats();
   }catch(err){toast(err.message||'Could not create event.','error')}
   finally{submitBtn.disabled=false}
+});
+
 // Newsletter & Broadcast Panel
 async function loadNewsletter(){
   const tbody = $('[data-newsletter-rows]');
