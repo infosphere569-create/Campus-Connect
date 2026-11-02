@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script>(function(){try{var v=localStorage.getItem("cc-theme")||"system";var r=v==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):v;document.documentElement.dataset.theme=r;document.documentElement.dataset.themePreference=v;}catch(e){}})();</script>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#5b5cf0">
+  <title>Safety & Community Guidelines — Campus Connect</title>
+  <meta name="description" content="Campus Connect Safety & Guidelines — peer moderation, report workflows, emergency resources, and student protection protocols.">
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/pages.css">
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="manifest" href="manifest.json">
+</head>
+<body data-page="safety">
+  <div id="globalProgressBar"></div>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="index.html">
+        <span class="brand-mark"><img src="icon.png" alt="Logo" width="22" height="22" style="border-radius:6px"></span>
+        <span class="brand-name">Campus Connect</span>
+      </a>
+      <div class="top-actions" style="margin-left:auto">
+        <a class="btn ghost sm" href="index.html">Home</a>
+        <a class="btn primary sm" href="login.html?mode=login">Sign In</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="main container" style="max-width:960px;padding-block:36px">
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">STUDENT PROTECTION & TRUST</div>
+        <h1>Safety & Community Guidelines</h1>
+        <p class="landing-copy">Keeping campus digital spaces constructive, inclusive, and protected for everyone.</p>
+      </div>
+      <span class="badge success" style="padding:8px 14px;font-weight:800"><i data-lucide="shield-alert"></i> Live Moderation Safeguards</span>
+    </div>
+
+    <div class="grid grid-3" style="margin-bottom:28px">
+      <div class="card stat">
+        <i data-lucide="flag" style="color:var(--danger);width:28px;height:28px"></i>
+        <strong style="margin-top:8px">Instant Reporting</strong>
+        <span class="small muted">Click the report flag on any post or message to send it directly to campus moderators.</span>
+      </div>
+      <div class="card stat">
+        <i data-lucide="bot" style="color:var(--primary);width:28px;height:28px"></i>
+        <strong style="margin-top:8px">Automated Filters</strong>
+        <span class="small muted">Proactive toxicity scanning blocks profanity and spam before it reaches public feeds.</span>
+      </div>
+      <div class="card stat">
+        <i data-lucide="phone-call" style="color:var(--success);width:28px;height:28px"></i>
+        <strong style="margin-top:8px">Emergency Helpline</strong>
+        <span class="small muted">Direct access to campus security and student anti-ragging support helplines.</span>
+      </div>
+    </div>
+
+    <section class="card stack" style="gap:22px;padding:28px">
+      <div>
+        <h2>1. Reporting Inappropriate Content</h2>
+        <p class="muted">If you encounter harmful content, harassment, or spam on Campus Connect:</p>
+        <ol style="padding-left:20px;line-height:1.7" class="muted">
+          <li>Click or tap the <strong>Report</strong> action button on the post or message.</li>
+          <li>Select the reason (Harassment, Misinformation, Spam, Inappropriate Media).</li>
+          <li>Our automated queue flags the item for review by designated campus student moderators and platform administrators.</li>
+        </ol>
+      </div>
+
+      <div class="divider"></div>
+
+      <div>
+        <h2>2. Campus Anti-Ragging & Anti-Harassment Policy</h2>
+        <p class="muted">Campus Connect strictly enforces zero-tolerance policies against ragging, discrimination based on gender, branch, or background, and hate speech.</p>
+      </div>
+
+      <div class="divider"></div>
+
+      <div>
+        <h2>3. Emergency & Mental Health Resources</h2>
+        <div class="notice danger-box" style="margin-top:12px">
+          <strong>Need immediate help?</strong>
+          <p class="small muted" style="margin:4px 0 0">Contact Campus Security at <code>1800-CAMPUS-SAFE</code> or student counselling services in the Student Activity Centre.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer" style="margin-top:40px">
+    <div class="container" style="text-align:center">
+      <span class="small muted">© 2026 Campus Connect. Built for student life. All rights reserved.</span>
+      <div class="toolbar" style="justify-content:center;margin-top:10px">
+        <a class="muted-link small" href="privacy.html">Privacy Policy</a>
+        <a class="muted-link small" href="terms.html">Terms of Service</a>
+        <a class="muted-link small" href="safety.html">Safety Guidelines</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => window.lucide?.createIcons());
+  </script>
+</body>
+</html>

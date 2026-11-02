@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script>(function(){try{var v=localStorage.getItem("cc-theme")||"system";var r=v==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):v;document.documentElement.dataset.theme=r;document.documentElement.dataset.themePreference=v;}catch(e){}})();</script>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#5b5cf0">
+  <title>Student Privacy Model & Policy — Campus Connect</title>
+  <meta name="description" content="Campus Connect Student Privacy Policy — pseudonymous reporting, end-to-end data safety, zero tracking telemetry, and student privacy guarantees.">
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/pages.css">
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="manifest" href="manifest.json">
+</head>
+<body data-page="privacy">
+  <div id="globalProgressBar"></div>
+  
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="index.html">
+        <span class="brand-mark"><img src="icon.png" alt="Logo" width="22" height="22" style="border-radius:6px"></span>
+        <span class="brand-name">Campus Connect</span>
+      </a>
+      <div class="top-actions" style="margin-left:auto">
+        <a class="btn ghost sm" href="index.html">Home</a>
+        <a class="btn primary sm" href="login.html?mode=login">Sign In</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="main container" style="max-width:960px;padding-block:36px">
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">PRIVACY & TRUST MODEL</div>
+        <h1>Student Privacy Policy</h1>
+        <p class="landing-copy">Campus Connect is engineered from the ground up to respect student identity, prevent unwanted tracking, and safeguard anonymous voices.</p>
+      </div>
+      <span class="badge primary" style="padding:8px 14px;font-weight:800"><i data-lucide="shield-check"></i> Privacy Standard 2026–2027</span>
+    </div>
+
+    <div class="grid grid-3" style="margin-bottom:28px">
+      <div class="card stat">
+        <i data-lucide="eye-off" style="color:var(--primary);width:28px;height:28px"></i>
+        <strong style="margin-top:8px">100% Pseudonymous</strong>
+        <span class="small muted">Anonymous issue reporting completely separates public posts from student profile IDs.</span>
+      </div>
+      <div class="card stat">
+        <i data-lucide="lock" style="color:var(--success);width:28px;height:28px"></i>
+        <strong style="margin-top:8px">Zero Telemetry</strong>
+        <span class="small muted">No third-party ad trackers, cross-site cookies, or behavioral profiling.</span>
+      </div>
+      <div class="card stat">
+        <i data-lucide="database" style="color:var(--warning);width:28px;height:28px"></i>
+        <strong style="margin-top:8px">Student Data Ownership</strong>
+        <span class="small muted">You can request export or permanent deletion of your profile data at any time.</span>
+      </div>
+    </div>
+
+    <section class="card stack" style="gap:22px;padding:28px">
+      <div>
+        <h2>1. Information We Collect</h2>
+        <p class="muted">We collect minimal information necessary to deliver a verified campus community experience:</p>
+        <ul style="padding-left:20px;line-height:1.7" class="muted">
+          <li><strong>Account Identity:</strong> Your name, student email address, academic branch, and graduation year provided during signup.</li>
+          <li><strong>Profile Customization:</strong> Optional bio, avatar image, and club memberships you choose to publish.</li>
+          <li><strong>Content Contributions:</strong> Posts, group messages, event RSVPs, and issue votes submitted across the platform.</li>
+        </ul>
+      </div>
+
+      <div class="divider"></div>
+
+      <div>
+        <h2>2. Anonymous Issues Identity Boundary</h2>
+        <p class="muted">When you submit a Campus Issue anonymously:</p>
+        <div class="notice" style="margin-block:12px">
+          <strong>Pseudonymity Guarantee:</strong>
+          <p class="small muted" style="margin:4px 0 0">The public issue document contains only the placeholder "Anonymous Student". Public users and non-staff members cannot view your real profile ID on anonymous complaints.</p>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div>
+        <h2>3. Data Protection & Security</h2>
+        <p class="muted">All student communications use encrypted HTTPS in transit and granular Firestore security rules on database documents. We enforce strict role-based access control (RBAC) so that private records remain restricted.</p>
+      </div>
+
+      <div class="divider"></div>
+
+      <div>
+        <h2>4. Data Control & Deletion</h2>
+        <p class="muted">You own your content. You can edit or delete your posts, leave groups, or request complete account erasure by contacting campus administration or via the Account Preferences menu.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer" style="margin-top:40px">
+    <div class="container" style="text-align:center">
+      <span class="small muted">© 2026 Campus Connect. Built for student life. All rights reserved.</span>
+      <div class="toolbar" style="justify-content:center;margin-top:10px">
+        <a class="muted-link small" href="privacy.html">Privacy Policy</a>
+        <a class="muted-link small" href="terms.html">Terms of Service</a>
+        <a class="muted-link small" href="safety.html">Safety Guidelines</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => window.lucide?.createIcons());
+  </script>
+</body>
+</html>

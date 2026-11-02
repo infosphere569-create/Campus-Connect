@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script>(function(){try{var v=localStorage.getItem("cc-theme")||"system";var r=v==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):v;document.documentElement.dataset.theme=r;document.documentElement.dataset.themePreference=v;}catch(e){}})();</script>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#5b5cf0">
+  <title>Institutional & Campus Accreditation — Campus Connect</title>
+  <meta name="description" content="Campus Connect Institutional Portal — college administration integration, student union partnerships, and verified campus digital infrastructure.">
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/pages.css">
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="manifest" href="manifest.json">
+</head>
+<body data-page="institutional">
+  <div id="globalProgressBar"></div>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="index.html">
+        <span class="brand-mark"><img src="icon.png" alt="Logo" width="22" height="22" style="border-radius:6px"></span>
+        <span class="brand-name">Campus Connect</span>
+      </a>
+      <div class="top-actions" style="margin-left:auto">
+        <a class="btn ghost sm" href="index.html">Home</a>
+        <a class="btn primary sm" href="login.html?mode=login">Sign In</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="main container" style="max-width:960px;padding-block:36px">
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">ADMINISTRATION & PARTNERSHIPS</div>
+        <h1>Institutional Portal</h1>
+        <p class="landing-copy">Empowering university leadership, department heads, and student unions with secure, real-time campus communication channels.</p>
+      </div>
+      <a class="btn primary sm" href="admin.html"><i data-lucide="shield"></i> Admin Portal</a>
+    </div>
+
+    <div class="grid grid-3" style="margin-bottom:28px">
+      <div class="card stat">
+        <i data-lucide="building-2" style="color:var(--primary);width:28px;height:28px"></i>
+        <strong style="margin-top:8px">Verified Campuses</strong>
+        <span class="small muted">Scoped domain matching ensures students interact strictly within their accredited institutional community.</span>
+      </div>
+      <div class="card stat">
+        <i data-lucide="megaphone" style="color:var(--success);width:28px;height:28px"></i>
+        <strong style="margin-top:8px">Official Bulletins</strong>
+        <span class="small muted">Administration accounts issue verified campus broadcast announcements with priority feed placement.</span>
+      </div>
+      <div class="card stat">
+        <i data-lucide="line-chart" style="color:var(--warning);width:28px;height:28px"></i>
+        <strong style="margin-top:8px">Issue Resolution Analytics</strong>
+        <span class="small muted">Track infrastructure complaint resolution metrics, student sentiment trends, and response speed.</span>
+      </div>
+    </div>
+
+    <section class="card stack" style="gap:20px;padding:28px">
+      <h2>Partnering with Your Institution</h2>
+      <p class="muted">Campus Connect offers customized deployment instances for universities, engineering colleges, and autonomous institutes. Features include single sign-on (SSO) integration, custom branding, and dedicated moderation control panels.</p>
+      
+      <div class="notice">
+        <strong>Interested in onboarding your college?</strong>
+        <p class="small muted" style="margin-top:4px">Reach out to our institutional onboarding desk at <code>institutional@campusconnect.edu</code> for a demo walkthrough.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer" style="margin-top:40px">
+    <div class="container" style="text-align:center">
+      <span class="small muted">© 2026 Campus Connect. Built for student life. All rights reserved.</span>
+      <div class="toolbar" style="justify-content:center;margin-top:10px">
+        <a class="muted-link small" href="privacy.html">Privacy Policy</a>
+        <a class="muted-link small" href="terms.html">Terms of Service</a>
+        <a class="muted-link small" href="institutional.html">Institutional</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => window.lucide?.createIcons());
+  </script>
+</body>
+</html>
