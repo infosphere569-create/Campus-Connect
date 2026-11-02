@@ -18,7 +18,7 @@ export function renderShell(profile){
  const desktop=nav.map(([href,icon,label,key])=>`<a class="nav-item ${page===key?'active':''}" href="${href}"><i data-lucide="${icon}"></i><span>${label}</span></a>`).join('');
  const admin=(profile?.role==='platformAdmin'||profile?.role==='moderator')?`<a class="nav-item ${page==='admin'?'active':''}" href="admin.html"><i data-lucide="shield"></i><span>Admin</span></a>`:'';
  const mobile=nav.filter((_,i)=>[0,1,2,3,6].includes(i)).map(([href,icon,label,key])=>`<a class="${page===key?'active':''}" href="${href}"><i data-lucide="${icon}"></i><span>${label}</span></a>`).join('');
- const top=`<header class="topbar"><div class="topbar-inner"><a class="brand" href="home.html"><span class="brand-mark"><i data-lucide="sparkles"></i></span><span class="brand-name">Campus Connect</span></a><button class="mobile-search-btn btn icon ghost" data-open-search aria-label="Search"><i data-lucide="search"></i></button><label class="top-search"><i data-lucide="search" class="icon"></i><input id="globalSearch" autocomplete="off" placeholder="Search campus, groups, posts..." aria-label="Search"></label><div class="top-actions"><button class="btn icon ghost" id="themeToggleBtn" title="Switch theme (System / Light / Dark)" aria-label="Switch theme"><i data-lucide="sun-moon"></i></button><a class="btn icon ghost hide-mobile" href="feed.html" title="Create post"><i data-lucide="plus"></i></a><a class="btn icon ghost notif-link" href="notifications.html" title="Notifications"><i data-lucide="bell"></i><span class="notif-dot" data-unread-dot hidden></span></a><a class="avatar" href="profile.html" title="Profile">${profile?.photoURL?`<img src="${escapeHtml(profile.photoURL)}" alt="">`:initials(profile?.displayName)}</a></div></div></header>`;
+  const top=`<header class="topbar"><div class="topbar-inner"><a class="brand" href="home.html"><span class="brand-mark"><i data-lucide="sparkles"></i></span><span class="brand-name">Campus Connect</span></a><button class="mobile-search-btn btn icon ghost" data-open-search aria-label="Search"><i data-lucide="search"></i></button><label class="top-search"><i data-lucide="search" class="icon"></i><input id="globalSearch" autocomplete="off" placeholder="Search campus, groups, posts..." aria-label="Search"></label><div class="top-actions"><button class="btn icon ghost" id="themeToggleBtn" title="Switch theme (System / Light / Dark)" aria-label="Switch theme"><i data-lucide="sun-moon"></i></button><a class="btn icon ghost hide-mobile" href="feed.html" title="Create post"><i data-lucide="plus"></i></a><div class="notif-container" style="position:relative"><button class="btn icon ghost notif-link" id="notifDropdownBtn" title="Notifications" aria-label="Notifications"><i data-lucide="bell"></i><span class="notif-dot" data-unread-dot hidden></span></button><div class="notif-dropdown" id="notifDropdown" hidden><div class="notif-head">Recent Activity</div><div class="notif-list" id="notifList"></div><a class="notif-footer" href="notifications.html">View all notifications</a></div></div><a class="avatar" href="profile.html" title="Profile">${profile?.photoURL?`<img src="${escapeHtml(profile.photoURL)}" alt="">`:initials(profile?.displayName)}</a></div></div></header>`;
  const mainContent=document.querySelector('[data-app-main]');
  if(mainContent&&mainContent.parentNode)mainContent.parentNode.removeChild(mainContent);
  const shell=`<div class="app-shell"><aside class="sidebar"><div class="side-nav">${desktop}${admin}</div><div class="sidebar-footer"><button class="nav-item" style="width:100%" data-logout><i data-lucide="log-out"></i><span>Logout</span></button></div></aside><main class="main" data-shell-slot></main></div><nav class="bottom-nav">${mobile}</nav>`;
@@ -34,7 +34,39 @@ export function renderShell(profile){
    const {toast}=await import('./utils.js');
    toast(`Theme: ${next.charAt(0).toUpperCase()+next.slice(1)} mode`);
  });
- if(profile?.uid){import('./services.js').then(({getNotifications})=>getNotifications(profile.uid,8).then(ns=>{const dot=document.querySelector('[data-unread-dot]');if(dot)dot.hidden=!ns.some(n=>!n.read)}).catch(()=>{}));}
+  if (profile?.uid) {
+    import('./realtime.js').then(({ watchMyNotifications }) => {
+      const notifBtn = root.querySelector('#notifDropdownBtn');
+      const notifDropdown = root.querySelector('#notifDropdown');
+      const notifList = root.querySelector('#notifList');
+      const notifDot = root.querySelector('[data-unread-dot]');
+
+      notifBtn?.addEventListener('click', () => {
+        notifDropdown.hidden = !notifDropdown.hidden;
+      });
+
+      document.addEventListener('click', (e) => {
+        if (notifBtn && !notifBtn.contains(e.target) && notifDropdown && !notifDropdown.contains(e.target)) {
+          notifDropdown.hidden = true;
+        }
+      });
+
+      watchMyNotifications((notifications) => {
+        const unread = notifications.filter(n => !n.read);
+        if (notifDot) notifDot.hidden = unread.length === 0;
+
+        notifList.innerHTML = notifications.length ? notifications.slice(0, 5).map(n => `
+          <div class="notif-item ${n.read ? '' : 'unread'}">
+            <div class="notif-text">${escapeHtml(n.text || n.message || 'New notification')}</div>
+            <div class="notif-time">${new Date(n.createdAt?.toDate?.() || n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+          </div>
+        `).join('') : '<div class="small muted" style="padding:10px">No recent notifications</div>';
+        
+        window.lucide?.createIcons();
+      });
+    });
+  }
+
  document.querySelector('[data-open-search]')?.addEventListener('click',()=>{const panel=document.createElement('div');panel.className='search-overlay';panel.innerHTML='<div class="search-dialog"><div class="split"><h2>Search Campus Connect</h2><button class="btn icon ghost" data-close><i data-lucide="x"></i></button></div><input id="mobileSearch" autocomplete="off" placeholder="Search people, groups, posts or events..."><div id="mobileSearchResults" class="search-results"></div></div>';document.body.appendChild(panel);window.lucide?.createIcons();panel.addEventListener('click',e=>{if(e.target===panel||e.target.closest('[data-close]'))panel.remove()});const escHandler=e=>{if(e.key==='Escape'){panel.remove();document.removeEventListener('keydown',escHandler)}};document.addEventListener('keydown',escHandler);panel.querySelector('input').focus();wireSearch('mobileSearch','mobileSearchResults')});
 // Both search boxes existed in the markup with zero listeners attached -- typing
 // into either one did nothing. Wired here, plus a dropdown result panel is

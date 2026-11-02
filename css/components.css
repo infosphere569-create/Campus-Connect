@@ -336,10 +336,16 @@ html.is-mobile-or-pwa .pwa-abstract-bg,
   100% { background-position: 36px 36px; }
 }
 
+
 @keyframes pwaLensPulse {
   0% { opacity: 0.4; transform: scale(0.9); }
   100% { opacity: 1; transform: scale(1.2); box-shadow: 0 0 12px #38bdf8; }
 }
+
+.notif-item{padding:12px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:4px}
+.notif-item.unread{background:color-mix(in srgb, var(--accent) 5%, var(--surface))}
+.notif-text{font-size:14px}
+.notif-time{font-size:11px;color:var(--muted)}
 
 
 
