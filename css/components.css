@@ -182,31 +182,37 @@ html[data-is-pwa="true"] .bottom-nav,
 }
 
 /* =========================================================
-   PWA & Mobile Animated Background
-   Strictly active on Mobile/Tablet (< 1024px) & PWA Standalone Mode.
-   Desktop Browsers (>= 1024px) are clean to prevent animation duplication.
+   PWA & Mobile Animated Background (Device Detection)
+   Strictly active on Mobile/Tablet devices & PWA Standalone Mode.
+   Laptop/PC Desktop Browsers are STRICTLY CLEAN (No animation in right card).
    ========================================================= */
 
 .pwa-abstract-bg {
-  display: none;
+  display: none !important;
 }
 
-/* Desktop Web Browsers (>= 1024px) when NOT in Standalone PWA Mode */
-@media (min-width: 1024px) {
-  html:not([data-is-pwa="true"]) .auth-panel {
-    background: var(--surface) !important;
-  }
-  html:not([data-is-pwa="true"]) .pwa-abstract-bg {
-    display: none !important;
-  }
+/* Laptop / PC Desktop Web Browser */
+html.is-laptop-device .auth-panel,
+html:not(.is-mobile-or-pwa) .auth-panel {
+  background: var(--surface) !important;
 }
 
-/* Enabled on Mobile & Tablet (< 1024px) OR Standalone PWA Mode */
-@media (max-width: 1023px), (display-mode: standalone) {
-  .auth-panel {
-    background: transparent !important;
-  }
+html.is-laptop-device .auth-card,
+html:not(.is-mobile-or-pwa) .auth-card {
+  background: var(--surface) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-radius: var(--radius);
+}
 
+html.is-laptop-device .pwa-abstract-bg,
+html:not(.is-mobile-or-pwa) .pwa-abstract-bg {
+  display: none !important;
+}
+
+/* Mobile & Tablet Devices OR Standalone PWA App Mode */
+html.is-mobile-or-pwa .pwa-abstract-bg,
+@media (max-width: 768px), (display-mode: standalone) {
   .pwa-abstract-bg {
     display: block !important;
     position: absolute;
@@ -216,6 +222,7 @@ html[data-is-pwa="true"] .bottom-nav,
     overflow: hidden;
     background: radial-gradient(circle at 50% 20%, color-mix(in srgb, var(--primary) 20%, var(--bg)) 0%, var(--bg) 80%);
   }
+}
 
   /* Abstract Gradient Orbs */
   .pwa-mesh-orb {
