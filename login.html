@@ -19,14 +19,15 @@
     </div>
   </section>
   <section class="auth-panel" style="position:relative;overflow:hidden">
-    <!-- PWA / Mobile Animated Device Backdrop -->
-    <div class="pwa-device-backdrop" style="position:absolute;inset:0;pointer-events:none;z-index:0;overflow:hidden">
-      <div class="pwa-bg-glow glow-1"></div>
-      <div class="pwa-bg-glow glow-2"></div>
-      <div class="pwa-device-silhouette">
-        <div class="pwa-silhouette-notch"></div>
+    <!-- CSS-Only PWA & Non-Desktop Abstract Animated Background -->
+    <div class="pwa-abstract-bg">
+      <div class="pwa-mesh-orb orb-1"></div>
+      <div class="pwa-mesh-orb orb-2"></div>
+      <div class="pwa-mesh-orb orb-3"></div>
+      <div class="pwa-mesh-grid"></div>
+      <div class="pwa-glass-card-frame">
+        <div class="pwa-phone-camera"></div>
       </div>
-      <canvas id="pwaHeroCanvas" style="position:absolute;inset:0;width:100%;height:100%;opacity:0.55;mix-blend-mode:screen"></canvas>
     </div>
 
     <div class="auth-card" style="position:relative;z-index:2;background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-radius:24px;border:1.5px solid color-mix(in srgb,var(--primary) 25%,var(--border));padding:28px;box-shadow:var(--shadow)">
