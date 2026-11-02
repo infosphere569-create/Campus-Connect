@@ -394,12 +394,21 @@ if(nForm){
     e.preventDefault();
     var emailInput=document.getElementById('newsletterEmail');
     var msgDiv=document.getElementById('newsletterMsg');
+    var subBtn=nForm.querySelector('button[type="submit"]');
     if(emailInput&&emailInput.value){
-      msgDiv.hidden=false;
-      msgDiv.style.color='var(--success, #1f9d69)';
-      msgDiv.textContent='Successfully subscribed to campus-wide updates!';
-      emailInput.value='';
-      setTimeout(function(){msgDiv.hidden=true},4000);
+      subBtn.disabled=true;
+      var orig=subBtn.innerHTML;
+      subBtn.innerHTML='<span class="btn-spinner"></span> Subscribing...';
+      setTimeout(function(){
+        subBtn.disabled=false;
+        subBtn.innerHTML=orig;
+        msgDiv.hidden=false;
+        msgDiv.style.color='var(--success, #1f9d69)';
+        msgDiv.textContent='Successfully subscribed to campus-wide updates!';
+        emailInput.value='';
+        setTimeout(function(){msgDiv.hidden=true},4000);
+        window.lucide?.createIcons();
+      }, 700);
     }
   });
 }

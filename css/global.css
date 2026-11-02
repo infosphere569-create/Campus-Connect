@@ -247,16 +247,9 @@ h1,h2,h3{font-weight:800;letter-spacing:-.02em}
   to{opacity:1}
 }
 
-body.cc-navigating{
-  opacity:.85;
-  transition:opacity .15s ease;
-}
-@media (prefers-reduced-motion:reduce){
-  body,body.cc-navigating{
-    animation:none!important;
-    transition:none!important;
-    transform:none!important;
-  }
-}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+.btn-spinner { display: inline-block; width: 16px; height: 16px; border: 2.5px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; margin-right: 6px; }
+#globalProgressBar { position: fixed; top: 0; left: 0; height: 3px; background: var(--primary); z-index: 99999; width: 0%; transition: width .3s ease, opacity .3s ease; pointer-events: none; }
+
 
 

@@ -1,4 +1,5 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><script>(function(){try{var v=localStorage.getItem("cc-theme")||"system";var r=v==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):v;document.documentElement.dataset.theme=r;document.documentElement.dataset.themePreference=v;}catch(e){}})();</script><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#5b5cf0"><meta name="robots" content="noindex,nofollow"><title>Sign in — Campus Connect</title><link rel="stylesheet" href="css/global.css"><link rel="stylesheet" href="css/components.css"><link rel="stylesheet" href="css/pages.css"><link rel="icon" type="image/png" href="icon.png"><link rel="apple-touch-icon" href="icon.png"><meta property="og:type" content="website"><meta property="og:site_name" content="Campus Connect"><meta property="og:title" content="Sign in — Campus Connect"><meta property="og:description" content="Sign in to Campus Connect — your campus community."><meta property="og:image" content="icon.png"><meta name="twitter:card" content="summary"><meta name="twitter:title" content="Sign in — Campus Connect"><meta name="twitter:description" content="Sign in to Campus Connect — your campus community."><meta name="twitter:image" content="icon.png"><link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icons/icon-180.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Campus Connect"></head><body>
+<div id="globalProgressBar"></div>
 <div class="auth-page">
   <section class="auth-side" style="position:relative;overflow:hidden">
     <canvas id="heroCanvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;mix-blend-mode:screen;opacity:0.35"></canvas>
@@ -18,7 +19,10 @@
     </div>
   </section>
   <section class="auth-panel">
-    <div class="auth-card">
+    <div class="auth-card" style="position:relative">
+      <a href="index.html" id="webCloseBtn" class="btn icon ghost" style="position:absolute;top:14px;right:14px;border-radius:50%;border:1px solid var(--border);z-index:10" aria-label="Close and return to home">
+        <i data-lucide="x"></i>
+      </a>
       <div class="split">
         <div>
           <div class="kicker">Welcome</div>
@@ -33,7 +37,7 @@
       <form id="authForm" class="form">
         <div class="field">
           <label for="email">Email</label>
-          <input id="email" type="email" autocomplete="email" required placeholder="you@college.edu">
+          <input id="email" type="email" autocomplete="email" required placeholder="you@gmail.com">
         </div>
         <div class="field">
           <label for="password">Password</label>
@@ -79,6 +83,12 @@
     </div>
   </section>
 </div>
+<script>
+if(window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone){
+  var wb = document.getElementById('webCloseBtn');
+  if(wb) wb.style.display = 'none';
+}
+</script>
 <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
 <script type="module">
 import {login,register,googleLogin,resetPassword} from './js/auth.js';
@@ -109,7 +119,7 @@ form.onsubmit=async e=>{
   const email=document.querySelector('#email').value.trim(),password=document.querySelector('#password').value;
   if(password.length<6)return toast('Use at least 6 characters for the password.','error');
   submit.disabled=true;
-  submit.textContent='Please wait…';
+  submit.innerHTML='<span class="btn-spinner"></span> Please wait…';
   try{
     if(mode==='login'){await login(email,password)}
     else{
@@ -117,8 +127,11 @@ form.onsubmit=async e=>{
       await register({email,password,displayName:name,profile:{branch:document.querySelector('#branch').value.trim(),year:document.querySelector('#year').value,gender:document.querySelector('#gender').value}});
     }
     location.href='home.html';
-  }catch(e){toast(e.message||'Authentication failed.','error')}
-  finally{submit.disabled=false;setMode(mode)}
+  }catch(e){
+    toast(e.message||'Authentication failed.','error');
+    submit.disabled=false;
+    setMode(mode);
+  }
 };
 window.lucide?.createIcons();
 

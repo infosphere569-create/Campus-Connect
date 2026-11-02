@@ -30,3 +30,23 @@ export function demoProfile(){return {uid:'demo-user',displayName:'Ayush Kumar',
 export function isDemo(){return document.documentElement.dataset.firebaseReady !== 'true' || sessionStorage.getItem('cc-demo') === '1' || localStorage.getItem('cc-demo') === '1';}
 export function safeNumber(v){const n=Number(v);return Number.isFinite(n)?n:0}
 
+export function showGlobalProgress(pct){
+  let bar=document.getElementById('globalProgressBar');
+  if(!bar){
+    bar=document.createElement('div');
+    bar.id='globalProgressBar';
+    document.body.prepend(bar);
+  }
+  bar.style.width=pct+'%';
+  bar.style.opacity='1';
+  if(pct>=100){
+    setTimeout(()=>{bar.style.opacity='0';setTimeout(()=>{bar.style.width='0%'},300)},400);
+  }
+}
+
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',()=>showGlobalProgress(100));
+}else{
+  showGlobalProgress(100);
+}
+
