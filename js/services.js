@@ -136,3 +136,5 @@ export async function broadcastNewsletter({ subject, message, senderName }) {
   };
 }
 
+export async function getLatestIssues(n=3){if(!db)return[];const snap=await getDocs(query(collection(db,'issues'),orderBy('createdAt','desc'),limit(n)));return snap.docs.map(d=>({id:d.id,...d.data()}))}
+

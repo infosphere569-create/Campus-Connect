@@ -1,7 +1,7 @@
 import './theme.js';
 import {db} from './firebase.js';
 import {subscribeAuth,requireAuth,currentProfile} from './auth.js';
-import {getLatestPosts,getNotifications} from './services.js';
+import {getLatestPosts,getNotifications,getLatestIssues} from './services.js';
 import {collection,getDocs,query,where,orderBy,limit} from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js';
 import { $, escapeHtml, initials, timeAgo, formatDateTime, toast } from './utils.js';
 
@@ -72,7 +72,22 @@ async function load(){
     ? `<div class="stack">${posts.map(postCard).join('')}</div>`
     : `<div class="card empty"><i data-lucide="pen-line"></i><h3>No posts yet</h3><p class="muted">Be the first to share something with your campus.</p></div>`;
 
-  root.innerHTML=`<div class="section-title"><div><div class="kicker">Community pulse</div><h2>Trending discussions</h2></div><a class="muted-link" href="feed.html">View all <i data-lucide="arrow-right"></i></a></div>${trending}`;
+  let issues = [];
+  try {
+    issues = await getLatestIssues(3);
+  } catch(e) {}
+
+  const issuesHtml = issues.length ? `
+    <div class="section-title" style="margin-top:24px"><div><div class="kicker">Campus Hub</div><h2>Recent Issues</h2></div><a class="muted-link" href="issues.html">View all</a></div>
+    <div class="stack" style="margin-top:16px">${issues.map(i => `
+      <div class="card compact-post">
+        <strong>${escapeHtml(i.title)}</strong>
+        <p class="small muted">${escapeHtml(i.description.slice(0, 80))}${i.description.length>80?'...':''}</p>
+        <div class="toolbar" style="margin-top:8px"><span class="badge">${escapeHtml(i.category)}</span><span class="small muted">${i.supportCount||0} support</span></div>
+      </div>
+    `).join('')}</div>` : '';
+
+  root.innerHTML=`<div class="section-title"><div><div class="kicker">Community pulse</div><h2>Trending discussions</h2></div><a class="muted-link" href="feed.html">View all <i data-lucide="arrow-right"></i></a></div>${trending}${issuesHtml}`;
   window.lucide?.createIcons();
   upcomingEvents();
 }
