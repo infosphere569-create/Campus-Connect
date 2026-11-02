@@ -29,6 +29,10 @@ export function setPageMeta(title,description='Campus Connect — Your Campus. Y
 export function demoProfile(){return {uid:'demo-user',displayName:'Ayush Kumar',photoURL:'',course:'B.Tech',branch:'CSE',year:'1st Year',section:'A',college:'NITRA Technical Campus',role:'student',interests:['CSE','coding','placement'],isActive:true}}
 export function safeNumber(v){const n=Number(v);return Number.isFinite(n)?n:0}
 
+export function isDemo() {
+  return sessionStorage.getItem('cc-demo') === '1' || localStorage.getItem('cc-demo') === '1';
+}
+
 export function isSameInstitution(collegeA, collegeB) {
   if (!collegeA || !collegeB) return false;
   const a = String(collegeA).toLowerCase().replace(/[^a-z0-9\s]/g, ' ').trim();

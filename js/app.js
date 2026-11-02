@@ -21,7 +21,7 @@ export function renderShell(profile){
   const top=`<header class="topbar"><div class="topbar-inner"><a class="brand" href="home.html"><span class="brand-mark"><i data-lucide="sparkles"></i></span><span class="brand-name">Campus Connect</span></a><button class="mobile-search-btn btn icon ghost" data-open-search aria-label="Search"><i data-lucide="search"></i></button><label class="top-search"><i data-lucide="search" class="icon"></i><input id="globalSearch" autocomplete="off" placeholder="Search campus, groups, posts..." aria-label="Search"></label><div class="top-actions"><button class="btn icon ghost" id="themeToggleBtn" title="Switch theme (System / Light / Dark)" aria-label="Switch theme"><i data-lucide="sun-moon"></i></button><a class="btn icon ghost hide-mobile" href="feed.html" title="Create post"><i data-lucide="plus"></i></a><div class="notif-container" style="position:relative"><button class="btn icon ghost notif-link" id="notifDropdownBtn" title="Notifications" aria-label="Notifications"><i data-lucide="bell"></i><span class="nav-badge" data-unread-dot hidden></span></button><div class="notif-dropdown" id="notifDropdown" hidden><div class="notif-head">Recent Activity</div><div class="notif-list" id="notifList"></div><a class="notif-footer" href="notifications.html">View all notifications</a></div></div></div></div></header>`;
  const mainContent=document.querySelector('[data-app-main]');
  if(mainContent&&mainContent.parentNode)mainContent.parentNode.removeChild(mainContent);
- const shell=`<div class="app-shell"><aside class="sidebar"><div class="side-nav">${desktop}${admin}</div><div class="sidebar-footer"><button class="nav-item" style="width:100%" data-logout><i data-lucide="log-out"></i><span>Logout</span></button></div></aside><main class="main" data-shell-slot></main></div><nav class="bottom-nav">${mobile}</nav>`;
+ const shell=`<div class="app-shell"><aside class="sidebar"><div class="side-nav">${desktop}${admin}</div><div class="sidebar-footer"><button class="nav-item" style="width:100%" data-logout><i data-lucide="log-out"></i><span>Logout</span></button></div></aside><main class="main" data-shell-slot></main><button class="quick-post-fab" id="quickPostFab" aria-label="Quick Action"><i data-lucide="plus"></i></button></div><nav class="bottom-nav">${mobile}</nav>`;
  root.innerHTML=top+shell;
  const slot=root.querySelector('[data-shell-slot]');
  if(mainContent&&slot)slot.appendChild(mainContent);
@@ -117,5 +117,31 @@ function mountNotificationBadge(){
  }));
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",mountNotificationBadge);else mountNotificationBadge();
+
+document.addEventListener('click', e => {
+  if (e.target.closest('#quickPostFab')) {
+    import('./utils.js').then(({ showModal }) => {
+      showModal('Quick Action', `<div class="stack" style="gap:12px">
+        <button class="btn primary" id="quickNewPost" style="width:100%;height:56px;justify-content:center"><i data-lucide="plus-circle"></i>Create a New Post</button>
+        <button class="btn" id="quickRaiseIssue" style="width:100%;height:56px;justify-content:center;border:1px dashed var(--border)"><i data-lucide="shield-alert"></i>Raise Anonymous Issue</button>
+      </div>`);
+      window.lucide?.createIcons();
+      
+      document.getElementById('quickNewPost')?.addEventListener('click', () => {
+        document.querySelector('.modal-backdrop')?.remove();
+        if (location.pathname.includes('feed.html')) {
+          document.querySelector('[data-create-post]')?.click();
+        } else {
+          location.href = 'feed.html?compose=1';
+        }
+      });
+
+      document.getElementById('quickRaiseIssue')?.addEventListener('click', () => {
+        document.querySelector('.modal-backdrop')?.remove();
+        location.href = 'issues.html?action=new';
+      });
+    });
+  }
+});
 import('./pwa.js').catch(()=>{});
 

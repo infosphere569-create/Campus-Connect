@@ -64,10 +64,18 @@ function loadTab(tabName){
 
 // Reports / Overview
 async function loadReports(){
-  if(!db)return;
   try{
-    const snap=await getDocs(query(collection(db,'reports'),orderBy('createdAt','desc'),limit(30)));
-    rawReports=snap.docs.map(d=>({id:d.id,...d.data()}));
+    let items = [];
+    if(db){
+      const snap=await getDocs(query(collection(db,'reports'),orderBy('createdAt','desc'),limit(30)));
+      items=snap.docs.map(d=>({id:d.id,...d.data()}));
+    } else {
+      items = [
+        { id: 'rep-1', type: 'post', reason: 'Inappropriate content', status: 'pending', createdAt: new Date() },
+        { id: 'rep-2', type: 'comment', reason: 'Spam', status: 'pending', createdAt: new Date(Date.now() - 3600000) }
+      ];
+    }
+    rawReports = items;
     renderReports();
   }catch(e){
     $('[data-report-rows]').innerHTML=errorRow(5,e.message||'Could not load moderation queue.');
@@ -91,22 +99,30 @@ function renderReports(){
 
 // Users
 async function loadUsers(reset=true){
-  if(!db)return;
   const box=$('[data-user-rows]');
   const loadMoreBtn=$('#loadMoreUsers');
-  if(reset){userCursor=null;rawUsers=[];box.innerHTML='<tr><td colspan="7" class="muted">Loading users…</td></tr>'}
+  if(reset){userCursor=null;rawUsers=[];if(box)box.innerHTML='<tr><td colspan="7" class="muted">Loading users…</td></tr>'}
   try{
-    const constraints=[collection(db,'users'),orderBy('createdAt','desc'),limit(25)];
-    if(userCursor)constraints.splice(1,0,startAfter(userCursor));
-    const snap=await getDocs(query(...constraints));
-    userCursor=snap.docs.at(-1)||userCursor;
-    const newRows=snap.docs.map(d=>({id:d.id,...d.data()}));
+    let newRows = [];
+    if(db){
+      const constraints=[collection(db,'users'),orderBy('createdAt','desc'),limit(25)];
+      if(userCursor)constraints.splice(1,0,startAfter(userCursor));
+      const snap=await getDocs(query(...constraints));
+      userCursor=snap.docs.at(-1)||userCursor;
+      newRows=snap.docs.map(d=>({id:d.id,...d.data()}));
+    } else {
+      newRows = [
+        { id: 'u1', displayName: 'Ayush Kumar', email: 'ayush@example.edu', college: 'NITRA Technical Campus', role: 'student', createdAt: new Date() },
+        { id: 'u2', displayName: 'Priya Singh', email: 'priya@example.edu', college: 'IIT Delhi', role: 'moderator', createdAt: new Date(Date.now() - 86400000) }
+      ];
+    }
     rawUsers=reset?newRows:rawUsers.concat(newRows);
     renderUsers();
-    if(loadMoreBtn)loadMoreBtn.hidden=snap.docs.length<25;
+    if(loadMoreBtn)loadMoreBtn.hidden=!db || newRows.length<25;
   }catch(e){
-    box.innerHTML=errorRow(7,e.message||'Could not load users.');
+    if(box)box.innerHTML=errorRow(7,e.message||'Could not load users.');
     if(loadMoreBtn)loadMoreBtn.hidden=true;
+  }
   }
 }
 
@@ -659,12 +675,11 @@ subscribeAuth((u,p)=>{
     const banner=document.createElement('div');
     banner.className='notice warning';
     banner.style.marginBottom='16px';
-    banner.innerHTML='<strong>Demo mode.</strong> Connect Firebase and sign in with a platformAdmin or moderator account to load live moderation data.';
+    banner.innerHTML='<strong>Demo mode.</strong> Showing simulated moderation data. Connect Firebase to manage live campus data.';
     const target=document.querySelector('.page-head');
     target?.parentElement?.insertBefore(banner,target.nextSibling);
-    return;
   }
-  if(!hasRole('platformAdmin','moderator')){
+  if(db && !hasRole('platformAdmin','moderator')){
     const root=document.querySelector('[data-app-main] section')||document.querySelector('main section');
     if(root){
       root.innerHTML='<div class="empty"><i data-lucide="shield-off"></i><h2>Admin access required</h2><p class="muted">This area is restricted to platform administrators and moderators.</p><a class="btn primary" href="home.html">Back to Home</a></div>';
