@@ -20,13 +20,25 @@ document.querySelector('#fullName').addEventListener('input',e=>{if(!selectedFil
 // Live progress bar across the 4 sections, purely cosmetic feedback as the form fills in.
 function updateProgress(){
  const fields=['fullName','course','branch','year','section','college','bio'];
- const filled=fields.filter(id=>document.getElementById(id).value.trim()).length;
- const pct=Math.max(15,Math.round((filled/fields.length)*100));
+ const filled=fields.filter(id=>document.getElementById(id)&&document.getElementById(id).value.trim()).length;
+ const pct=Math.max(20,Math.round((filled/fields.length)*100));
  const bar=document.getElementById('onbProgress');if(bar)bar.style.width=pct+'%';
+ const lbl=document.getElementById('onbProgressPct');if(lbl)lbl.textContent=pct+'% completed';
 }
 form.addEventListener('input',updateProgress);
 updateProgress();
 
+if(!auth){
+ form.addEventListener("submit",async e=>{
+  e.preventDefault(); status.textContent="Saving profile…";
+  const value=id=>document.querySelector("#"+id)?.value.trim()||'';
+  const name=value("fullName")||"Student";
+  const demoData={displayName:name,course:value("course")||"B.Tech",branch:value("branch")||"CSE",year:value("year")||"3rd Year",section:value("section")||"A",college:value("college")||"Apex Institute of Technology",bio:value("bio")};
+  try{localStorage.setItem('cc-demo-profile',JSON.stringify(demoData));}catch(err){}
+  status.textContent="Profile saved!";
+  setTimeout(()=>location.href="home.html",350);
+ });
+}else{
 onAuthStateChanged(auth,async user=>{
  if(!user){location.href="login.html";return;}
  const ref=doc(db,"users",user.uid);
@@ -58,3 +70,4 @@ onAuthStateChanged(auth,async user=>{
   }catch(err){status.textContent=err.message||"Could not save profile.";submitBtn.disabled=false;}
  });
 });
+}

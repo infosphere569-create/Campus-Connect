@@ -11,12 +11,13 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-export function alreadyInstalled() {
+function alreadyInstalled() {
   return localStorage.getItem(INSTALLED_KEY) === '1' ||
     window.matchMedia('(display-mode: standalone)').matches ||
     window.navigator.standalone === true ||
     sessionStorage.getItem('cc-is-pwa') === '1';
 }
+window.alreadyInstalled = alreadyInstalled;
 
 function shownCount() {
   return Number(localStorage.getItem(COUNT_KEY) || 0);
