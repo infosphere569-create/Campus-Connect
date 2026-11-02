@@ -60,6 +60,7 @@ const DEMO_CHAT_MESSAGES = [
 let localMsgs = [...DEMO_CHAT_MESSAGES];
 
 async function start(){
+ if(unsub){unsub();unsub=null;}
  groupId=getQuery('id')||'demo-grp-coders';
  if(groupId.startsWith('demo')||!db){
   renderMessages(localMsgs);
