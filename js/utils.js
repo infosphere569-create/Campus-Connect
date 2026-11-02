@@ -27,8 +27,26 @@ export function showModal(title,content,options={}){const back=document.createEl
 export function getQuery(name){return new URLSearchParams(location.search).get(name)}
 export function setPageMeta(title,description='Campus Connect — Your Campus. Your Community.'){document.title=title;const m=document.querySelector('meta[name="description"]');if(m)m.content=description}
 export function demoProfile(){return {uid:'demo-user',displayName:'Ayush Kumar',photoURL:'',course:'B.Tech',branch:'CSE',year:'1st Year',section:'A',college:'NITRA Technical Campus',role:'student',interests:['CSE','coding','placement'],isActive:true}}
-export function isDemo(){return document.documentElement.dataset.firebaseReady !== 'true' || sessionStorage.getItem('cc-demo') === '1' || localStorage.getItem('cc-demo') === '1';}
 export function safeNumber(v){const n=Number(v);return Number.isFinite(n)?n:0}
+
+export function isSameInstitution(collegeA, collegeB) {
+  if (!collegeA || !collegeB) return false;
+  const a = String(collegeA).toLowerCase().replace(/[^a-z0-9\s]/g, ' ').trim();
+  const b = String(collegeB).toLowerCase().replace(/[^a-z0-9\s]/g, ' ').trim();
+
+  if (a === b) return true;
+  if (a.length >= 3 && b.length >= 3 && (a.includes(b) || b.includes(a))) return true;
+
+  const stopWords = new Set(['college', 'institute', 'institution', 'university', 'campus', 'school', 'of', 'and', '&', 'the', 'dept', 'department', 'engineering', 'technology', 'tech']);
+  const wordsA = a.split(/\s+/).filter(w => w.length >= 3 && !stopWords.has(w));
+  const wordsB = b.split(/\s+/).filter(w => w.length >= 3 && !stopWords.has(w));
+
+  if (wordsA.length === 0 || wordsB.length === 0) {
+    return a.includes(b) || b.includes(a);
+  }
+
+  return wordsA.some(w => wordsB.includes(w));
+}
 
 export function showGlobalProgress(pct){
   let bar=document.getElementById('globalProgressBar');

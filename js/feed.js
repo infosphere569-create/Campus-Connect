@@ -4,7 +4,7 @@ import {doc,getDoc,updateDoc,deleteDoc,increment,serverTimestamp} from 'https://
 import {subscribeAuth,requireAuth,currentProfile,currentUser} from './auth.js';
 import {getLatestPosts,createPost,togglePostLike,getPostComments,addComment,editComment,deleteComment,toggleSave,toggleRepost,uploadImage} from './services.js';
 import {paginatePosts} from './content-actions.js';
-import { $, $$, escapeHtml, linkifyHtml, initials, timeAgo, toast, showModal, isDemo, getQuery } from './utils.js';
+import { $, $$, escapeHtml, linkifyHtml, initials, timeAgo, toast, showModal, isDemo, getQuery, isSameInstitution } from './utils.js';
 import {observeLazyImages} from './performance.js';
 import {rankPosts} from './algorithm.js';
 
@@ -63,7 +63,7 @@ function postTemplate(p){
   const liked = Boolean(p._liked);
   const saved = Boolean(p._saved);
   const reposted = Boolean(p._reposted);
-  const sameCollege = p.college && profile?.college && String(p.college).toLowerCase() === String(profile.college).toLowerCase();
+  const sameCollege = p.college && profile?.college && isSameInstitution(p.college, profile.college);
 
   return `<article class="card post-card" data-post-id="${escapeHtml(p.id||'')}" data-author-id="${escapeHtml(p.authorId||'')}">
     <div class="post-head">
@@ -97,7 +97,7 @@ function renderActivePosts(){
 
   let filtered = [...allFetchedPosts];
   if (activeTab === 'Following') {
-    filtered = filtered.filter(p => p.college === profile?.college || p.authorId === currentUser?.uid || p.role === 'platformAdmin');
+    filtered = filtered.filter(p => isSameInstitution(p.college, profile?.college) || p.authorId === currentUser?.uid || p.role === 'platformAdmin');
     if (!filtered.length) filtered = allFetchedPosts.slice(0, 5);
   } else if (activeTab === 'Latest') {
     filtered.sort((a,b) => (b.createdAt?.toMillis?.() || new Date(b.createdAt).getTime() || 0) - (a.createdAt?.toMillis?.() || new Date(a.createdAt).getTime() || 0));
