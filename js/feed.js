@@ -5,6 +5,7 @@ import {subscribeAuth,requireAuth,currentProfile,currentUser} from './auth.js';
 import {getLatestPosts,createPost,togglePostLike,getPostComments,addComment,editComment,deleteComment,toggleSave,toggleRepost,uploadImage} from './services.js';
 import {paginatePosts} from './content-actions.js';
 import { $, $$, escapeHtml, linkifyHtml, initials, timeAgo, toast, showModal, isDemo, getQuery } from './utils.js';
+import {observeLazyImages} from './performance.js';
 import {rankPosts} from './algorithm.js';
 
 let profile;
@@ -66,7 +67,7 @@ function postTemplate(p){
 
   return `<article class="card post-card" data-post-id="${escapeHtml(p.id||'')}" data-author-id="${escapeHtml(p.authorId||'')}">
     <div class="post-head">
-      <div class="avatar">${p.photoURL?`<img src="${escapeHtml(p.photoURL)}" alt="">`:initials(p.authorName)}</div>
+      <div class="avatar">${p.photoURL?`<img data-src="${escapeHtml(p.photoURL)}" alt="" loading="lazy" decoding="async">`:initials(p.authorName)}</div>
       <div class="post-meta">
         <strong>${escapeHtml(p.authorName||'Campus Student')}${p.role==='platformAdmin'?` <span class="badge primary">Official</span>`:''}</strong>
         <span>${escapeHtml(p.branch||'Student')}${p.college?` · ${escapeHtml(p.college)}`:''} · ${timeAgo(p.createdAt)}</span>
@@ -75,7 +76,7 @@ function postTemplate(p){
       <button class="btn icon ghost" data-post-menu aria-label="More post actions"><i data-lucide="more-horizontal"></i></button>
     </div>
     <div class="post-text" data-raw="${escapeHtml(p.text||'')}">${linkifyHtml(p.text||'')}</div>
-    ${p.imageURL?`<img class="post-media" src="${escapeHtml(p.imageURL)}" alt="Post image">`:''}
+    ${p.imageURL?`<img class="post-media" data-src="${escapeHtml(p.imageURL)}" alt="Post image" loading="lazy" decoding="async">`:''}
     <div class="post-actions">
       <button class="action ${liked?'active':''}" data-like><i data-lucide="heart"></i><span>${p.likes||0}</span></button>
       <button class="action" data-comment><i data-lucide="message-circle"></i><span>${p.comments||0}</span></button>
@@ -111,6 +112,7 @@ function renderActivePosts(){
     box.innerHTML = filtered.map(postTemplate).join('');
   }
   window.lucide?.createIcons();
+  observeLazyImages(box);
 }
 
 async function loadPosts(){
