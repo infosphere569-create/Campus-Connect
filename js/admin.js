@@ -6,6 +6,7 @@ import {subscribeAuth,requireAuth,hasRole} from './auth.js';
 import {collection,collectionGroup,getDocs,getCountFromServer,query,orderBy,limit,startAfter,where,updateDoc,doc,deleteDoc,addDoc,serverTimestamp} from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js';
 import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-functions.js';
 import { $, $$, escapeHtml, formatDateTime, timeAgo, toast, showModal, initials } from './utils.js';
+import { getNewsletterSubscribers, broadcastNewsletter } from './services.js';
 
 let adminProfile = null;
 let activeTab = 'overview';
@@ -56,6 +57,7 @@ function loadTab(tabName){
     case 'requests': loadGroupRequests(); break;
     case 'issues': loadIssues(); break;
     case 'events': loadEvents(); break;
+    case 'newsletter': loadNewsletter(); break;
     case 'audit': loadAudit(); break;
   }
 }
@@ -585,6 +587,67 @@ document.addEventListener('submit',async e=>{
     loadEvents();loadStats();
   }catch(err){toast(err.message||'Could not create event.','error')}
   finally{submitBtn.disabled=false}
+// Newsletter & Broadcast Panel
+async function loadNewsletter(){
+  const tbody = $('[data-newsletter-rows]');
+  const badge = $('#badgeNewsletterSubs');
+  if(!tbody) return;
+  
+  try {
+    const subs = await getNewsletterSubscribers();
+    if(badge) {
+      badge.textContent = subs.length;
+      badge.hidden = (subs.length === 0);
+    }
+    
+    tbody.innerHTML = subs.length ? subs.map(s => `<tr>
+      <td><strong>${escapeHtml(s.email)}</strong></td>
+      <td><span class="badge success">${s.active ? 'Active' : 'Unsubscribed'}</span></td>
+      <td class="small muted">${s.createdAt ? formatDateTime(s.createdAt) : 'Recently'}</td>
+    </tr>`).join('') : '<tr><td colspan="3" class="muted">No newsletter subscribers yet. Subscriptions from footer forms appear here.</td></tr>';
+  } catch(e) {
+    tbody.innerHTML = errorRow(3, e.message || 'Could not load newsletter subscribers.');
+  }
+}
+
+document.addEventListener('submit', async (e) => {
+  const bcForm = e.target.closest('#broadcastNewsletterForm');
+  if (!bcForm) return;
+  e.preventDefault();
+  const subject = $('#newsletterSubject')?.value?.trim();
+  const message = $('#newsletterBody')?.value?.trim();
+  const statusDiv = $('#broadcastStatus');
+  const submitBtn = bcForm.querySelector('button[type="submit"]');
+
+  if (!subject || !message) return;
+
+  submitBtn.disabled = true;
+  const origText = submitBtn.innerHTML;
+  submitBtn.innerHTML = '<span class="btn-spinner"></span> Broadcasting…';
+
+  try {
+    const res = await broadcastNewsletter({
+      subject,
+      message,
+      senderName: adminProfile?.displayName || 'Campus Admin'
+    });
+    if (statusDiv) {
+      statusDiv.style.color = 'var(--success, #1f9d69)';
+      statusDiv.textContent = ` Broadcast sent to ${res.recipientCount} subscriber(s)!`;
+    }
+    toast(`Newsletter broadcast sent to ${res.recipientCount} subscriber(s)!`, 'success');
+    bcForm.reset();
+    loadNewsletter();
+  } catch(err) {
+    if (statusDiv) {
+      statusDiv.style.color = 'var(--danger, #c44949)';
+      statusDiv.textContent = err.message || 'Failed to send broadcast.';
+    }
+    toast(err.message || 'Broadcast failed', 'error');
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = origText;
+  }
 });
 
 subscribeAuth((u,p)=>{

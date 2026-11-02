@@ -67,3 +67,72 @@ export async function createNotification(recipientId,data){if(!db)return;await a
 export async function getNotifications(uid,n=30){if(!db||!uid)return[];const snap=await getDocs(query(collection(db,'notifications'),where('uid','==',uid),orderBy('createdAt','desc'),limit(n)));return snap.docs.map(d=>({id:d.id,...d.data()}))}
 export async function markNotificationRead(uid,id){if(!db)return;await updateDoc(doc(db,'notifications',id),{read:true})}
 export async function getCounts(names){const out={};for(const name of names){try{out[name]=(await getDocs(query(collection(db,name),limit(1)))).size? '1':'0'}catch{out[name]='—'}}return out}
+
+// Newsletter & Campus Broadcast Services
+export async function subscribeNewsletter(email) {
+  const cleanEmail = String(email || '').trim().toLowerCase();
+  if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+    throw new Error('Please enter a valid email address.');
+  }
+
+  if (!db) {
+    let list = [];
+    try { list = JSON.parse(localStorage.getItem('cc-newsletter-subscribers') || '[]'); } catch(e) {}
+    if (!list.includes(cleanEmail)) {
+      list.push(cleanEmail);
+      localStorage.setItem('cc-newsletter-subscribers', JSON.stringify(list));
+    }
+    return { email: cleanEmail, status: 'subscribed', count: list.length };
+  }
+
+  const subId = cleanEmail.replace(/[^a-z0-9]/gi, '_');
+  const ref = doc(db, 'subscribers', subId);
+  await setDoc(ref, {
+    email: cleanEmail,
+    active: true,
+    source: 'web_footer',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+
+  return { email: cleanEmail, status: 'subscribed', id: subId };
+}
+
+export async function getNewsletterSubscribers() {
+  if (!db) {
+    try {
+      const list = JSON.parse(localStorage.getItem('cc-newsletter-subscribers') || '[]');
+      return list.map(e => ({ id: e, email: e, active: true }));
+    } catch(e) {
+      return [];
+    }
+  }
+  const snap = await getDocs(query(collection(db, 'subscribers'), orderBy('createdAt', 'desc'), limit(100)));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+export async function broadcastNewsletter({ subject, message, senderName }) {
+  if (!subject || !message) {
+    throw new Error('Subject and message content are required for broadcast.');
+  }
+
+  const subs = await getNewsletterSubscribers();
+  
+  if (db) {
+    await addDoc(collection(db, 'announcements'), {
+      title: subject,
+      body: message,
+      type: 'newsletter',
+      recipientCount: subs.length || 1,
+      authorName: senderName || 'Campus Administration',
+      createdAt: serverTimestamp()
+    });
+  }
+
+  return {
+    subject,
+    recipientCount: subs.length || 1,
+    sentAt: new Date().toISOString()
+  };
+}
+

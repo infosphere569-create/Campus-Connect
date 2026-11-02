@@ -36,6 +36,7 @@
   <button class="tab" data-tab="requests"><i data-lucide="user-plus"></i>Requests <span class="tab-badge" id="badgePendingRequests" hidden>0</span></button>
   <button class="tab" data-tab="issues"><i data-lucide="circle-alert"></i>Issues</button>
   <button class="tab" data-tab="events"><i data-lucide="calendar"></i>Events</button>
+  <button class="tab" data-tab="newsletter"><i data-lucide="mail"></i>Newsletter <span class="tab-badge" id="badgeNewsletterSubs" hidden>0</span></button>
   <button class="tab" data-tab="audit"><i data-lucide="history"></i>Audit Log</button>
 </div>
 
@@ -255,10 +256,45 @@
           <thead>
             <tr><th>Action</th><th>Admin UID</th><th>Target / Resource</th><th>Timestamp</th></tr>
           </thead>
-          <tbody data-audit-rows>
-            <tr><td colspan="4" class="muted">Loading audit log…</td></tr>
-          </tbody>
-        </table>
+<!-- Newsletter Broadcast Panel -->
+<div id="admin-newsletter" data-admin-panel="newsletter" class="admin-panel">
+  <div class="admin-section">
+    <div class="section-title" style="margin-top:0">
+      <div><div class="kicker">Campus Updates</div><h2>Newsletter &amp; Campus Broadcasts</h2></div>
+      <span class="badge primary"><i data-lucide="mail"></i> Subscriber Network Active</span>
+    </div>
+    <div class="grid grid-2" style="gap:20px">
+      <div class="card stack">
+        <h3>Compose Newsletter Broadcast</h3>
+        <form id="broadcastNewsletterForm" class="form">
+          <div class="field">
+            <label for="newsletterSubject">Subject / Title</label>
+            <input id="newsletterSubject" required placeholder="e.g. Campus Connect Monthly Digest &amp; Academic Updates">
+          </div>
+          <div class="field">
+            <label for="newsletterBody">Announcement Body</label>
+            <textarea id="newsletterBody" required placeholder="Type the announcement or digest message content here..."></textarea>
+          </div>
+          <button type="submit" class="btn primary">
+            <i data-lucide="send"></i>
+            <span>Send Broadcast to All Subscribers</span>
+          </button>
+          <div id="broadcastStatus" class="small muted"></div>
+        </form>
+      </div>
+
+      <div class="card stack">
+        <h3>Subscribed Campus Emails</h3>
+        <div class="table-wrap" style="max-height:380px;overflow:auto">
+          <table class="table">
+            <thead>
+              <tr><th>Email</th><th>Status</th><th>Joined</th></tr>
+            </thead>
+            <tbody data-newsletter-rows>
+              <tr><td colspan="3" class="muted">Loading subscriber list…</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
