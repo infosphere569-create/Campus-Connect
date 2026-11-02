@@ -22,18 +22,9 @@ export function initPWA() {
   const isLanding = document.body?.hasAttribute('data-landing') || location.pathname.endsWith('index.html') || location.pathname === '/';
 
   // 1. PWA Route Gating: Skip marketing landing page in PWA.
-  // Go straight to dashboard IF logged in, or login if NOT logged in.
+  // Always go to login.html, let login.html handle redirect if already authenticated.
   if (pwa && isLanding) {
-    import('./auth.js').then(({ currentUser }) => {
-      const demoAuth = sessionStorage.getItem('cc-demo') === '1' || localStorage.getItem('cc-demo') === '1';
-      if (currentUser || demoAuth) {
-        location.replace('home.html?pwa=1');
-      } else {
-        location.replace('login.html?mode=login&pwa=1');
-      }
-    }).catch(() => {
-      location.replace('login.html?mode=login&pwa=1');
-    });
+    location.replace('login.html?mode=login&pwa=1');
     return;
   }
 
