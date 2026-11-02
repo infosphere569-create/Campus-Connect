@@ -183,18 +183,28 @@ html[data-is-pwa="true"] .bottom-nav,
 
 /* =========================================================
    PWA & Mobile CSS-Only Abstract Animated Background
-   Targeting non-desktop viewports (<= 1024px) & Standalone PWA mode
+   Targeting Mobile Viewports (<= 720px) & Standalone PWA mode ONLY.
+   STRICTLY HIDDEN on Desktop / Laptop browsers.
    ========================================================= */
 
-/* Default: hidden on desktop web */
 .pwa-abstract-bg {
-  display: none;
+  display: none !important;
 }
 
-/* Enabled ONLY on mobile/tablet viewports OR in PWA standalone display mode */
-@media (max-width: 1024px), (display-mode: standalone) {
+/* Desktop / Laptop Browser Viewport (>= 721px) when NOT standalone app */
+@media (min-width: 721px) {
+  .auth-panel {
+    background: var(--surface) !important;
+  }
   .pwa-abstract-bg {
-    display: block;
+    display: none !important;
+  }
+}
+
+/* Enabled ONLY on mobile screens (<= 720px) OR in Standalone PWA App Mode */
+@media (max-width: 720px), (display-mode: standalone) {
+  .pwa-abstract-bg {
+    display: block !important;
     position: absolute;
     inset: 0;
     pointer-events: none;
@@ -258,6 +268,7 @@ html[data-is-pwa="true"] .bottom-nav,
     position: absolute;
     inset: 12px;
     border-radius: 36px;
+
     border: 1.5px solid color-mix(in srgb, var(--primary) 30%, transparent);
     box-shadow: 
       0 0 40px rgba(91, 92, 240, 0.12),
