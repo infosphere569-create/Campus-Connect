@@ -8,42 +8,6 @@ import {supportIssue} from './services.js';
 
 let all=[];
 
-const DEMO_ISSUES = [
-  {
-    id: 'demo-iss-1',
-    title: 'Wi-Fi connectivity drops frequently on Library 2nd floor',
-    description: 'During study hours between 2 PM - 6 PM, the connection in the silent reading section repeatedly disconnects, interrupting online research and coursework submissions.',
-    category: 'Wi-Fi',
-    severity: 'High',
-    location: 'Central Library, 2nd Floor',
-    status: 'Open',
-    supportCount: 64,
-    createdAt: new Date(Date.now() - 86400000 * 2)
-  },
-  {
-    id: 'demo-iss-2',
-    title: 'Water cooler and filtration unit in Block C requires urgent servicing',
-    description: 'The cold water dispenser has not been cooling water and the filter replacement indicator light has been blinking for over two weeks.',
-    category: 'Infrastructure',
-    severity: 'Medium',
-    location: 'Academic Block C, 3rd Floor',
-    status: 'In Progress',
-    supportCount: 88,
-    createdAt: new Date(Date.now() - 86400000 * 4)
-  },
-  {
-    id: 'demo-iss-3',
-    title: 'Street lights between Girls Hostel and Main Gate are non-functional',
-    description: 'Three consecutive street lights along the pathway are out of order, creating safety concerns for students returning from evening lab classes.',
-    category: 'Safety',
-    severity: 'Critical',
-    location: 'Hostel Pathway',
-    status: 'Under Review',
-    supportCount: 142,
-    createdAt: new Date(Date.now() - 86400000 * 6)
-  }
-];
-
 function issueCard(i){
   return `<article class="card issue-card" data-issue data-status="${escapeHtml(i.status)}" data-category="${escapeHtml(i.category)}">
     <div class="issue-status">
@@ -71,11 +35,10 @@ async function load(){
       const snap=await getDocs(query(collection(db,'issues'),orderBy('createdAt','desc'),limit(50)));
       all=snap.docs.map(d=>({id:d.id,...d.data()}));
     }catch(e){
-      console.warn('Issues fetch fallback:', e);
-      all=DEMO_ISSUES;
+      console.warn('Issues fetch error:', e);
+      all=[];
     }
   }
-  if(!all.length) all=DEMO_ISSUES;
   render(all);
 }
 
