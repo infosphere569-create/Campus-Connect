@@ -228,24 +228,8 @@ h1,h2,h3{font-weight:800;letter-spacing:-.02em}
   height:20px;
 }
 
-/* ========== Smooth Native App Page Navigation ========== */
-@view-transition{
-  navigation:auto;
-}
-::view-transition-old(root){
-  animation:120ms ease-out both ccPageFadeOut;
-}
-::view-transition-new(root){
-  animation:160ms ease-in both ccPageFadeIn;
-}
-@keyframes ccPageFadeOut{
-  from{opacity:1}
-  to{opacity:0}
-}
-@keyframes ccPageFadeIn{
-  from{opacity:0}
-  to{opacity:1}
-}
+/* ========== Smooth Native App Page Navigation (Disabled) ========== */
+
 
 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 .btn-spinner { display: inline-block; width: 16px; height: 16px; border: 2.5px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle; margin-right: 6px; }

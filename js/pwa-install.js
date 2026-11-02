@@ -1,9 +1,11 @@
 // PWA Install Prompt Banner, Detection & Reactive State
 // Handles Chrome/Android/Desktop beforeinstallprompt, live uninstall detection, and iOS Safari instructions
 
-const SHOW_LIMIT = 5;
+const SHOW_LIMIT = 50;
 const COUNT_KEY = 'cc-install-shown-count';
 const INSTALLED_KEY = 'cc-install-done';
+
+const debug = (msg) => console.log(`[PWA Debug] ${msg}`);
 
 let deferredPrompt = null;
 
@@ -32,9 +34,9 @@ async function checkIsInstalled() {
           localStorage.setItem(INSTALLED_KEY, '1');
           return true;
         } else {
-          // If the list is empty and we are not in standalone window, the app is uninstalled or not yet installed
-          localStorage.removeItem(INSTALLED_KEY);
-          return false;
+          // Be conservative: don't clear INSTALLED_KEY just because the list is empty,
+          // as it might be an API limitation in some contexts.
+          return localStorage.getItem(INSTALLED_KEY) === '1';
         }
       }
     } catch (e) {}
@@ -223,10 +225,10 @@ function buildBanner() {
   if (document.querySelector('[data-pwa-install-banner]') || alreadyInstalled()) return;
   const bar = document.createElement('div');
   bar.setAttribute('data-pwa-install-banner', '');
-  bar.style.cssText = 'position:fixed;left:14px;right:14px;bottom:calc(max(14px,env(safe-area-inset-bottom,14px)) + 58px);z-index:200;'
+  bar.style.cssText = 'position:fixed;left:14px;right:14px;bottom:calc(max(14px,env(safe-area-inset-bottom,14px)) + 82px);z-index:110000;'
     + 'display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:18px;'
     + 'background:var(--surface,#11151e);border:1px solid var(--border,#232a37);'
-    + 'box-shadow:0 18px 50px rgba(0,0,0,.35);animation:ccInstallUp .25s ease;max-width:540px;margin:0 auto;';
+    + 'box-shadow:0 18px 50px rgba(0,0,0,.45);animation:ccInstallUp .25s ease;max-width:540px;margin:0 auto;';
   bar.innerHTML = `
     <img src="icon.png" alt="" style="width:40px;height:40px;border-radius:12px;flex:0 0 auto;object-fit:cover">
     <div style="flex:1;min-width:0">
@@ -262,12 +264,25 @@ document.addEventListener('click', (e) => {
 
 // Capture browser beforeinstallprompt
 window.addEventListener('beforeinstallprompt', (e) => {
+  debug('beforeinstallprompt event fired');
   e.preventDefault();
   deferredPrompt = e;
   syncInstallUI();
-  if (alreadyInstalled() || shownCount() >= SHOW_LIMIT) return;
-  localStorage.setItem(COUNT_KEY, String(shownCount() + 1));
-  buildBanner();
+  
+  const installed = alreadyInstalled();
+  const count = shownCount();
+  debug(`Check: installed=${installed}, count=${count}/${SHOW_LIMIT}`);
+
+  if (installed || count >= SHOW_LIMIT) {
+    debug('Banner conditions not met (already installed or limit reached)');
+    return;
+  }
+  
+  if (!document.querySelector('[data-pwa-install-banner]')) {
+    debug('Showing PWA install banner');
+    localStorage.setItem(COUNT_KEY, String(count + 1));
+    buildBanner();
+  }
 });
 
 // App installed event
