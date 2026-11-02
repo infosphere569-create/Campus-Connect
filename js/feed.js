@@ -125,7 +125,7 @@ async function loadPosts(){
   let items = [];
   if (db) {
     try {
-      const page = await paginatePosts(20, null);
+      const page = await paginatePosts(40, null);
       feedCursor = page.lastDoc;
       feedExhausted = !page.hasMore;
       items = page.items;
