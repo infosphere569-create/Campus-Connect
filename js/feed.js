@@ -123,6 +123,18 @@ async function loadPosts(){
   if(loadMoreBtn){ loadMoreBtn.disabled = false; loadMoreBtn.textContent = 'Load more'; loadMoreBtn.hidden = false; }
 
   let items = [];
+  const timeoutId = setTimeout(() => {
+    if (!allFetchedPosts.length && box) {
+       box.innerHTML = `<div class="card empty">
+         <i data-lucide="clock"></i>
+         <h3>Taking longer than usual…</h3>
+         <p class="muted">The campus network might be slow. You can try refreshing or use demo mode.</p>
+         <button class="btn sm primary" style="margin-top:12px" onclick="location.reload()">Refresh Feed</button>
+       </div>`;
+       window.lucide?.createIcons();
+    }
+  }, 6000);
+
   if (db) {
     try {
       const page = await paginatePosts(20, null);
@@ -134,6 +146,7 @@ async function loadPosts(){
       items = FALLBACK_POSTS;
     }
   }
+  clearTimeout(timeoutId);
   if (!items.length) {
     items = FALLBACK_POSTS;
   }

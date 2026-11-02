@@ -126,7 +126,6 @@ async function loadUsers(reset=true){
     if(box)box.innerHTML=errorRow(7,e.message||'Could not load users.');
     if(loadMoreBtn)loadMoreBtn.hidden=true;
   }
-  }
 }
 
 function renderUsers(){
