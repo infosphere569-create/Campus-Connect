@@ -20,7 +20,14 @@ export async function uploadImage(file,path,onProgress){
   }catch(err){throw new Error(err?.message||'Could not upload image.');}
 }
 
-export async function getLatestPosts(n=25){if(!db)return[];const snap=await getDocs(query(collection(db,'posts'),orderBy('createdAt','desc'),limit(n)));return snap.docs.map(d=>({id:d.id,...d.data()}))}
+export async function getLatestPosts(n=25){
+  if(!db) return [
+    { id: 'demo-p-1', authorName: 'Aarav Sharma', branch: 'CSE 3rd Year', text: 'Anyone forming teams for the upcoming inter-college hackathon? We need a frontend dev and designer!', likes: 24, comments: 8, createdAt: new Date(Date.now() - 3600000 * 2) },
+    { id: 'demo-p-2', authorName: 'Priya Patel', branch: 'ECE 2nd Year', text: 'Library 2nd floor silent study room is now open until 10 PM throughout exam week.', likes: 42, comments: 5, createdAt: new Date(Date.now() - 3600000 * 5) }
+  ];
+  const snap=await getDocs(query(collection(db,'posts'),orderBy('createdAt','desc'),limit(n)));
+  return snap.docs.map(d=>({id:d.id,...d.data()}))
+}
 export async function createPost(data){if(!db)throw new Error('Firebase is not configured.');
   // firestore.rules checks authorUid on create; some older callers used authorId.
   // Both fields are written with the same value so either rule version is satisfied.
@@ -136,5 +143,12 @@ export async function broadcastNewsletter({ subject, message, senderName }) {
   };
 }
 
-export async function getLatestIssues(n=3){if(!db)return[];const snap=await getDocs(query(collection(db,'issues'),orderBy('createdAt','desc'),limit(n)));return snap.docs.map(d=>({id:d.id,...d.data()}))}
+export async function getLatestIssues(n=3){
+  if(!db) return [
+    { id: 'demo-is-1', title: 'Water cooler broken in Block C', description: 'It has been leaking for 3 days and now it stopped cooling.', status: 'Open', category: 'Infrastructure', supportCount: 15, createdAt: new Date() },
+    { id: 'demo-is-2', title: 'Library Wi-Fi very slow', description: 'Cannot even open Google Docs in the evening.', status: 'In Progress', category: 'IT Services', supportCount: 42, createdAt: new Date(Date.now() - 86400000) }
+  ];
+  const snap=await getDocs(query(collection(db,'issues'),orderBy('createdAt','desc'),limit(n)));
+  return snap.docs.map(d=>({id:d.id,...d.data()}))
+}
 

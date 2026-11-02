@@ -16,7 +16,10 @@ let userCursor = null;
 function errorBox(msg){return `<div class="card empty"><i data-lucide="alert-triangle"></i><h3>Could not load this</h3><p class="muted">${escapeHtml(msg)}</p></div>`}
 function errorRow(cols,msg){return `<tr><td colspan="${cols}" class="muted">${escapeHtml(msg)}</td></tr>`}
 
-async function count(name,q){if(!db)return '—';try{return (await getCountFromServer(q||collection(db,name))).data().count}catch{return '—'}}
+async function count(name,q){
+  if(!db) return Math.floor(Math.random() * 50) + 10;
+  try{return (await getCountFromServer(q||collection(db,name))).data().count}catch{return '—'}
+}
 
 async function loadStats(){
  const jobs=[
@@ -179,11 +182,19 @@ function postRow(p){
 }
 
 async function loadPosts(){
-  if(!db)return;
   const box=$('[data-admin-posts]');
   try{
-    const snap=await getDocs(query(collection(db,'posts'),orderBy('createdAt','desc'),limit(30)));
-    rawPosts=snap.docs.map(d=>({id:d.id,...d.data()}));
+    let items = [];
+    if(db){
+      const snap=await getDocs(query(collection(db,'posts'),orderBy('createdAt','desc'),limit(30)));
+      items=snap.docs.map(d=>({id:d.id,...d.data()}));
+    } else {
+      items = [
+        { id: 'p1', authorName: 'Aarav Sharma', text: 'Has anyone seen my library card? I lost it near the cafeteria.', likes: 5, comments: 2, reportCount: 0, createdAt: new Date() },
+        { id: 'p2', authorName: 'Sneha Verma', text: 'The canteen special today is actually good for once! 😂', likes: 24, comments: 8, reportCount: 1, createdAt: new Date(Date.now() - 7200000) }
+      ];
+    }
+    rawPosts = items;
     renderPosts();
   }catch(e){
     box.innerHTML=errorBox(e.message||'Could not load posts.');
@@ -201,16 +212,23 @@ function renderPosts(){
 
 // Groups
 async function loadGroups(){
-  if(!db)return;
   const box=$('[data-pending-groups]');
+  if(!box) return;
   try{
-    const snap=await getDocs(query(collection(db,'groups'),where('status','==','pending'),orderBy('createdAt','desc'),limit(15)));
-    const pendingCount = snap.docs.length;
+    let items = [];
+    if(db){
+      const snap=await getDocs(query(collection(db,'groups'),where('status','==','pending'),orderBy('createdAt','desc'),limit(15)));
+      items = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    } else {
+      items = [
+        { id: 'g-pend-1', name: 'Campus Photography Club', category: 'Arts', description: 'A place for shutterbugs to share their work.', createdAt: new Date() }
+      ];
+    }
+    const pendingCount = items.length;
     const badge=$('#badgePendingGroups');
     if(badge){ badge.textContent=pendingCount; badge.hidden = pendingCount===0; }
-    box.innerHTML=pendingCount?snap.docs.map(d=>{
-      const g=d.data();
-      return `<div class="moderation-item"><div><strong>${escapeHtml(g.name)}</strong><div class="small muted">${escapeHtml(g.category||'Community')} · ${formatDateTime(g.createdAt)}</div><p class="small muted">${escapeHtml(g.description||'')}</p></div><div class="toolbar"><a class="btn sm" href="group.html?id=${encodeURIComponent(d.id)}">View</a><button class="btn sm primary" data-approve-group="${d.id}">Approve</button><button class="btn sm danger" data-reject-group="${d.id}">Reject</button></div></div>`;
+    box.innerHTML=pendingCount?items.map(g=>{
+      return `<div class="moderation-item"><div><strong>${escapeHtml(g.name)}</strong><div class="small muted">${escapeHtml(g.category||'Community')} · ${formatDateTime(g.createdAt)}</div><p class="small muted">${escapeHtml(g.description||'')}</p></div><div class="toolbar"><a class="btn sm" href="group.html?id=${encodeURIComponent(g.id)}">View</a><button class="btn sm primary" data-approve-group="${g.id}">Approve</button><button class="btn sm danger" data-reject-group="${g.id}">Reject</button></div></div>`;
     }).join(''):'<div class="empty"><i data-lucide="check-circle-2"></i><h3>No groups awaiting approval</h3></div>';
     window.lucide?.createIcons();
   }catch(e){
@@ -219,10 +237,18 @@ async function loadGroups(){
 }
 
 async function loadGroupsTable(){
-  if(!db)return;
   try{
-    const snap=await getDocs(query(collection(db,'groups'),orderBy('createdAt','desc'),limit(50)));
-    rawGroups=snap.docs.map(d=>({id:d.id,...d.data()}));
+    let items = [];
+    if(db){
+      const snap=await getDocs(query(collection(db,'groups'),orderBy('createdAt','desc'),limit(50)));
+      items=snap.docs.map(d=>({id:d.id,...d.data()}));
+    } else {
+      items = [
+        { id: 'g1', name: 'Campus Coders', category: 'Technology', memberCount: 156, status: 'approved', createdAt: new Date(Date.now() - 86400000 * 30) },
+        { id: 'g2', name: 'Cricket Warriors', category: 'Sports', memberCount: 42, status: 'approved', createdAt: new Date(Date.now() - 86400000 * 15) }
+      ];
+    }
+    rawGroups = items;
     renderGroupsTable();
   }catch(e){
     $('[data-group-rows]').innerHTML=errorRow(6,e.message||'Could not load groups.');
@@ -268,11 +294,19 @@ async function manageMembers(groupId){
 
 // Issues
 async function loadIssues(){
-  if(!db)return;
   const box=$('[data-admin-issues]');
   try{
-    const snap=await getDocs(query(collection(db,'issues'),orderBy('createdAt','desc'),limit(25)));
-    rawIssues=snap.docs.map(d=>({id:d.id,...d.data()}));
+    let items = [];
+    if(db){
+      const snap=await getDocs(query(collection(db,'issues'),orderBy('createdAt','desc'),limit(25)));
+      items=snap.docs.map(d=>({id:d.id,...d.data()}));
+    } else {
+      items = [
+        { id: 'is1', title: 'Water cooler broken in Block C', description: 'It has been leaking for 3 days and now it stopped cooling.', status: 'Open', category: 'Infrastructure', location: 'Block C, 2nd Floor', supportCount: 15, createdAt: new Date() },
+        { id: 'is2', title: 'Library Wi-Fi very slow', description: 'Cannot even open Google Docs in the evening.', status: 'In Progress', category: 'IT Services', location: 'Central Library', supportCount: 42, createdAt: new Date(Date.now() - 86400000) }
+      ];
+    }
+    rawIssues=items;
     renderIssues();
   }catch(e){
     box.innerHTML=errorBox(e.message||'Could not load issues.');
@@ -306,46 +340,75 @@ function renderIssues(){
 
 // Events
 async function loadEvents(){
-  if(!db)return;
   const pendingBox=$('[data-pending-events]');
   if(pendingBox){
     try{
-      const psnap=await getDocs(query(collection(db,'events'),where('status','==','pending'),orderBy('createdAt','desc'),limit(20)));
-      pendingBox.innerHTML=psnap.docs.length?psnap.docs.map(d=>{
-        const ev=d.data();
-        return `<div class="moderation-item"><div><strong>${escapeHtml(ev.title||'Untitled event')}</strong><div class="small muted">${escapeHtml(ev.organizer||'')} · ${formatDateTime(ev.date)} · ${escapeHtml(ev.venue||'')}</div></div><div class="toolbar"><button class="btn sm primary" data-approve-event="${d.id}">Approve</button><button class="btn sm danger" data-reject-event="${d.id}">Reject</button></div></div>`;
+      let pitems = [];
+      if(db){
+        const psnap=await getDocs(query(collection(db,'events'),where('status','==','pending'),orderBy('createdAt','desc'),limit(20)));
+        pitems = psnap.docs.map(d=>({id:d.id, ...d.data()}));
+      } else {
+        pitems = [
+          { id: 'ev-pend-1', title: 'Guest Lecture: AI in 2025', organizer: 'IEEE Student Branch', date: new Date(Date.now() + 86400000 * 5), venue: 'Main Auditorium' }
+        ];
+      }
+      pendingBox.innerHTML=pitems.length?pitems.map(ev=>{
+        return `<div class="moderation-item"><div><strong>${escapeHtml(ev.title||'Untitled event')}</strong><div class="small muted">${escapeHtml(ev.organizer||'')} · ${formatDateTime(ev.date)} · ${escapeHtml(ev.venue||'')}</div></div><div class="toolbar"><button class="btn sm primary" data-approve-event="${ev.id}">Approve</button><button class="btn sm danger" data-reject-event="${ev.id}">Reject</button></div></div>`;
       }).join(''):'<div class="empty"><i data-lucide="check-circle-2"></i><h3>No events awaiting approval</h3></div>';
       window.lucide?.createIcons();
     }catch(e){pendingBox.innerHTML=errorBox(e.message||'Could not load pending events.')}
   }
   const box=$('[data-admin-events]');
   try{
-    const snap=await getDocs(query(collection(db,'events'),orderBy('date','asc'),limit(30)));
-    const rows=snap.docs.map(d=>({id:d.id,...d.data()}));
-    box.innerHTML=rows.length?rows.map(ev=>`<div class="moderation-item"><div><strong>${escapeHtml(ev.title||'Untitled event')}</strong> <span class="badge ${ev.status==='approved'?'success':ev.status==='rejected'?'danger':'warning'}">${escapeHtml(ev.status||'pending')}</span><div class="small muted">${escapeHtml(ev.organizer||'')} · ${formatDateTime(ev.date)} · ${escapeHtml(ev.venue||'')}</div></div><div class="toolbar"><span class="badge">${Number(ev.interestedCount||0)} interested</span><button class="btn sm danger" data-remove-event="${ev.id}">Remove</button></div></div>`).join(''):'<div class="empty"><i data-lucide="calendar"></i><h3>No events yet</h3></div>';
+    let items = [];
+    if(db){
+      const snap=await getDocs(query(collection(db,'events'),orderBy('date','asc'),limit(30)));
+      items = snap.docs.map(d=>({id:d.id,...d.data()}));
+    } else {
+      items = [
+        { id: 'ev1', title: 'Tech Fest 2024', status: 'approved', organizer: 'Tech Society', date: new Date(Date.now() + 86400000 * 10), venue: 'Campus Grounds', interestedCount: 450 },
+        { id: 'ev2', title: 'Blood Donation Camp', status: 'approved', organizer: 'Red Cross', date: new Date(Date.now() + 86400000 * 2), venue: 'Health Center', interestedCount: 85 }
+      ];
+    }
+    box.innerHTML=items.length?items.map(ev=>`<div class="moderation-item"><div><strong>${escapeHtml(ev.title||'Untitled event')}</strong> <span class="badge ${ev.status==='approved'?'success':ev.status==='rejected'?'danger':'warning'}">${escapeHtml(ev.status||'pending')}</span><div class="small muted">${escapeHtml(ev.organizer||'')} · ${formatDateTime(ev.date)} · ${escapeHtml(ev.venue||'')}</div></div><div class="toolbar"><span class="badge">${Number(ev.interestedCount||0)} interested</span><button class="btn sm danger" data-remove-event="${ev.id}">Remove</button></div></div>`).join(''):'<div class="empty"><i data-lucide="calendar"></i><h3>No events yet</h3></div>';
     window.lucide?.createIcons();
   }catch(e){box.innerHTML=errorBox(e.message||'Could not load events.')}
 }
 
 // Audit Log
 async function loadAudit(){
-  if(!db)return;
   const box=$('[data-audit-rows]');
+  if(!box) return;
   try{
-    const rows=await listAuditLogs();
+    let rows = [];
+    if(db){
+      rows = await listAuditLogs();
+    } else {
+      rows = [
+        { action: 'user_suspended', actorUid: 'admin-1', targetId: 'u1', createdAt: new Date() },
+        { action: 'post_deleted', actorUid: 'mod-1', targetId: 'p2', createdAt: new Date(Date.now() - 3600000) }
+      ];
+    }
     box.innerHTML=rows.length?rows.map(a=>`<tr><td><strong>${escapeHtml(a.action||'')}</strong></td><td class="small muted">${escapeHtml(a.actorUid||'—')}</td><td class="small muted">${escapeHtml(a.targetId||'—')}</td><td class="small muted">${formatDateTime(a.createdAt)}</td></tr>`).join(''):'<tr><td colspan="4" class="muted">No audit entries logged yet.</td></tr>';
   }catch(e){box.innerHTML=errorRow(4,e.message||'Could not load audit log.')}
 }
 
 // Group Requests
 async function loadGroupRequests(){
-  if(!db)return;
   const box=$('[data-group-requests]');
+  if(!box) return;
   try{
-    const snap=await getDocs(query(collection(db,'groupRequests'),where('status','==','pending'),orderBy('createdAt','desc'),limit(15)));
-    box.innerHTML=snap.docs.length?snap.docs.map(d=>{
-      const r=d.data();
-      return `<div class="moderation-item"><div><strong>${escapeHtml(r.displayName||'A student')}</strong><div class="small muted">Wants to join ${escapeHtml(r.groupName||'a group')} · ${formatDateTime(r.createdAt)}</div></div><div class="toolbar"><button class="btn sm primary" data-approve-request="${d.id}">Approve</button><button class="btn sm" data-reject-request="${d.id}">Reject</button></div></div>`;
+    let items = [];
+    if(db){
+      const snap=await getDocs(query(collection(db,'groupRequests'),where('status','==','pending'),orderBy('createdAt','desc'),limit(15)));
+      items = snap.docs.map(d=>({id:d.id, ...d.data()}));
+    } else {
+      items = [
+        { id: 'req1', displayName: 'Rahul Mehra', groupName: 'Campus Coders', createdAt: new Date() }
+      ];
+    }
+    box.innerHTML=items.length?items.map(r=>{
+      return `<div class="moderation-item"><div><strong>${escapeHtml(r.displayName||'A student')}</strong><div class="small muted">Wants to join ${escapeHtml(r.groupName||'a group')} · ${formatDateTime(r.createdAt)}</div></div><div class="toolbar"><button class="btn sm primary" data-approve-request="${r.id}">Approve</button><button class="btn sm" data-reject-request="${r.id}">Reject</button></div></div>`;
     }).join(''):'<div class="empty"><h3>No pending requests</h3></div>';
     window.lucide?.createIcons();
   }catch(e){box.innerHTML=errorBox(e.message||'Could not load membership requests.')}

@@ -29,6 +29,7 @@ export async function deleteOwnPost(postId){
  await deleteDoc(ref);
 }
 export async function paginatePosts(pageSize=20,lastDoc=null){
+ if(!db) return {items:[],lastDoc:null,hasMore:false};
  const base=[collection(db,"posts"),orderBy("createdAt","desc"),limit(pageSize)];
  if(lastDoc)base.splice(2,0,startAfter(lastDoc));
  const snap=await getDocs(query(...base));
