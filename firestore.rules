@@ -1,90 +1,425 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Helper function
-    function isSignedIn() {
+
+    // =========================================================
+    // HELPERS
+    // =========================================================
+
+    function signedIn() {
       return request.auth != null;
     }
-    
-    // Users collection
-    match /users/{userId} {
-      allow read, write: if isSignedIn();
+
+    function self(uid) {
+      return signedIn() && request.auth.uid == uid;
     }
-    
-    // Posts collection & comments
+
+    function currentUser() {
+      return get(
+        /databases/$(database)/documents/users/$(request.auth.uid)
+      ).data;
+    }
+
+    function roleIs(role) {
+      return signedIn() && currentUser().role == role;
+    }
+
+    function staff() {
+      return signedIn()
+        && currentUser().role in ['moderator', 'platformAdmin'];
+    }
+
+    function admin() {
+      return signedIn()
+        && currentUser().role == 'platformAdmin';
+    }
+
+    function isGroupLeader(groupId) {
+      return signedIn() &&
+        get(/databases/$(database)/documents/groups/$(groupId)).data.createdBy == request.auth.uid;
+    }
+
+
+    // =========================================================
+    // USERS
+    // =========================================================
+
+    match /users/{uid} {
+      allow read: if self(uid) || staff();
+      allow create: if self(uid);
+      allow update: if self(uid) || admin();
+      allow delete: if admin();
+    }
+
+
+    // =========================================================
+    // POSTS
+    // =========================================================
+
     match /posts/{postId} {
-      allow read, write: if isSignedIn();
-      
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.resource.data.authorId == request.auth.uid;
+
+      allow update: if signedIn()
+        && (
+          resource.data.authorId == request.auth.uid
+          || staff()
+          || request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['likes','comments','shares','saves','reportCount','reposts'])
+        );
+
+      allow delete: if signedIn()
+        && (
+          resource.data.authorId == request.auth.uid
+          || staff()
+        );
+
+      // COMMENTS
       match /comments/{commentId} {
-        allow read, write: if isSignedIn();
+        allow read: if signedIn();
+        allow create: if signedIn()
+          && request.resource.data.authorId == request.auth.uid;
+        allow update: if signedIn()
+          && resource.data.authorId == request.auth.uid;
+        allow delete: if signedIn()
+          && (
+            resource.data.authorId == request.auth.uid
+            || staff()
+          );
       }
     }
-    
-    match /postLikes/{postId}/users/{userId} {
-      allow read, write: if isSignedIn();
-    }
-    
-    match /savedPosts/{userId}/items/{postId} {
-      allow read, write: if isSignedIn();
-    }
-    
-    match /reposts/{repostId} {
-      allow read, write: if isSignedIn();
-    }
-    
-    // Campus Issues
-    match /issues/{issueId} {
-      allow read: if true;
-      allow write: if isSignedIn();
-    }
-    
-    match /issueVotes/{voteId} {
-      allow read, write: if isSignedIn();
-    }
-    
-    match /issuePrivate/{privateId} {
-      allow read, write: if isSignedIn();
-    }
-    
-    // Groups
+
+
+    // =========================================================
+    // GROUPS
+    // =========================================================
+
     match /groups/{groupId} {
-      allow read, write: if isSignedIn();
-      
-      match /members/{memberId} {
-        allow read, write: if isSignedIn();
-      }
-      
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid;
+
+      allow update: if signedIn()
+        && (
+          resource.data.createdBy == request.auth.uid
+          || staff()
+          || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount'])
+        );
+
+      allow delete: if signedIn()
+        && (
+          resource.data.createdBy == request.auth.uid
+          || staff()
+        );
+
+      // GROUP MESSAGES
       match /messages/{messageId} {
-        allow read, write: if isSignedIn();
+        allow read: if signedIn();
+
+        allow create: if signedIn()
+          && request.resource.data.authorId == request.auth.uid;
+
+        allow update: if signedIn()
+          && (
+            (resource.data.authorId == request.auth.uid)
+            || staff()
+            || (isGroupLeader(groupId) &&
+                request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pinned']))
+          );
+
+        allow delete: if signedIn()
+          && (
+            resource.data.authorId == request.auth.uid
+            || staff()
+            || isGroupLeader(groupId)
+          );
       }
     }
-    
+
+
+    // =========================================================
+    // GROUP MEMBERS
+    // =========================================================
+
+    match /groupMembers/{memberId} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && (
+          request.resource.data.uid == request.auth.uid
+          || staff()
+        );
+
+      allow update: if signedIn()
+        && (
+          resource.data.uid == request.auth.uid
+          || staff()
+          || isGroupLeader(resource.data.groupId)
+        );
+
+      allow delete: if signedIn()
+        && (
+          resource.data.uid == request.auth.uid
+          || staff()
+          || isGroupLeader(resource.data.groupId)
+        );
+    }
+
+
+    // =========================================================
+    // GROUP REQUESTS
+    // =========================================================
+
     match /groupRequests/{requestId} {
-      allow read, write: if isSignedIn();
+      allow read: if signedIn()
+        && (
+          resource.data.uid == request.auth.uid
+          || staff()
+          || isGroupLeader(resource.data.groupId)
+        );
+
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid;
+
+      allow update: if signedIn()
+        && (
+          resource.data.uid == request.auth.uid
+          || staff()
+          || isGroupLeader(resource.data.groupId)
+        );
+
+      allow delete: if signedIn()
+        && (
+          resource.data.uid == request.auth.uid
+          || staff()
+          || isGroupLeader(resource.data.groupId)
+        );
     }
-    
-    // Events
+
+
+    // =========================================================
+    // ISSUES
+    // =========================================================
+
+    match /issues/{issueId} {
+      // Students can read public issues.
+      allow read: if signedIn();
+
+      // Allow signed-in students / users to submit issues
+      allow create: if signedIn();
+
+      // Staff can update everything.
+      // Students can only update supportCount + updatedAt.
+      allow update: if signedIn()
+        && (
+          staff()
+          ||
+          request.resource.data
+            .diff(resource.data)
+            .affectedKeys()
+            .hasOnly([
+              'supportCount',
+              'updatedAt'
+            ])
+        );
+
+      allow delete: if staff();
+    }
+
+
+    // =========================================================
+    // PRIVATE ISSUE DATA
+    // =========================================================
+
+    match /issuePrivate/{issueId} {
+      // Reporter identity/private data only for staff.
+      allow read: if staff();
+
+      // Allow signed-in users to attach private metadata to their own issue
+      allow create: if signedIn() && request.resource.data.authorUid == request.auth.uid;
+      allow update, delete: if staff();
+    }
+
+
+    // =========================================================
+    // ISSUE VOTES / SUPPORT
+    // =========================================================
+
+    match /issueVotes/{voteId} {
+      allow read: if signedIn();
+
+      // User can support only as themselves.
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid;
+
+      allow delete: if signedIn()
+        && resource.data.uid == request.auth.uid;
+
+      allow update: if false;
+    }
+
+
+    // =========================================================
+    // EVENTS
+    // =========================================================
+
     match /events/{eventId} {
-      allow read, write: if isSignedIn();
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid;
+
+      allow update: if staff()
+        || (signedIn() && resource.data.createdBy == request.auth.uid)
+        || (signedIn() &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['interestedCount']));
+
+      allow delete: if staff()
+        || (signedIn() && resource.data.createdBy == request.auth.uid);
     }
-    
-    match /eventRsvps/{rsvpId} {
-      allow read, write: if isSignedIn();
+
+
+    // =========================================================
+    // EVENT INTEREST
+    // =========================================================
+
+    match /eventInterest/{interestId} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid;
+
+      allow delete: if signedIn()
+        && resource.data.uid == request.auth.uid;
+
+      allow update: if false;
     }
-    
-    // Notifications
-    match /notifications/{notifId} {
-      allow read, write: if isSignedIn();
+
+
+    // =========================================================
+    // NOTIFICATIONS
+    // =========================================================
+
+    match /notifications/{notificationId} {
+      allow read: if signedIn()
+        && resource.data.uid == request.auth.uid;
+
+      allow create: if staff();
+
+      allow update: if signedIn()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data
+          .diff(resource.data)
+          .affectedKeys()
+          .hasOnly(['read']);
+
+      allow delete: if signedIn()
+        && resource.data.uid == request.auth.uid;
     }
-    
-    // Reports & Audit logs
+
+
+    // =========================================================
+    // SAVED POSTS
+    // =========================================================
+
+    match /savedPosts/{uid} {
+      allow read: if self(uid);
+      allow create, update, delete: if false;
+
+      match /items/{postId} {
+        allow read: if self(uid);
+        allow create: if self(uid);
+        allow update: if self(uid);
+        allow delete: if self(uid);
+      }
+    }
+
+
+    // =========================================================
+    // POST LIKES
+    // =========================================================
+
+    match /postLikes/{postId} {
+      allow read: if signedIn();
+      allow create, update, delete: if false;
+
+      match /users/{uid} {
+        allow read: if signedIn();
+        allow create: if self(uid);
+        allow delete: if self(uid);
+        allow update: if false;
+      }
+    }
+
+
+    // =========================================================
+    // REPOSTS & REPORTS
+    // =========================================================
+
+    match /reposts/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow update: if false;
+    }
+
     match /reports/{reportId} {
-      allow read, write: if isSignedIn();
+      allow create: if signedIn()
+        && request.resource.data.reporterId == request.auth.uid;
+
+      allow read: if staff();
+      allow update: if staff();
+      allow delete: if admin();
     }
-    
+
+
+    // =========================================================
+    // AUDIT LOGS
+    // =========================================================
+
     match /auditLogs/{logId} {
-      allow read, write: if isSignedIn();
+      allow read: if staff();
+      allow create: if staff();
+      allow update, delete: if admin();
+    }
+
+
+    // =========================================================
+    // GROUP INVITES
+    // =========================================================
+
+    match /groupInvites/{inviteCode} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid;
+      allow delete: if signedIn()
+        && (resource.data.createdBy == request.auth.uid || staff());
+      allow update: if false;
+    }
+
+
+    // =========================================================
+    // ANNOUNCEMENTS
+    // =========================================================
+
+    match /announcements/{announcementId} {
+      allow read: if signedIn();
+      allow create: if staff();
+      allow update: if staff();
+      allow delete: if staff();
+    }
+
+
+    // =========================================================
+    // DEFAULT DENY
+    // =========================================================
+
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

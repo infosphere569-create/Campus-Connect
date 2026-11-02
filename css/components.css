@@ -181,3 +181,66 @@ html[data-is-pwa="true"] .bottom-nav,
   animation:ccRingPulse 1.2s infinite;
 }
 
+/* PWA Animated Mobile Backdrop & Device Silhouette for Auth Page */
+.pwa-device-backdrop {
+  display: block;
+}
+.pwa-bg-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(55px);
+  opacity: 0.45;
+  pointer-events: none;
+  animation: pwaGlowFloat 8s ease-in-out infinite alternate;
+}
+.pwa-bg-glow.glow-1 {
+  width: 260px;
+  height: 260px;
+  top: -40px;
+  right: -40px;
+  background: radial-gradient(circle, rgba(91,92,240,0.55) 0%, rgba(139,124,246,0) 70%);
+}
+.pwa-bg-glow.glow-2 {
+  width: 300px;
+  height: 300px;
+  bottom: -60px;
+  left: -60px;
+  background: radial-gradient(circle, rgba(56,189,248,0.45) 0%, rgba(91,92,240,0) 70%);
+  animation-delay: -4s;
+}
+@keyframes pwaGlowFloat {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(25px, -30px) scale(1.12); }
+  100% { transform: translate(-20px, 20px) scale(0.95); }
+}
+.pwa-device-silhouette {
+  position: absolute;
+  inset: 12px;
+  border-radius: 32px;
+  border: 1.5px solid color-mix(in srgb, var(--primary) 22%, transparent);
+  box-shadow: 0 0 40px rgba(91,92,240,0.08), inset 0 0 20px rgba(91,92,240,0.04);
+  pointer-events: none;
+}
+.pwa-silhouette-notch {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 84px;
+  height: 16px;
+  background: color-mix(in srgb, var(--surface-2) 80%, var(--border));
+  border-radius: 99px;
+  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pwa-silhouette-notch::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--primary) 70%, var(--muted));
+}
+
+
