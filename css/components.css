@@ -182,27 +182,31 @@ html[data-is-pwa="true"] .bottom-nav,
 }
 
 /* =========================================================
-   PWA & Mobile CSS-Only Abstract Animated Background
-   Targeting Mobile Viewports (<= 720px) & Standalone PWA mode ONLY.
-   STRICTLY HIDDEN on Desktop / Laptop browsers.
+   PWA & Mobile Animated Background
+   Strictly active on Mobile/Tablet (< 1024px) & PWA Standalone Mode.
+   Desktop Browsers (>= 1024px) are clean to prevent animation duplication.
    ========================================================= */
 
 .pwa-abstract-bg {
-  display: none !important;
+  display: none;
 }
 
-/* Desktop / Laptop Browser Viewport (>= 721px) when NOT standalone app */
-@media (min-width: 721px) {
-  .auth-panel {
+/* Desktop Web Browsers (>= 1024px) when NOT in Standalone PWA Mode */
+@media (min-width: 1024px) {
+  html:not([data-is-pwa="true"]) .auth-panel {
     background: var(--surface) !important;
   }
-  .pwa-abstract-bg {
+  html:not([data-is-pwa="true"]) .pwa-abstract-bg {
     display: none !important;
   }
 }
 
-/* Enabled ONLY on mobile screens (<= 720px) OR in Standalone PWA App Mode */
-@media (max-width: 720px), (display-mode: standalone) {
+/* Enabled on Mobile & Tablet (< 1024px) OR Standalone PWA Mode */
+@media (max-width: 1023px), (display-mode: standalone) {
+  .auth-panel {
+    background: transparent !important;
+  }
+
   .pwa-abstract-bg {
     display: block !important;
     position: absolute;
@@ -210,7 +214,7 @@ html[data-is-pwa="true"] .bottom-nav,
     pointer-events: none;
     z-index: 0;
     overflow: hidden;
-    background: radial-gradient(circle at 50% 20%, color-mix(in srgb, var(--primary) 18%, var(--bg)) 0%, var(--bg) 80%);
+    background: radial-gradient(circle at 50% 20%, color-mix(in srgb, var(--primary) 20%, var(--bg)) 0%, var(--bg) 80%);
   }
 
   /* Abstract Gradient Orbs */
@@ -218,14 +222,14 @@ html[data-is-pwa="true"] .bottom-nav,
     position: absolute;
     border-radius: 50%;
     filter: blur(50px);
-    opacity: 0.65;
+    opacity: 0.7;
     will-change: transform, opacity;
   }
 
   .pwa-mesh-orb.orb-1 {
     width: 280px;
     height: 280px;
-    top: -60px;
+    top: -50px;
     left: -40px;
     background: radial-gradient(circle, #5b5cf0 0%, #8b7cf6 60%, transparent 100%);
     animation: pwaOrbFloat1 10s ease-in-out infinite alternate;
@@ -234,7 +238,7 @@ html[data-is-pwa="true"] .bottom-nav,
   .pwa-mesh-orb.orb-2 {
     width: 320px;
     height: 320px;
-    bottom: -80px;
+    bottom: -70px;
     right: -50px;
     background: radial-gradient(circle, #38bdf8 0%, #5b5cf0 65%, transparent 100%);
     animation: pwaOrbFloat2 12s ease-in-out infinite alternate;
@@ -243,10 +247,10 @@ html[data-is-pwa="true"] .bottom-nav,
   .pwa-mesh-orb.orb-3 {
     width: 220px;
     height: 220px;
-    top: 40%;
-    right: 10%;
+    top: 35%;
+    right: 5%;
     background: radial-gradient(circle, #f43f5e 0%, #a855f7 70%, transparent 100%);
-    opacity: 0.35;
+    opacity: 0.4;
     animation: pwaOrbFloat3 9s ease-in-out infinite alternate;
   }
 
@@ -255,11 +259,11 @@ html[data-is-pwa="true"] .bottom-nav,
     position: absolute;
     inset: 0;
     background-image: 
-      linear-gradient(to right, color-mix(in srgb, var(--primary) 12%, transparent) 1px, transparent 1px),
-      linear-gradient(to bottom, color-mix(in srgb, var(--primary) 12%, transparent) 1px, transparent 1px);
+      linear-gradient(to right, color-mix(in srgb, var(--primary) 15%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in srgb, var(--primary) 15%, transparent) 1px, transparent 1px);
     background-size: 36px 36px;
-    mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.8) 0%, transparent 75%);
-    -webkit-mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.8) 0%, transparent 75%);
+    mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.85) 0%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.85) 0%, transparent 75%);
     animation: pwaGridShift 20s linear infinite;
   }
 
@@ -268,11 +272,10 @@ html[data-is-pwa="true"] .bottom-nav,
     position: absolute;
     inset: 12px;
     border-radius: 36px;
-
-    border: 1.5px solid color-mix(in srgb, var(--primary) 30%, transparent);
+    border: 1.5px solid color-mix(in srgb, var(--primary) 32%, transparent);
     box-shadow: 
-      0 0 40px rgba(91, 92, 240, 0.12),
-      inset 0 0 30px rgba(91, 92, 240, 0.05);
+      0 0 40px rgba(91, 92, 240, 0.15),
+      inset 0 0 30px rgba(91, 92, 240, 0.08);
   }
 
   .pwa-phone-camera {
