@@ -77,7 +77,7 @@ export function modal(title, html, { wide = false, onMount } = {}){
 
 export function csv(filename, rows){
   const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const blob = new Blob(['﻿' + rows.map(r => r.map(q).join(',')).join('\n')], { type: 'text/csv;charset=utf-8' });
+  const blob = new Blob(['\uFEFF' + rows.map(r => r.map(q).join(',')).join('\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 }
@@ -266,18 +266,18 @@ const CLOUDINARY_UPLOAD_PRESET = 'campus_connect_unsigned';
 export async function uploadImage(file, pathOrOpts, onProgress){
   if(!file || !/^image\//.test(file.type)) throw new Error('Please choose an image file (JPG, PNG or WebP).');
   if(file.size > 8 * 1024 * 1024) throw new Error('Image is larger than 8 MB.');
-  
+
   let kind = 'thumb';
   if(typeof pathOrOpts === 'object' && pathOrOpts !== null){
     kind = pathOrOpts.kind || 'thumb';
   } else if(typeof pathOrOpts === 'string' && pathOrOpts.includes('banner')) {
     kind = 'banner';
   }
-  
+
   const cfg = kind === 'banner' ? { w: 1600, q: .82, ratio: 16 / 6 } : { w: 720, q: .8, ratio: 4 / 3 };
   const { blob } = await shrink(file, cfg.w, cfg.q, cfg.ratio);
   onProgress?.(15);
-  
+
   try {
     const body = new FormData();
     body.append('file', blob);
@@ -293,7 +293,7 @@ export async function uploadImage(file, pathOrOpts, onProgress){
   } catch(clErr) {
     console.warn('Cloudinary upload fallback:', clErr);
   }
-  
+
   onProgress?.(70);
   try {
     const pathStr = typeof pathOrOpts === 'string' ? pathOrOpts : `hackathons/${pathOrOpts?.uid || 'demo'}/${pathOrOpts?.hid || 'hack'}/${kind}-${Date.now()}.jpg`;
@@ -758,14 +758,14 @@ function createDefaultHackathonBannerDataUrl(title, subtitle){
     canvas.width = 1200;
     canvas.height = 630;
     const ctx = canvas.getContext('2d');
-    
+
     const grad = ctx.createLinearGradient(0, 0, 1200, 630);
     grad.addColorStop(0, '#0f172a');
     grad.addColorStop(0.5, '#1e1b4b');
     grad.addColorStop(1, '#312e81');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 1200, 630);
-    
+
     ctx.fillStyle = 'rgba(99, 102, 241, 0.15)';
     ctx.beginPath();
     ctx.arc(1050, 100, 250, 0, Math.PI * 2);
@@ -826,66 +826,92 @@ function createDefaultHackathonBannerDataUrl(title, subtitle){
   }
 }
 
-export async function shareHackathon(h, role = 'participant'){
+/* ---------------- sharing (3 roles: host / applicant / public) ---------------- */
+export async function shareHackathon(h, role = 'public'){
   if(!h || !h.id) return false;
+  // purane callers 'participant' bhejte the, use public maano
+  if(!['host', 'applicant', 'public'].includes(role)) role = 'public';
+
   const url = publicShareUrl(h.id);
   const title = h.title || 'Hackathon on Campus Connect One';
   const slug = title.replace(/[^\w]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'hackathon';
-  const where = h.mode === 'online' ? '🌐 Online' : `📍 ${[h.college, h.city].filter(Boolean).join(', ') || 'Campus Venue'}`;
-  const when = dateRange(h.startMs, h.endMs);
-  const prize = h.prizePool ? `🏆 Prize Pool: ${money(h.prizePool)}` : '🏆 Exciting Prizes, Perks & Swag';
-  const organizer = h.hostName ? `🏢 Organized by: ${h.hostName}` : (h.college ? `🏢 Organized by: ${h.college}` : '🏢 Organized via Campus Connect One');
-  const tagline = h.tagline ? `✨ "${h.tagline}"` : '';
-  
-  const lead = role === 'host'
-    ? `🚀 We're hosting ${title} on Campus Connect One!`
-    : `🚀 Join & participate in ${title} on Campus Connect One!`;
-  
-  const cta = role === 'host'
-    ? '📌 Explore tracks, schedule, submissions & register your team here:'
-    : '📌 View full hackathon details, schedule, tracks & register here:';
 
-  const textBody = [
-    lead,
-    tagline,
-    organizer,
+  const when = dateRange(h.startMs, h.endMs);
+  const venue = h.mode === 'online'
+    ? 'Online'
+    : [h.venue, h.college, h.city].filter(Boolean).join(', ') || 'Campus Venue';
+  const modeLabel = h.mode === 'hybrid' ? ' (Hybrid)' : '';
+  const organizer = h.brandName || h.hostName || h.college || 'Campus Connect One';
+  const prize = h.prizePool ? `${money(h.prizePool)} prize pool` : 'Prizes, perks & swag';
+  const fee = h.fee ? `₹${Number(h.fee).toLocaleString('en-IN')}` : 'Free';
+
+  const COPY = {
+    host: {
+      intro: `🚀 We're hosting ${title} on Campus Connect One!`,
+      cta: '📌 Explore tracks, schedule, submissions & register your team here:'
+    },
+    applicant: {
+      intro: `🙌 I've registered for ${title} on Campus Connect One. Join me!`,
+      cta: '📌 Check the details and register your team here:'
+    },
+    public: {
+      intro: `🚀 You're invited to ${title} on Campus Connect One.`,
+      cta: '📌 View full details, tracks & schedule, and register here:'
+    }
+  };
+  const { intro, cta } = COPY[role];
+
+  // textBody me link NAHI hai
+  const lines = [
+    intro,
+    h.tagline ? `✨ "${h.tagline}"` : '',
+    '',
+    `🏢 Organized by: ${organizer}`,
     `📅 Date: ${when}`,
-    where,
-    prize,
+    `📍 Venue: ${venue}${modeLabel}`,
+    `🏆 ${prize}`,
+    `🎟️ Entry: ${fee}`,
     '',
     cta
-  ].filter(Boolean).join('\n');
+  ];
+  // dobara khali line na aaye
+  const textBody = lines
+    .filter((l, i, a) => !(l === '' && (i === 0 || a[i - 1] === '')))
+    .join('\n');
 
+  // fullText me link ek baar, end me
   const fullText = `${textBody}\n${url}`;
-  
-  let imgUrl = safeUrl(h.bannerURL || h.thumbURL) || safeUrl(h.thumbURL);
+
+  let imgUrl = safeUrl(h.bannerURL || h.thumbURL);
   if(!imgUrl){
     imgUrl = createDefaultHackathonBannerDataUrl(title, h.college || h.hostName || 'Campus Connect One');
   }
 
   try {
     if(navigator.share){
+      // 1) Image ke saath: link fullText me, `url` field NAHI
       const file = await imageToShareFile(imgUrl, slug);
       if(file && navigator.canShare){
-        const withUrl = { title, text: fullText, url, files: [file] };
-        if(navigator.canShare(withUrl)){
-          await navigator.share(withUrl);
-          return true;
-        }
-        const textOnlyWithFile = { title, text: fullText, files: [file] };
-        if(navigator.canShare(textOnlyWithFile)){
-          await navigator.share(textOnlyWithFile);
+        const withFile = { title, text: fullText, files: [file] };
+        if(navigator.canShare(withFile)){
+          await navigator.share(withFile);
           return true;
         }
       }
+      // 2) Bina image: text me link NAHI, `url` field me link
       await navigator.share({ title, text: textBody, url });
       return true;
     }
+    // 3) Desktop fallback
     await navigator.clipboard.writeText(fullText);
-    toast('Professional event details & link copied to clipboard!');
+    toast('Event details & link copied to clipboard');
     return true;
   } catch(e){
     if(e?.name === 'AbortError') return false;
-    try { await navigator.clipboard.writeText(fullText); toast('Event details & link copied'); return true; } catch { return false; }
+    try {
+      await navigator.clipboard.writeText(fullText);
+      toast('Event details & link copied');
+      return true;
+    } catch { return false; }
   }
 }
