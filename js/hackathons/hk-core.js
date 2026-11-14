@@ -222,12 +222,30 @@ async function shrink(file, maxW, q, ratio){
   const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', q));
   return { blob, dataUrl: c.toDataURL('image/jpeg', Math.max(.5, q - .15)) };
 }
-// Uploads to Firebase Storage; if Storage rules are not deployed yet, falls back to a small inline image.
+const CLOUDINARY_CLOUD_NAME = 'bqwj7eos';
+const CLOUDINARY_UPLOAD_PRESET = 'campus_connect_unsigned';
+
+// Uploads to Cloudinary (same as profile upload), falling back to Firebase Storage and inline data URL.
 export async function uploadImage(file, { uid, hid, kind }){
   if(!file || !/^image\//.test(file.type)) throw new Error('Please choose an image file (JPG, PNG or WebP).');
   if(file.size > 8 * 1024 * 1024) throw new Error('Image is larger than 8 MB.');
   const cfg = kind === 'banner' ? { w: 1600, q: .82, ratio: 16 / 6 } : { w: 720, q: .8, ratio: 4 / 3 };
   const { blob } = await shrink(file, cfg.w, cfg.q, cfg.ratio);
+  
+  try {
+    const body = new FormData();
+    body.append('file', blob);
+    body.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+    body.append('folder', 'campus-connect');
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, { method: 'POST', body });
+    const data = await res.json();
+    if(res.ok && data.secure_url) {
+      return { url: data.secure_url, inline: false };
+    }
+  } catch(clErr) {
+    console.warn('Cloudinary upload fallback:', clErr);
+  }
+
   try {
     const r = sRef(storage, `hackathons/${uid}/${hid}/${kind}-${Date.now()}.jpg`);
     await uploadBytes(r, blob, { contentType: 'image/jpeg' });
