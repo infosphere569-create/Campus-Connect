@@ -215,28 +215,33 @@ async function detail(t, id){
   if(!h){ view.innerHTML = `<div class="hk-view">${empty('search-x', 'Hackathon not found', 'It may have been removed or is not published yet.', '<a class="hk-btn" href="#/home">Back to home</a>')}</div>`; return; }
   const reg = await getReg(id); if(stale(t)) return;
   const own = C.isHackHost(h, S.user), ph = h._phase;
+  const partBanned = !!(S.hk?.participantBlocked || S.hk?.banned);
   let cta;
   if(own) cta = `<a class="hk-btn gold" href="#/host/manage/${h.id}"><i data-lucide="users"></i>Manage</a><a class="hk-btn" href="#/host/edit/${h.id}"><i data-lucide="pencil"></i>Edit</a>`;
   else if(S.role === 'host') cta = `<button class="hk-btn" disabled>Log in as participant to register</button>`;
+  else if(partBanned) cta = `<button class="hk-btn danger" disabled>Participant access paused</button>`;
   else if(reg) cta = `<a class="hk-btn primary" href="#/my/${h.id}"><i data-lucide="layout-dashboard"></i>Open my dashboard</a><button class="hk-btn danger" data-act="cancel-reg" data-id="${h.id}">Cancel</button>`;
   else if(h.status !== 'approved') cta = `<button class="hk-btn" disabled>Not open for registration</button>`;
   else if(C.canRegister(h)) cta = `<button class="hk-btn primary lg" data-act="register" data-id="${h.id}"><i data-lucide="ticket-check"></i>Register now</button>`;
   else cta = `<button class="hk-btn" disabled>${ph.label}</button>`;
   const notice = h.status !== 'approved' ? `<div class="hk-banner" style="margin:14px 0 0"><i data-lucide="eye"></i><div class="grow"><b>Preview</b><div class="hk-sm hk-muted">Status: ${statusBadge(h.status)} ${h.adminNote ? '· ' + esc(h.adminNote) : ''}</div></div></div>` : '';
+  const banNote = partBanned ? `<div class="hk-msg err" style="margin:14px 0 0"><i data-lucide="ban"></i><span>Your participant access has been paused by an admin.${S.hk?.banReason ? ' Reason: ' + esc(S.hk.banReason) : ''} Contact support@campusconnectone.online.</span></div>` : '';
   const regNote = reg ? `<div class="hk-banner" style="margin:14px 0 0"><i data-lucide="party-popper" style="color:var(--hk-p)"></i><div class="grow"><b>You're registered</b><div class="hk-sm hk-muted">${reg.teamMode === 'solo' ? 'Solo' : 'Team ' + esc(reg.teamName || '')} · status: ${esc(reg.status)}</div></div></div>` : '';
   const cd = countdownHtml(h, reg, reg?.status === 'selected');
   view.innerHTML = `<div class="hk-view"><button class="hk-btn ghost sm" data-act="back" style="margin-bottom:12px"><i data-lucide="arrow-left"></i>Back</button>
-    ${detailHeader(h)}${notice}${regNote}${cd ? `<div style="margin:14px 0 0">${cd}</div>` : ''}
+    ${detailHeader(h)}${notice}${banNote}${regNote}${cd ? `<div style="margin:14px 0 0">${cd}</div>` : ''}
     <div class="hk-detail"><div>${detailBody(h)}</div>${factsCard(h, `<div class="hk-cta-inline" style="display:grid;gap:10px">${cta}</div>`)}</div>
     <div class="hk-sticky-cta">${cta}</div>
     <div style="margin-top:18px"><button class="hk-btn sm" data-act="share" data-id="${h.id}" data-title="${esc(h.title)}"><i data-lucide="share-2"></i>Share</button></div></div>`;
   bindTabs(view);
   const stopTimer = startCountdowns(view);
-  S.cleanup = () => { stopTimer?.(); };
+  S.cleanup = () => { stopTimersSafe(stopTimer); };
   S.cur = h;
 }
+function stopTimersSafe(fn){ try { fn?.(); } catch {} }
 
 function registerModal(h){
+  if(S.hk?.participantBlocked || S.hk?.banned){ toast('Your participant access has been paused by an admin.', 'error'); return; }
   const hk = S.hk, max = Math.max(1, +h.teamMax || 1), min = Math.max(1, +h.teamMin || 1), soloOnly = max <= 1, teamOnly = min > 1;
   const memRow = (i, m = {}) => `<div class="hk-mem" data-i="${i}"><div class="hk-grid3"><input class="hk-input" name="mn" placeholder="Member name" value="${esc(m.name || '')}" maxlength="80"><input class="hk-input" name="me" type="email" placeholder="Email" value="${esc(m.email || '')}"><input class="hk-input" name="mp" inputmode="tel" placeholder="Phone (optional)" value="${esc(m.phone || '')}"></div><button type="button" class="hk-btn sm ghost" data-rm aria-label="Remove member"><i data-lucide="x"></i></button></div>`;
   modal(`Register · ${h.title}`, `<form class="hk-form" id="regForm" novalidate>

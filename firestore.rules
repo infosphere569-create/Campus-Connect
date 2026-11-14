@@ -455,12 +455,16 @@ service cloud.firestore {
       allow create: if self(uid)
         && request.resource.data.uid == uid
         && request.resource.data.hostVerified == false
-        && request.resource.data.hostBlocked == false;
+        && request.resource.data.hostBlocked == false
+        && request.resource.data.get('participantBlocked', false) == false
+        && request.resource.data.get('banned', false) == false;
 
-      // Owner may edit their profile but never the trust flags; only a platform admin changes those.
+      // Owner may edit their profile but never the trust/ban flags; only a platform admin changes or edits those.
       allow update: if (self(uid)
           && request.resource.data.hostVerified == resource.data.hostVerified
-          && request.resource.data.hostBlocked == resource.data.hostBlocked)
+          && request.resource.data.hostBlocked == resource.data.hostBlocked
+          && request.resource.data.get('participantBlocked', false) == resource.data.get('participantBlocked', false)
+          && request.resource.data.get('banned', false) == resource.data.get('banned', false))
         || admin();
 
       allow delete: if admin();
@@ -541,7 +545,10 @@ service cloud.firestore {
         && request.resource.data.status == 'registered'
         && request.resource.data.stage == 0
         && hkHack(request.resource.data.hackathonId).status == 'approved'
-        && request.resource.data.hostUid == hkHack(request.resource.data.hackathonId).hostUid;
+        && request.resource.data.hostUid == hkHack(request.resource.data.hackathonId).hostUid
+        && (!exists(/databases/$(database)/documents/hkProfiles/$(request.auth.uid))
+            || (hkProfile(request.auth.uid).get('participantBlocked', false) == false
+                && hkProfile(request.auth.uid).get('banned', false) == false));
 
       // Primary host, co-host, or staff may change only review fields.
       allow update: if signedIn()
@@ -603,13 +610,13 @@ service cloud.firestore {
             || staff()
             || exists(/databases/$(database)/documents/hkRegistrations/$(hid + '_' + request.auth.uid)));
       allow create, update: if signedIn()
-        && isHkHost(hkHack(hid))
+        && (isHkHost(hkHack(hid)) || staff())
         && request.resource.data.hostUid == hkHack(hid).hostUid;
-      allow delete: if signedIn() && isHkHost(hkHack(hid));
+      allow delete: if signedIn() && (isHkHost(hkHack(hid)) || staff());
     }
     match /hkTestKeys/{hid} {
       allow read: if signedIn() && (isHkHost(hkHack(hid)) || staff());
-      allow create, update, delete: if signedIn() && isHkHost(hkHack(hid));
+      allow create, update, delete: if signedIn() && (isHkHost(hkHack(hid)) || staff());
     }
     match /hkAttempts/{aid} {
       allow read: if signedIn()

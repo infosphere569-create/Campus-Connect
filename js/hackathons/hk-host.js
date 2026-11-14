@@ -210,19 +210,20 @@ const SUGGEST = ['AI/ML', 'Web', 'App', 'IoT', 'Web3', 'Open Innovation', 'Cyber
 
 export async function wizard(cx, id){
   const { S, view } = cx;
-  if(S.hk.hostBlocked){ view.innerHTML = `<div class="hk-view">${empty('shield-alert', 'Hosting is paused', 'Contact support@campusconnectone.online.')}</div>`; return; }
+  const hk = S.hk || {};
+  if(hk.hostBlocked && !C.isStaff(S.site)){ view.innerHTML = `<div class="hk-view">${empty('shield-alert', 'Hosting is paused', 'Contact support@campusconnectone.online.')}</div>`; return; }
   const blank = () => ({
-    id: C.newId(), status: 'draft', title: '', tagline: '', description: '', tags: [], mode: 'offline', bannerURL: '', thumbURL: '', brandName: S.hk.org || '', website: '',
-    college: S.hk.college || S.site?.college || '', city: S.hk.city || '', state: '', venue: '', lat: null, lng: null, regDeadlineMs: 0, startMs: 0, endMs: 0,
+    id: C.newId(), status: 'draft', title: '', tagline: '', description: '', tags: [], mode: 'offline', bannerURL: '', thumbURL: '', brandName: hk.org || '', website: '',
+    college: hk.college || S.site?.college || '', city: hk.city || '', state: '', venue: '', lat: null, lng: null, regDeadlineMs: 0, startMs: 0, endMs: 0,
     teamMin: 1, teamMax: 4, maxParticipants: 0, fee: 0, eligibility: '', rules: '', tracks: [{ title: '', desc: '' }], schedule: [{ when: '', title: '' }],
-    prizePool: 0, prizes: [{ place: '1st Prize', amount: '', note: '' }], perks: '', contactName: S.hk.organiserName || S.hk.displayName || '', contactEmail: S.hk.orgEmail || S.user.email || '', contactPhone: S.hk.orgPhone || S.hk.phone || '', rounds: [{ name: 'Idea submission', desc: '', startMs: 0, endMs: 0 }, { name: 'Final round', desc: '', startMs: 0, endMs: 0 }], submission: { open: true, deadlineMs: 0, instructions: '' }, autoEmail: true, community: '', faqs: [{ q: '', a: '' }], agree: false
+    prizePool: 0, prizes: [{ place: '1st Prize', amount: '', note: '' }], perks: '', contactName: hk.organiserName || hk.displayName || '', contactEmail: hk.orgEmail || S.user.email || '', contactPhone: hk.orgPhone || hk.phone || '', rounds: [{ name: 'Idea submission', desc: '', startMs: 0, endMs: 0 }, { name: 'Final round', desc: '', startMs: 0, endMs: 0 }], submission: { open: true, deadlineMs: 0, instructions: '' }, autoEmail: true, community: '', faqs: [{ q: '', a: '' }], agree: false
   });
   const BK = `hk-draft-new-${S.user.uid}`;
   let D, isNew = !id, restored = false;
   if(id){
     const h = await C.fetchOne(id); if(cx.stale()) return;
-    if(!h || !C.isHackHost(h, S.user)){ view.innerHTML = `<div class="hk-view">${empty('search-x', 'Hackathon not found', 'You can only edit hackathons you host or were invited to co-host.', '<a class="hk-btn" href="#/host">Back to dashboard</a>')}</div>`; return; }
-    if(h.status === 'closed'){ view.innerHTML = `<div class="hk-view">${empty('lock', 'This hackathon is closed', 'Closed hackathons cannot be edited. Contact support if this is a mistake.', '<a class="hk-btn" href="#/host">Back</a>')}</div>`; return; }
+    if(!h || (!C.isHackHost(h, S.user) && !C.isStaff(S.site))){ view.innerHTML = `<div class="hk-view">${empty('search-x', 'Hackathon not found', 'You can only edit hackathons you host or were invited to co-host.', `<a class="hk-btn" href="${esc(cx.backHash || '#/host')}">Back to dashboard</a>`)}</div>`; return; }
+    if(h.status === 'closed' && !C.isStaff(S.site)){ view.innerHTML = `<div class="hk-view">${empty('lock', 'This hackathon is closed', 'Closed hackathons cannot be edited. Contact support if this is a mistake.', '<a class="hk-btn" href="#/host">Back</a>')}</div>`; return; }
     D = { ...blank(), ...h, agree: false };
     ['tracks', 'schedule', 'prizes', 'faqs', 'rounds'].forEach(k => { if(!D[k]?.length) D[k] = blank()[k]; });
   } else {
@@ -292,14 +293,14 @@ export async function wizard(cx, id){
 
   /* --- paint --- */
   const paint = () => {
-    view.innerHTML = `<div class="hk-view"><div class="hk-page-h"><div><span class="hk-eyebrow" style="color:var(--hk-gold)">Host · ${isNew ? 'new hackathon' : 'edit'}</span><h1>${isNew ? 'Create a hackathon' : esc(D.title || 'Edit hackathon')}</h1></div><div style="display:flex;gap:8px;align-items:center">${statusBadge(D.status)}<a class="hk-btn ghost sm" href="#/host">Exit</a></div></div>
+    view.innerHTML = `<div class="hk-view"><div class="hk-page-h"><div><span class="hk-eyebrow" style="color:var(--hk-gold)">Host · ${isNew ? 'new hackathon' : 'edit'}</span><h1>${isNew ? 'Create a hackathon' : esc(D.title || 'Edit hackathon')}</h1></div><div style="display:flex;gap:8px;align-items:center">${statusBadge(D.status)}<a class="hk-btn ghost sm" href="${esc(cx.backHash || '#/host')}">Exit</a></div></div>
       ${['changes_requested', 'rejected'].includes(D.status) && D.adminNote ? `<div class="hk-msg err" style="margin-bottom:16px"><i data-lucide="message-square-warning"></i><span><b>Admin note:</b> ${esc(D.adminNote)}</span></div>` : ''}
       ${restored ? '<div class="hk-msg ok" style="margin-bottom:16px"><i data-lucide="history"></i><span>Restored your unsaved draft from this device.</span></div>' : ''}
       <div class="hk-stepper" id="stepper">${STEPS.map(([ic, l], i) => `<button type="button" data-step="${i + 1}"><span class="n">${i + 1}</span>${l}</button>`).join('')}</div>
       <div class="hk-wiz"><section class="hk-glass hk-wiz-main" id="stepBody"></section><aside class="hk-sidecard"><div class="hk-eyebrow">Live card preview</div><div id="prev" style="pointer-events:none"></div><div class="hk-card-s hk-sm hk-muted"><b style="color:var(--hk-ink)">Tip</b><br>Your draft is saved to your account whenever you change step, and kept on this device as you type.</div></aside></div></div>`;
     paintStep();
   };
-  const preview = () => { const el = $('#prev'); if(el) { el.innerHTML = card({ ...D, _phase: C.phase({ ...D, status: 'approved' }), hostVerified: S.hk.hostVerified, regCount: 0 }); icons(); } };
+  const preview = () => { const el = $('#prev'); if(el) { el.innerHTML = card({ ...D, _phase: C.phase({ ...D, status: 'approved' }), hostVerified: D.hostVerified || hk.hostVerified || false, regCount: D.regCount || 0 }); icons(); } };
   const paintStep = () => {
     $$('#stepper button').forEach((b, i) => { b.classList.toggle('on', i + 1 === step); b.classList.toggle('done', i + 1 < step); });
     const last = step === 6;
@@ -395,7 +396,7 @@ export async function wizard(cx, id){
     if(sb){
       if(!D.agree){ errs = C.validateForSubmit(D); }
       sb.disabled = true; const o = sb.innerHTML; sb.innerHTML = '<span class="hk-spin"></span> Submitting…';
-      try { if(await persist('submit')){ toast(live ? 'Resubmitted for approval' : 'Submitted for approval. We will notify you.'); cx.nav('#/host'); } }
+      try { if(await persist('submit')){ toast(live ? 'Resubmitted for approval' : 'Submitted for approval. We will notify you.'); cx.nav(cx.backHash || '#/host'); } }
       catch(err){ if(err.errs){ toast('Please complete the checklist first.', 'error'); step = 6; paintStep(); } }
       sb.disabled = false; sb.innerHTML = o; icons();
     }

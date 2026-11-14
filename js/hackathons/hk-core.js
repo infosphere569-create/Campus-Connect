@@ -7,7 +7,7 @@ import { ref as sRef, uploadBytes, getDownloadURL } from 'https://www.gstatic.co
 import { ensureProfile } from '../auth.js';
 import { isSameInstitution } from '../utils.js';
 
-export { auth, db, FS };
+export { auth, db, FS, isSameInstitution };
 
 /* ---------------- tiny DOM / format helpers ---------------- */
 export const $ = (s, r = document) => r.querySelector(s);
@@ -432,6 +432,8 @@ export function watchMyRegistrations(uid, cb){
 }
 export async function hackathonRegistrations(hid, hostUid){ return mapDocs(await FS.getDocs(FS.query(FS.collection(db, 'hkRegistrations'), FS.where('hackathonId', '==', hid), FS.where('hostUid', '==', hostUid), FS.limit(1000)))).sort((a, b) => b.createdAtMs - a.createdAtMs); }
 export async function allRegistrations(){ return mapDocs(await FS.getDocs(FS.query(FS.collection(db, 'hkRegistrations'), FS.limit(1500)))); }
+export async function allSubmissions(){ return mapDocs(await FS.getDocs(FS.query(FS.collection(db, 'hkSubmissions'), FS.limit(1500)))); }
+export async function allAttempts(){ return mapDocs(await FS.getDocs(FS.query(FS.collection(db, 'hkAttempts'), FS.limit(1500)))); }
 
 export async function registerFor(h, user, d){
   const rid = `${h.id}_${user.uid}`, rr = FS.doc(db, 'hkRegistrations', rid), hr = FS.doc(db, 'hkHackathons', h.id);

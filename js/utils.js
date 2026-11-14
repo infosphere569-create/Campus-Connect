@@ -81,17 +81,27 @@ export function demoProfile() {
   };
 }
 
+export function normalizeInstitutionKey(name = '') {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function isSameInstitution(collegeA, collegeB) {
   if (!collegeA || !collegeB) return false;
-  const a = String(collegeA).toLowerCase().replace(/[^a-z0-9\s]/g, ' ').trim();
-  const b = String(collegeB).toLowerCase().replace(/[^a-z0-9\s]/g, ' ').trim();
+  const a = normalizeInstitutionKey(collegeA);
+  const b = normalizeInstitutionKey(collegeB);
+  if (!a || !b) return false;
 
   if (a === b) return true;
+  if (a.replace(/\s+/g, '') === b.replace(/\s+/g, '')) return true;
   if (a.length >= 3 && b.length >= 3 && (a.includes(b) || b.includes(a))) return true;
 
-  const stopWords = new Set(['college', 'institute', 'institution', 'university', 'campus', 'school', 'of', 'and', '&', 'the', 'dept', 'department', 'engineering', 'technology', 'tech']);
-  const wordsA = a.split(/\s+/).filter(w => w.length >= 3 && !stopWords.has(w));
-  const wordsB = b.split(/\s+/).filter(w => w.length >= 3 && !stopWords.has(w));
+  const stopWords = new Set(['college', 'institute', 'institution', 'institutions', 'university', 'campus', 'school', 'of', 'and', 'the', 'in', 'at', 'for', 'dept', 'department', 'engineering', 'technology', 'tech', 'group', 'management', 'science', 'sciences', 'studies', 'research']);
+  const wordsA = a.split(' ').filter(w => w.length >= 3 && !stopWords.has(w));
+  const wordsB = b.split(' ').filter(w => w.length >= 3 && !stopWords.has(w));
 
   if (wordsA.length === 0 || wordsB.length === 0) {
     return a.includes(b) || b.includes(a);

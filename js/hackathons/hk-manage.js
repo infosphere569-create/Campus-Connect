@@ -9,10 +9,10 @@ const MAIL_FOR_STATUS = { shortlisted: 'shortlisted', selected: 'selected', wait
 export async function manage(cx, id){
   const { S, view } = cx;
   const h = await C.fetchOne(id); if(cx.stale()) return;
-  if(!h || (!C.isHackHost(h, S.user) && !C.isStaff(S.site))){ view.innerHTML = `<div class="hk-view">${empty('search-x', 'Hackathon not found', 'You can only manage hackathons you host.', '<a class="hk-btn" href="#/host">Back to dashboard</a>')}</div>`; return; }
+  if(!h || (!C.isHackHost(h, S.user) && !C.isStaff(S.site))){ view.innerHTML = `<div class="hk-view">${empty('search-x', 'Hackathon not found', 'You can only manage hackathons you host.', `<a class="hk-btn" href="${esc(cx.backHash || '#/host')}">Back to dashboard</a>`)}</div>`; return; }
   const hostUid = h.hostUid, rounds = C.roundsOf(h);
   let [regs, subs, atts, meta] = await Promise.all([C.hackathonRegistrations(id, hostUid), C.hackathonSubmissions(id, hostUid).catch(() => []), C.hackathonAttempts(id, hostUid).catch(() => []), C.getTestMeta(id)]); if(cx.stale()) return;
-  const org = { name: S.hk.organiserName || S.hk.displayName || 'The organiser', org: S.hk.org || h.hostName || '' };
+  const org = { name: S.hk?.organiserName || S.hk?.displayName || S.site?.displayName || 'The organiser', org: S.hk?.org || h.hostName || '' };
   const subOf = uid => subs.find(x => x.uid === uid), attOf = uid => atts.find(x => x.uid === uid);
   const sel = new Set(); let tab = 'regs', q = '', fs = '', fr = '';
   const ph = C.phase(h), roundName = i => rounds[i]?.name || (rounds.length ? 'Completed' : '—');
@@ -55,9 +55,9 @@ export async function manage(cx, id){
   const setTab = t => { tab = t; paint(); };
   const paint = () => {
     const closed = h.registrationClosed, mailed = regs.filter(r => r.lastMailAtMs).length;
-    view.innerHTML = `<div class="hk-view"><a class="hk-btn ghost sm" href="#/host" style="margin-bottom:10px"><i data-lucide="arrow-left"></i>Dashboard</a>
+    view.innerHTML = `<div class="hk-view"><a class="hk-btn ghost sm" href="${esc(cx.backHash || '#/host')}" style="margin-bottom:10px"><i data-lucide="arrow-left"></i>${cx.backLabel || 'Dashboard'}</a>
       <div class="hk-page-h"><div><span class="hk-eyebrow" style="color:var(--hk-gold)">Manage</span><h1>${esc(h.title)}</h1><p>${statusBadge(h.status)} <span class="hk-chip ${ph.tone}">${ph.label}</span></p></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="hk-btn" href="#/h/${h.id}"><i data-lucide="eye"></i>View page</a><button class="hk-btn" data-announce><i data-lucide="megaphone"></i>Announce</button><button class="hk-btn" data-csv><i data-lucide="file-spreadsheet"></i>CSV</button><button class="hk-btn primary" data-pdf><i data-lucide="file-down"></i>PDF</button></div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">${cx.viewHref ? `<a class="hk-btn" href="${esc(cx.viewHref)}"><i data-lucide="eye"></i>View page</a>` : `<a class="hk-btn" href="#/h/${h.id}"><i data-lucide="eye"></i>View page</a>`}<button class="hk-btn" data-announce><i data-lucide="megaphone"></i>Announce</button><button class="hk-btn" data-csv><i data-lucide="file-spreadsheet"></i>CSV</button><button class="hk-btn primary" data-pdf><i data-lucide="file-down"></i>PDF</button></div></div>
       <div class="hk-kpis"><div class="hk-kpi"><div class="ki"><i data-lucide="users"></i></div><strong>${regs.length}</strong><span>Registrations${h.maxParticipants ? ` / ${h.maxParticipants}` : ''}</span></div>
         <div class="hk-kpi g"><div class="ki"><i data-lucide="user-check"></i></div><strong>${regs.filter(r => ['shortlisted', 'selected'].includes(r.status)).length}</strong><span>Shortlisted / selected</span></div>
         <div class="hk-kpi c"><div class="ki"><i data-lucide="lightbulb"></i></div><strong>${subs.length}</strong><span>Submissions</span></div>
@@ -78,7 +78,7 @@ export async function manage(cx, id){
       <div class="hk-field"><label>Template</label><select class="hk-select" name="kind" id="mk"><option value="">Choose a template…</option>${Object.entries(C.MAIL_KINDS).map(([k, l]) => `<option value="${k}" ${k === def ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></div>
       ${rounds.length ? `<div class="hk-field hk-hidden" id="rdWrap"><label>Round name <small>shown in the email</small></label><select class="hk-select" name="roundName">${rounds.map((x, i) => `<option ${one && (one.stage || 0) === i ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>` : ''}
       <div class="hk-field"><label>Note / idea for the team <small id="noteHint">optional</small></label><textarea class="hk-textarea" name="note" maxlength="1000" style="min-height:110px" placeholder="e.g. Great idea! Please add a short demo video to your PPT before the final round."></textarea></div>
-      <div class="hk-msg ok"><i data-lucide="info"></i><span>Replies go to ${esc(S.hk.orgEmail || S.user.email || 'your contact email')}. The email is signed with your organiser name.</span></div>
+      <div class="hk-msg ok"><i data-lucide="info"></i><span>Replies go to ${esc(S.hk?.orgEmail || h.contactEmail || S.user?.email || 'your contact email')}. The email is signed with your organiser name.</span></div>
       <div id="mErr" class="hk-msg err hk-hidden"></div>
       <button class="hk-btn hk-sendbtn" type="submit" id="mSend" disabled><i data-lucide="send"></i><span>Choose a template</span></button></form>`, { onMount(b, close){
       const k = $('#mk', b), btn = $('#mSend', b), n = $('[name=note]', b), err = m => { const e = $('#mErr', b); e.classList.toggle('hk-hidden', !m); e.innerHTML = m ? `<i data-lucide="circle-alert"></i><span>${esc(m)}</span>` : ''; icons(); };
