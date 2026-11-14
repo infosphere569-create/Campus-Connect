@@ -491,7 +491,96 @@ export function watchNotifications(uid, cb){
 export const markRead = id => FS.updateDoc(FS.doc(db, 'hkNotifications', id), { read: true });
 
 export async function audit(by, action, target, extra = {}){
-  try { await FS.addDoc(FS.collection(db, 'auditLogs'), { scope: 'hackathons', action, target, by, ...extra, createdAtMs: Date.now(), createdAt: FS.serverTimestamp() }); } catch(e){ console.warn('audit', e); }
+  try {
+    const u = auth.currentUser;
+    await FS.addDoc(FS.collection(db, 'auditLogs'), {
+      scope: 'hackathons',
+      action,
+      target,
+      by,
+      byEmail: extra.byEmail || u?.email || '',
+      byName: extra.byName || u?.displayName || '',
+      ...extra,
+      createdAtMs: Date.now(),
+      createdAt: FS.serverTimestamp()
+    });
+  } catch(e){ console.warn('audit', e); }
+}
+
+/* ---------------- Sub-admin delegation ---------------- */
+export const SUBADMIN_PERMS = [
+  { key: 'approve', label: 'Approve & Decisions', desc: 'Approve, reject, or request changes on pending hackathons', icon: 'badge-check' },
+  { key: 'view_delete', label: 'Inspection & Delete', desc: 'Inspect registrations, tests, host view workspace, and delete hackathons', icon: 'trash-2' },
+  { key: 'edit_hackathon', label: 'Edit Hackathons', desc: 'Modify hackathon wizard, details, schedule, rounds, and submission rules', icon: 'pencil' },
+  { key: 'ban_unban', label: 'Ban & Unban Users', desc: 'Ban or unban hosts and participants, restrict platform registration', icon: 'shield-alert' },
+  { key: 'edit_profile', label: 'Edit Profiles', desc: 'Modify host or participant profile and contact details', icon: 'user' }
+];
+
+export async function fetchSubAdmins(){
+  return mapDocs(await safeGetDocs(FS.query(FS.collection(db, 'hkSubAdmins'), FS.limit(200)))).sort((a, b) => (b.grantedAtMs || 0) - (a.grantedAtMs || 0));
+}
+
+export async function fetchSubAdmin(uid){
+  if(!uid) return null;
+  try {
+    const s = await safeGetDoc(FS.doc(db, 'hkSubAdmins', uid));
+    return s.exists() ? { uid: s.id, ...s.data() } : null;
+  } catch { return null; }
+}
+
+export async function saveSubAdmin(uid, data){
+  const rf = FS.doc(db, 'hkSubAdmins', uid);
+  await FS.setDoc(rf, {
+    ...data,
+    uid,
+    updatedAtMs: Date.now(),
+    updatedAt: FS.serverTimestamp()
+  }, { merge: true });
+}
+
+export async function deleteSubAdmin(uid){
+  await FS.deleteDoc(FS.doc(db, 'hkSubAdmins', uid));
+}
+
+export async function searchPlatformUsers(term, cachedProfiles = []){
+  const q = String(term || '').trim().toLowerCase();
+  if(!q) return [];
+  const map = new Map();
+  (cachedProfiles || []).forEach(p => {
+    const email = (p.email || p.orgEmail || '').toLowerCase();
+    const name = (p.displayName || p.organiserName || '').toLowerCase();
+    if(email.includes(q) || name.includes(q)){
+      map.set(p.uid || p.id, {
+        uid: p.uid || p.id,
+        displayName: p.displayName || p.organiserName || 'User',
+        email: p.email || p.orgEmail || '',
+        photoURL: p.photoURL || '',
+        college: p.college || '',
+        role: Array.isArray(p.roles) ? p.roles.join(', ') : (p.role || 'User')
+      });
+    }
+  });
+  try {
+    const snap = await safeGetDocs(FS.query(FS.collection(db, 'users'), FS.limit(100)));
+    snap.docs.forEach(d => {
+      const u = d.data();
+      const email = (u.email || '').toLowerCase();
+      const name = (u.displayName || '').toLowerCase();
+      if(email.includes(q) || name.includes(q)){
+        const uid = d.id;
+        const ex = map.get(uid);
+        map.set(uid, {
+          uid,
+          displayName: u.displayName || ex?.displayName || 'User',
+          email: u.email || ex?.email || '',
+          photoURL: u.photoURL || ex?.photoURL || '',
+          college: u.college || ex?.college || '',
+          role: u.role || ex?.role || 'student'
+        });
+      }
+    });
+  } catch(e) { console.warn('search users error', e); }
+  return [...map.values()].slice(0, 20);
 }
 
 

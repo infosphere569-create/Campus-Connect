@@ -13,17 +13,26 @@ initBg($('#hkBg'));
 
 const S = {
   user: null, site: null, hk: null,
+  subAdmins: [], subAdmin: null,
   all: [], hosts: [], regs: [], subs: [], atts: [], logs: [],
   rt: 0, booted: false, cleanup: null,
   q: '', st: '', hid: '',
   apQ: '', apPhase: '', apDateField: 'approved', apPreset: '', apFrom: '', apTo: '',
-  hq: '', hst: '', pq: '', pst: ''
+  hq: '', hst: '', pq: '', pst: '',
+  saQ: '', saUser: null, saResults: [],
+  saPerms: { approve: false, view_delete: false, edit_hackathon: false, ban_unban: false, edit_profile: false }
 };
 const view = $('#view'), app = $('#app');
 const stale = t => t !== S.rt;
 const nav = h => { if(location.hash === h) route(); else location.hash = h; };
 const curPath = () => (location.hash || '').replace(/^#/, '') || '/overview';
 const isAdmin = () => C.isAdminUser(S.site);
+const isSubAdmin = () => !isAdmin() && !!S.subAdmin;
+const can = perm => {
+  if(isAdmin()) return true;
+  if(!S.subAdmin) return false;
+  return !!S.subAdmin.permissions?.[perm];
+};
 const pendingN = () => S.all.filter(h => h.status === 'pending').length;
 
 const isCompleted = h => h.status === 'closed' || (h.status === 'approved' && !!h.endMs && Date.now() > h.endMs);
@@ -109,7 +118,7 @@ function buildParticipantsList(){
   })).sort((a, b) => (b._applied - a._applied) || (b.createdAtMs || 0) - (a.createdAtMs || 0));
 }
 
-const NAV = [
+const BASE_NAV = [
   ['/overview', 'layout-dashboard', 'Overview'],
   ['/approvals', 'badge-check', 'Approvals'],
   ['/approved', 'circle-check-big', 'Approved'],
@@ -119,14 +128,15 @@ const NAV = [
   ['/regs', 'users', 'Registrations'],
   ['/logs', 'scroll-text', 'Audit log']
 ];
+const getNavItems = () => isAdmin() ? [...BASE_NAV, ['/subadmins', 'shield-plus', 'Sub-admins']] : BASE_NAV;
 
 function paintNav(){
-  const p = pendingN(), cur = curPath();
+  const p = pendingN(), cur = curPath(), navItems = getNavItems();
   const on = x => cur === x || cur.startsWith(x + '/')
     || (x === '/all' && (cur.startsWith('/view') || cur.startsWith('/manage') || cur.startsWith('/edit')));
   $('#side').innerHTML = `<div class="lbl">Hackathons admin</div>` +
-    NAV.map(([x, ic, l]) => `<a class="hk-nav-i ${on(x) ? 'on' : ''}" href="#${x}"><i data-lucide="${ic}"></i><span class="t">${l}</span>${x === '/approvals' && p ? `<span class="badge">${p}</span>` : ''}</a>`).join('') +
-    `<div class="sp"></div><a class="hk-nav-i" href="hackthons-portal.html"><i data-lucide="rocket"></i><span class="t">Hackathons portal</span></a><a class="hk-nav-i" href="admin.html"><i data-lucide="shield"></i><span class="t">Main admin</span></a><button class="hk-nav-i" data-act="theme"><i data-lucide="sun-moon"></i><span class="t">Theme</span></button><button class="hk-nav-i" data-act="logout"><i data-lucide="log-out"></i><span class="t">Log out</span></button>`;
+    navItems.map(([x, ic, l]) => `<a class="hk-nav-i ${on(x) ? 'on' : ''}" href="#${x}"><i data-lucide="${ic}"></i><span class="t">${l}</span>${x === '/approvals' && p ? `<span class="badge">${p}</span>` : ''}</a>`).join('') +
+    `<div class="sp"></div><a class="hk-nav-i" href="hackthons-portal.html"><i data-lucide="rocket"></i><span class="t">Hackathons portal</span></a>${isAdmin() ? `<a class="hk-nav-i" href="admin.html"><i data-lucide="shield"></i><span class="t">Main admin</span></a>` : ''}<button class="hk-nav-i" data-act="theme"><i data-lucide="sun-moon"></i><span class="t">Theme</span></button><button class="hk-nav-i" data-act="logout"><i data-lucide="log-out"></i><span class="t">Log out</span></button>`;
   const b = (x, ic, l) => `<a href="#${x}" class="${on(x) ? 'on' : ''}"><i data-lucide="${ic}"></i><span>${l}</span>${x === '/approvals' && p ? `<span class="badge">${p}</span>` : ''}</a>`;
   $('#bottom').innerHTML = b('/overview', 'layout-dashboard', 'Home') + b('/approvals', 'badge-check', 'Approve') + b('/approved', 'circle-check-big', 'Approved') + b('/hosts', 'building-2', 'Hosts') + b('/participants', 'user-check', 'Users');
   const d = $('#bellDot'); d.textContent = p > 9 ? '9+' : p; d.classList.toggle('hk-hidden', !p);
@@ -139,13 +149,14 @@ $('#bellBtn').onclick = () => nav('#/approvals');
 
 const mapDocs = s => s.docs.map(d => ({ id: d.id, ...d.data() }));
 async function load(){
-  const [all, hosts, regs, subs, atts, logs] = await Promise.all([
+  const [all, hosts, regs, subs, atts, logs, subAdmins] = await Promise.all([
     C.fetchAll(),
     FS.getDocs(FS.query(FS.collection(C.db, 'hkProfiles'), FS.limit(1000))).then(mapDocs),
     C.allRegistrations(),
     C.allSubmissions().catch(() => []),
     C.allAttempts().catch(() => []),
-    FS.getDocs(FS.query(FS.collection(C.db, 'auditLogs'), FS.where('scope', '==', 'hackathons'), FS.limit(250))).then(mapDocs).catch(() => [])
+    FS.getDocs(FS.query(FS.collection(C.db, 'auditLogs'), FS.where('scope', '==', 'hackathons'), FS.limit(400))).then(mapDocs).catch(() => []),
+    C.fetchSubAdmins().catch(() => [])
   ]);
   S.all = all.sort((a, b) => (b.updatedAtMs || 0) - (a.updatedAtMs || 0));
   S.hosts = hosts;
@@ -153,6 +164,10 @@ async function load(){
   S.subs = subs;
   S.atts = atts;
   S.logs = logs.sort((a, b) => b.createdAtMs - a.createdAtMs);
+  S.subAdmins = subAdmins;
+  if(!isAdmin() && S.user){
+    S.subAdmin = subAdmins.find(x => x.uid === S.user.uid) || S.subAdmin;
+  }
 }
 
 const adminCtx = t => ({
@@ -174,12 +189,27 @@ const ROUTES = [
   [/^\/approved$/, approvedList],
   [/^\/all$/, allList],
   [/^\/view\/([\w-]+)$/, viewOne],
-  [/^\/manage\/([\w-]+)$/, (t, id) => manage({ ...adminCtx(t), backHash: `#/view/${id}`, backLabel: 'Back to Hackathon View', viewHref: `#/view/${id}` }, id)],
-  [/^\/edit\/([\w-]+)$/, (t, id) => wizard({ ...adminCtx(t), backHash: `#/view/${id}` }, id)],
+  [/^\/manage\/([\w-]+)$/, (t, id) => {
+    if(!can('view_delete')){
+      toast('Permission required: Inspection & Delete to enter Host View', 'error');
+      nav('#/view/' + id);
+      return;
+    }
+    return manage({ ...adminCtx(t), backHash: `#/view/${id}`, backLabel: 'Back to Hackathon View', viewHref: `#/view/${id}` }, id);
+  }],
+  [/^\/edit\/([\w-]+)$/, (t, id) => {
+    if(!can('edit_hackathon')){
+      toast('Permission required: Edit Hackathons', 'error');
+      nav('#/view/' + id);
+      return;
+    }
+    return wizard({ ...adminCtx(t), backHash: `#/view/${id}` }, id);
+  }],
   [/^\/hosts$/, hostsView],
   [/^\/participants$/, participantsView],
   [/^\/regs$/, regsView],
-  [/^\/logs$/, logsView]
+  [/^\/logs$/, logsView],
+  [/^\/subadmins$/, subAdminsView]
 ];
 
 async function route(){
@@ -278,6 +308,7 @@ function approvals(){
 }
 
 async function decide(id, decision){
+  if(!can('approve')) return toast('Permission required: Approve & Decisions', 'error');
   const h = S.all.find(x => x.id === id); if(!h) return;
   const needNote = decision !== 'approved', label = { approved: 'Approve', changes_requested: 'Request changes', rejected: 'Reject' }[decision];
   modal(`${label} · ${h.title}`, `<form class="hk-form" id="dec"><p class="hk-sm hk-muted">${decision === 'approved' ? 'This makes the hackathon visible to all students immediately and adds it to the Approved section.' : 'The host will see your note and be notified.'}</p>
@@ -461,6 +492,8 @@ async function patch(id, data, action, msg){
    ===================================================================== */
 function confirmHostModeModal(h, action = 'manage'){
   const isEdit = action === 'edit';
+  if(isEdit && !can('edit_hackathon')) return toast('Permission required: Edit Hackathons', 'error');
+  if(!isEdit && !can('view_delete')) return toast('Permission required: Inspection & Delete to enter Host View', 'error');
   modal(`Confirm Host View · ${h.title}`, `<div class="hk-form">
     <div class="hk-msg ok"><i data-lucide="shield-alert"></i><span>You are entering <b>Host-level controls</b> for <b>${esc(h.title)}</b>.</span></div>
     <p class="hk-sm hk-muted">Inside Host View you can perform every action a host can: shortlist/select/reject participants, move teams between rounds, score project submissions, manage screening tests, send team emails/announcements, and edit hackathon details.</p>
@@ -646,8 +679,14 @@ async function viewOne(t, id){
     $$('#vTabs button').forEach(x => x.classList.toggle('on', x === b));
     drawBody();
   };
-  $('#enterHostView').onclick = () => confirmHostModeModal(h, 'manage');
-  $('#enterHostEdit').onclick = () => confirmHostModeModal(h, 'edit');
+  $('#enterHostView').onclick = () => {
+    if(!can('view_delete')) return toast('Permission required: Inspection & Delete to enter Host View', 'error');
+    confirmHostModeModal(h, 'manage');
+  };
+  $('#enterHostEdit').onclick = () => {
+    if(!can('edit_hackathon')) return toast('Permission required: Edit Hackathons', 'error');
+    confirmHostModeModal(h, 'edit');
+  };
   drawBody();
   const stopTimer = startCountdowns(view);
   S.cleanup = () => { try { stopTimer?.(); } catch {} };
@@ -1088,24 +1127,516 @@ function logsView(){
 }
 
 /* =====================================================================
+   Sub-Admins Delegation Section (/subadmins) — Platform Admin Only
+   ===================================================================== */
+async function subAdminsView(){
+  if(!isAdmin()){
+    toast('Only Platform Admins can manage sub-admin delegations.', 'error');
+    nav('#/overview');
+    return;
+  }
+
+  const list = S.subAdmins || [];
+
+  view.innerHTML = `<div class="hk-view">
+    <div class="hk-page-h">
+      <div>
+        <span class="hk-eyebrow">Access Control · Delegation</span>
+        <h1>Sub-Admins</h1>
+        <p>Grant delegated sub-admin access to platform users with granular permissions for hackathon approvals, deep process view &amp; deletion, editing, user bans, and profile edits.</p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="hk-btn" data-act="refresh"><i data-lucide="refresh-cw"></i>Refresh</button>
+      </div>
+    </div>
+
+    <!-- Grant Sub-Admin Access Card -->
+    <div class="hk-card-s hk-subadmin-grant" style="margin-bottom:24px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <div class="ki" style="width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:color-mix(in srgb,var(--hk-p) 14%,var(--hk-surface));color:var(--hk-p)"><i data-lucide="user-plus"></i></div>
+        <div>
+          <b style="font-size:1.05rem">Delegate New Sub-Admin</b>
+          <div class="hk-xs hk-muted">Search any registered user by Gmail or display name, configure checkboxes, and tap grant.</div>
+        </div>
+      </div>
+
+      <!-- Step 1: User Search & Selection -->
+      <div class="hk-field" style="margin-bottom:16px">
+        <label>Platform User <small>(Search by Gmail or Name)</small></label>
+        <div id="saSelectedBox">
+          ${S.saUser ? `
+            <div class="hk-user-pick">
+              <img class="hk-avatar" src="${C.safeUrl(S.saUser.photoURL) || 'icon.png'}" alt="" width="38" height="38">
+              <div class="grow" style="min-width:0">
+                <b>${esc(S.saUser.displayName || 'User')}</b>
+                <div class="hk-xs hk-muted">${esc(S.saUser.email || '')}${S.saUser.college ? ' · ' + esc(S.saUser.college) : ''}</div>
+              </div>
+              <button type="button" class="hk-btn sm ghost" id="saChangeUserBtn"><i data-lucide="x"></i>Change</button>
+            </div>
+          ` : `
+            <div class="hk-user-search-wrap">
+              <div class="hk-search" style="margin-bottom:4px">
+                <i data-lucide="search"></i>
+                <input class="hk-input" id="saSearchInput" value="${esc(S.saQ)}" placeholder="Type user's Gmail address or name to search…">
+              </div>
+              <div class="hk-user-dropdown ${S.saResults.length ? 'show' : ''}" id="saResultsBox">
+                ${S.saResults.map(u => `
+                  <div class="hk-user-opt" data-pick-user="${esc(u.uid)}">
+                    <img class="hk-avatar" src="${C.safeUrl(u.photoURL) || 'icon.png'}" alt="" width="32" height="32">
+                    <div class="grow" style="min-width:0">
+                      <b>${esc(u.displayName || 'User')}</b>
+                      <div class="hk-xs hk-muted">${esc(u.email || '')}${u.college ? ' · ' + esc(u.college) : ''}</div>
+                    </div>
+                    <button type="button" class="hk-btn sm primary" data-pick-user="${esc(u.uid)}">Select</button>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `}
+        </div>
+      </div>
+
+      <!-- Step 2: Granular Permission Checkboxes -->
+      <div style="margin-top:16px;border-top:1px solid var(--hk-line);padding-top:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+          <div>
+            <b style="font-size:.92rem">Select Permissions to Delegate</b>
+            <div class="hk-xs hk-muted">Select individual boxes or toggle Full Access. Unchecked actions will be strictly forbidden.</div>
+          </div>
+          <label class="hk-check" style="font-weight:700;font-size:.82rem;color:var(--hk-p)">
+            <input type="checkbox" id="saPermAll" ${Object.values(S.saPerms).every(Boolean) ? 'checked' : ''}>
+            <span>Select All (Full Sub-Admin)</span>
+          </label>
+        </div>
+
+        <div class="hk-perm-grid">
+          ${C.SUBADMIN_PERMS.map(p => `
+            <label class="hk-perm-card ${S.saPerms[p.key] ? 'on' : ''}">
+              <input type="checkbox" data-sa-perm="${p.key}" ${S.saPerms[p.key] ? 'checked' : ''}>
+              <div class="chk"><i data-lucide="${S.saPerms[p.key] ? 'circle-check' : 'circle'}"></i></div>
+              <div class="meta">
+                <b><i data-lucide="${p.icon}"></i> ${esc(p.label)}</b>
+                <small>${esc(p.desc)}</small>
+              </div>
+            </label>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- Step 3: Action Button -->
+      <div style="display:flex;justify-content:flex-end;margin-top:18px;border-top:1px solid var(--hk-line);padding-top:14px">
+        <button type="button" class="hk-btn primary lg" id="saGrantBtn" ${!S.saUser || !Object.values(S.saPerms).some(Boolean) ? 'disabled' : ''}>
+          <i data-lucide="shield-plus"></i>Grant Sub-Admin Access
+        </button>
+      </div>
+    </div>
+
+    <!-- Active Sub-Admins Directory -->
+    <div class="hk-sec">
+      <h2><i data-lucide="users"></i>Active Sub-Admins (${list.length})</h2>
+      <span class="hk-sm hk-muted">Tap any card to view their activity history log</span>
+    </div>
+
+    ${list.length ? `
+      <div class="hk-subadmins-grid">
+        ${list.map(sa => {
+          const perms = sa.permissions || {};
+          const isFull = Object.keys(perms).length >= 5 && Object.values(perms).every(Boolean);
+          return `
+            <div class="hk-sacard" data-sa-card="${esc(sa.uid)}">
+              <div class="hk-sacard-top">
+                <img class="hk-avatar" src="${C.safeUrl(sa.photoURL) || 'icon.png'}" alt="" width="44" height="44">
+                <div class="grow" style="min-width:0">
+                  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                    <b>${esc(sa.displayName || 'Sub-admin')}</b>
+                    <span class="hk-chip sm">Sub-admin</span>
+                  </div>
+                  <div class="hk-xs hk-muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(sa.email || '')}</div>
+                  ${sa.college ? `<div class="hk-xs hk-muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><i data-lucide="school"></i>${esc(sa.college)}</div>` : ''}
+                </div>
+              </div>
+
+              <div class="hk-sacard-perms">
+                ${isFull ? `
+                  <span class="hk-chip gold"><i data-lucide="award"></i>Full Access (All 5)</span>
+                ` : `
+                  ${perms.approve ? '<span class="hk-chip"><i data-lucide="badge-check"></i>Approve</span>' : ''}
+                  ${perms.view_delete ? '<span class="hk-chip warn"><i data-lucide="trash-2"></i>Inspect &amp; Delete</span>' : ''}
+                  ${perms.edit_hackathon ? '<span class="hk-chip"><i data-lucide="pencil"></i>Edit Hackathon</span>' : ''}
+                  ${perms.ban_unban ? '<span class="hk-chip bad"><i data-lucide="shield-alert"></i>Ban / Unban</span>' : ''}
+                  ${perms.edit_profile ? '<span class="hk-chip neutral"><i data-lucide="user"></i>Edit Profiles</span>' : ''}
+                  ${!Object.values(perms).some(Boolean) ? '<span class="hk-chip neutral">No permissions</span>' : ''}
+                `}
+              </div>
+
+              <div class="hk-sacard-meta">
+                <span>Granted ${fmtFullDT(sa.grantedAtMs || sa.updatedAtMs)}</span>
+                ${sa.grantedByName ? `<span class="hk-muted">by ${esc(sa.grantedByName)}</span>` : ''}
+              </div>
+
+              <div class="hk-sacard-acts" onclick="event.stopPropagation()">
+                <button type="button" class="hk-btn sm ghost" data-view-sa-activity="${esc(sa.uid)}" title="View activity log"><i data-lucide="history"></i>Activity</button>
+                <button type="button" class="hk-btn sm" data-edit-sa="${esc(sa.uid)}" title="Edit permissions"><i data-lucide="pencil"></i>Edit</button>
+                <button type="button" class="hk-btn sm danger" data-revoke-sa="${esc(sa.uid)}" title="Revoke access"><i data-lucide="trash-2"></i>Revoke</button>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    ` : empty('shield-alert', 'No sub-admins yet', 'Use the panel above to grant granular sub-admin access to any user.')}
+  </div>`;
+
+  // Bind events for user search & selection
+  const searchInput = $('#saSearchInput');
+  if(searchInput){
+    searchInput.oninput = C.debounce(async e => {
+      S.saQ = e.target.value.trim();
+      if(!S.saQ){
+        S.saResults = [];
+        const box = $('#saResultsBox');
+        if(box){ box.classList.remove('show'); box.innerHTML = ''; }
+        return;
+      }
+      try {
+        S.saResults = await C.searchPlatformUsers(S.saQ, S.hosts);
+        const box = $('#saResultsBox');
+        if(box){
+          if(S.saResults.length){
+            box.classList.add('show');
+            box.innerHTML = S.saResults.map(u => `
+              <div class="hk-user-opt" data-pick-user="${esc(u.uid)}">
+                <img class="hk-avatar" src="${C.safeUrl(u.photoURL) || 'icon.png'}" alt="" width="32" height="32">
+                <div class="grow" style="min-width:0">
+                  <b>${esc(u.displayName || 'User')}</b>
+                  <div class="hk-xs hk-muted">${esc(u.email || '')}${u.college ? ' · ' + esc(u.college) : ''}</div>
+                </div>
+                <button type="button" class="hk-btn sm primary" data-pick-user="${esc(u.uid)}">Select</button>
+              </div>
+            `).join('');
+            icons();
+          } else {
+            box.classList.add('show');
+            box.innerHTML = `<div class="hk-sm hk-muted" style="padding:12px">No users found matching “${esc(S.saQ)}”.</div>`;
+          }
+        }
+      } catch(err){ console.warn('search error', err); }
+    }, 240);
+  }
+
+  $('#saChangeUserBtn')?.addEventListener('click', () => {
+    S.saUser = null;
+    S.saQ = '';
+    S.saResults = [];
+    subAdminsView();
+    icons();
+  });
+
+  // Pick user from results
+  $('#saResultsBox')?.addEventListener('click', e => {
+    const opt = e.target.closest('[data-pick-user]');
+    if(!opt) return;
+    const uid = opt.dataset.pickUser;
+    const u = S.saResults.find(x => x.uid === uid);
+    if(u){
+      S.saUser = u;
+      S.saResults = [];
+      S.saQ = '';
+      subAdminsView();
+      icons();
+    }
+  });
+
+  // Permission toggles
+  $('#saPermAll')?.addEventListener('change', e => {
+    const val = !!e.target.checked;
+    Object.keys(S.saPerms).forEach(k => { S.saPerms[k] = val; });
+    subAdminsView();
+    icons();
+  });
+
+  $$('[data-sa-perm]').forEach(chk => {
+    chk.addEventListener('change', e => {
+      const k = e.target.dataset.saPerm;
+      S.saPerms[k] = !!e.target.checked;
+      const allChecked = Object.values(S.saPerms).every(Boolean);
+      const allChk = $('#saPermAll');
+      if(allChk) allChk.checked = allChecked;
+      const card = e.target.closest('.hk-perm-card');
+      if(card){
+        card.classList.toggle('on', !!e.target.checked);
+        const iconEl = card.querySelector('.chk i');
+        if(iconEl) iconEl.setAttribute('data-lucide', e.target.checked ? 'circle-check' : 'circle');
+        icons();
+      }
+      const grantBtn = $('#saGrantBtn');
+      if(grantBtn) grantBtn.disabled = !S.saUser || !Object.values(S.saPerms).some(Boolean);
+    });
+  });
+
+  // Grant button
+  $('#saGrantBtn')?.addEventListener('click', async () => {
+    if(!S.saUser) return toast('Please select a platform user first.', 'error');
+    if(!Object.values(S.saPerms).some(Boolean)) return toast('Please select at least one permission.', 'error');
+
+    const btn = $('#saGrantBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="hk-spin"></span> Granting…';
+    try {
+      const payload = {
+        uid: S.saUser.uid,
+        displayName: S.saUser.displayName || 'Sub-admin',
+        email: S.saUser.email || '',
+        photoURL: S.saUser.photoURL || '',
+        college: S.saUser.college || '',
+        permissions: { ...S.saPerms },
+        grantedByUid: S.user.uid,
+        grantedByName: S.site?.displayName || S.user.displayName || 'Platform Admin',
+        grantedByEmail: S.user.email || '',
+        grantedAtMs: Date.now()
+      };
+      await C.saveSubAdmin(S.saUser.uid, payload);
+      C.audit(S.user.uid, 'subadmin.grant', S.saUser.email || S.saUser.uid, {
+        targetUid: S.saUser.uid,
+        targetName: S.saUser.displayName,
+        permissions: S.saPerms,
+        note: `Granted sub-admin permissions: ${Object.keys(S.saPerms).filter(k => S.saPerms[k]).join(', ')}`
+      });
+      toast(`Sub-admin access granted to ${S.saUser.displayName || S.saUser.email}`, 'success');
+      S.saUser = null;
+      S.saQ = '';
+      S.saResults = [];
+      Object.keys(S.saPerms).forEach(k => { S.saPerms[k] = false; });
+      await reload();
+    } catch(err){
+      toast(err.message, 'error');
+      btn.disabled = false;
+      btn.innerHTML = '<i data-lucide="shield-plus"></i>Grant Sub-Admin Access';
+      icons();
+    }
+  });
+
+  // Card click: opens activity modal
+  $$('[data-sa-card]').forEach(c => {
+    c.addEventListener('click', e => {
+      if(e.target.closest('button') || e.target.closest('a')) return;
+      viewSubAdminActivityModal(c.dataset.saCard);
+    });
+  });
+}
+
+function viewSubAdminActivityModal(uid){
+  const sa = S.subAdmins.find(x => x.uid === uid) || { uid, displayName: 'Sub-admin', email: '' };
+  const subLogs = S.logs.filter(l => l.by === uid || (l.byEmail && sa.email && l.byEmail.toLowerCase() === sa.email.toLowerCase()));
+
+  const actionBadge = act => {
+    switch(act){
+      case 'hackathon.approved':
+      case 'hackathon.approve':
+      case 'hackathon.reopen':
+      case 'host.unban':
+      case 'participant.unban':
+        return '<span class="hk-chip" style="background:color-mix(in srgb,var(--hk-p) 14%,var(--hk-surface));color:var(--hk-p)"><i data-lucide="circle-check"></i>Approved / Restored</span>';
+      case 'hackathon.rejected':
+      case 'hackathon.reject':
+      case 'host.ban':
+      case 'participant.ban':
+      case 'hackathon.delete':
+        return '<span class="hk-chip bad"><i data-lucide="circle-x"></i>Rejected / Banned / Deleted</span>';
+      case 'hackathon.changes_requested':
+      case 'hackathon.close':
+        return '<span class="hk-chip warn"><i data-lucide="circle-alert"></i>Changes / Closed</span>';
+      case 'host.edit':
+      case 'participant.edit':
+      case 'hackathon.admin_host_edit':
+        return '<span class="hk-chip" style="background:color-mix(in srgb,var(--hk-sky) 14%,var(--hk-surface));color:var(--hk-sky)"><i data-lucide="pencil"></i>Edited</span>';
+      case 'hackathon.admin_host_view':
+        return '<span class="hk-chip neutral"><i data-lucide="eye"></i>Host Workspace View</span>';
+      case 'subadmin.grant':
+      case 'subadmin.update':
+        return '<span class="hk-chip gold"><i data-lucide="shield-plus"></i>Sub-Admin Access</span>';
+      case 'subadmin.revoke':
+        return '<span class="hk-chip bad"><i data-lucide="trash-2"></i>Access Revoked</span>';
+      default:
+        return `<span class="hk-chip neutral">${esc(act)}</span>`;
+    }
+  };
+
+  const perms = sa.permissions || {};
+  const isFull = Object.keys(perms).length >= 5 && Object.values(perms).every(Boolean);
+
+  const html = `
+    <div class="hk-stack" style="gap:16px">
+      <!-- Profile summary banner -->
+      <div class="hk-org-strip">
+        <img src="${C.safeUrl(sa.photoURL) || 'icon.png'}" alt="" width="44" height="44">
+        <div class="grow" style="min-width:0">
+          <small>Sub-Admin Activity Trail</small>
+          <b>${esc(sa.displayName || 'Sub-admin')}</b>
+          <span>${esc(sa.email || '')}${sa.college ? ' · ' + esc(sa.college) : ''}</span>
+        </div>
+        <div style="text-align:right">
+          ${isFull ? '<span class="hk-chip gold sm"><i data-lucide="award"></i>Full Access</span>' : '<span class="hk-chip sm">Delegated</span>'}
+        </div>
+      </div>
+
+      <!-- Enabled permissions overview -->
+      <div class="hk-card-s" style="padding:10px 14px">
+        <div class="hk-xs hk-muted" style="font-weight:700;text-transform:uppercase;margin-bottom:6px">Active Assigned Permissions:</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${perms.approve ? '<span class="hk-chip sm"><i data-lucide="badge-check"></i>Approve</span>' : ''}
+          ${perms.view_delete ? '<span class="hk-chip warn sm"><i data-lucide="trash-2"></i>Inspect &amp; Delete</span>' : ''}
+          ${perms.edit_hackathon ? '<span class="hk-chip sm"><i data-lucide="pencil"></i>Edit Hackathons</span>' : ''}
+          ${perms.ban_unban ? '<span class="hk-chip bad sm"><i data-lucide="shield-alert"></i>Ban / Unban</span>' : ''}
+          ${perms.edit_profile ? '<span class="hk-chip neutral sm"><i data-lucide="user"></i>Edit Profiles</span>' : ''}
+        </div>
+      </div>
+
+      <!-- Activity Timeline -->
+      <div>
+        <div class="hk-xs hk-muted" style="font-weight:700;text-transform:uppercase;margin-bottom:10px">History Log (${subLogs.length} action${subLogs.length === 1 ? '' : 's'})</div>
+        ${subLogs.length ? `
+          <div class="hk-activity-timeline">
+            ${subLogs.map(l => `
+              <div class="hk-activity-item">
+                <div class="hk-activity-head">
+                  ${actionBadge(l.action)}
+                  <span class="hk-xs hk-muted">${C.fmtDT(l.createdAtMs)} · ${C.ago(l.createdAtMs)}</span>
+                </div>
+                <div class="hk-activity-body">
+                  <b>Target: ${esc(l.title || l.target || '—')}</b>
+                  ${l.note ? `<div class="hk-xs hk-muted" style="margin-top:2px">“${esc(l.note)}”</div>` : ''}
+                  ${l.byName ? `<div class="hk-xs hk-muted" style="margin-top:2px">Logged by: ${esc(l.byName)}</div>` : ''}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        ` : empty('history', 'No activity recorded yet', 'This sub-admin has not performed any approvals, edits, bans, or workspace actions yet.')}
+      </div>
+    </div>
+  `;
+
+  modal(`Activity Log: ${sa.displayName || sa.email}`, html, { wide: true });
+}
+
+function editSubAdminModal(sa){
+  const perms = { ...(sa.permissions || {}) };
+  const html = `
+    <form class="hk-form" id="editSaForm">
+      <p class="hk-sm hk-muted">Update delegated permissions for <b>${esc(sa.displayName || sa.email)}</b>.</p>
+      <div class="hk-perm-grid" style="margin:14px 0">
+        ${C.SUBADMIN_PERMS.map(p => `
+          <label class="hk-perm-card ${perms[p.key] ? 'on' : ''}">
+            <input type="checkbox" name="perm_${p.key}" ${perms[p.key] ? 'checked' : ''}>
+            <div class="chk"><i data-lucide="${perms[p.key] ? 'circle-check' : 'circle'}"></i></div>
+            <div class="meta">
+              <b><i data-lucide="${p.icon}"></i> ${esc(p.label)}</b>
+              <small>${esc(p.desc)}</small>
+            </div>
+          </label>
+        `).join('')}
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:14px">
+        <button type="button" class="hk-btn" data-cancel-edit-sa>Cancel</button>
+        <button type="submit" class="hk-btn primary"><i data-lucide="save"></i>Save Permissions</button>
+      </div>
+    </form>
+  `;
+
+  modal(`Edit Permissions · ${sa.displayName || sa.email}`, html, {
+    onMount(b, close){
+      $('[data-cancel-edit-sa]', b).onclick = close;
+      $$('input[type="checkbox"]', b).forEach(chk => {
+        chk.onchange = e => {
+          const card = e.target.closest('.hk-perm-card');
+          card?.classList.toggle('on', e.target.checked);
+          const ic = card?.querySelector('.chk i');
+          if(ic) ic.setAttribute('data-lucide', e.target.checked ? 'circle-check' : 'circle');
+          icons();
+        };
+      });
+      $('#editSaForm', b).onsubmit = async ev => {
+        ev.preventDefault();
+        const fd = new FormData(ev.target);
+        const updatedPerms = {};
+        C.SUBADMIN_PERMS.forEach(p => {
+          updatedPerms[p.key] = !!fd.get(`perm_${p.key}`);
+        });
+        const btn = $('button[type="submit"]', b);
+        btn.disabled = true;
+        btn.innerHTML = '<span class="hk-spin"></span> Saving…';
+        try {
+          await C.saveSubAdmin(sa.uid, { permissions: updatedPerms });
+          C.audit(S.user.uid, 'subadmin.update', sa.email || sa.uid, {
+            targetUid: sa.uid,
+            permissions: updatedPerms,
+            note: 'Updated sub-admin permissions'
+          });
+          toast('Permissions updated', 'success');
+          close();
+          await reload();
+        } catch(err){
+          toast(err.message, 'error');
+          btn.disabled = false;
+          btn.innerHTML = '<i data-lucide="save"></i>Save Permissions';
+          icons();
+        }
+      };
+    }
+  });
+}
+
+async function revokeSubAdmin(uid){
+  const sa = S.subAdmins.find(x => x.uid === uid);
+  const name = sa?.displayName || sa?.email || 'this sub-admin';
+  if(!confirm(`Revoke sub-admin access for ${name}? They will immediately lose access to the hackathons admin portal.`)) return;
+
+  try {
+    await C.deleteSubAdmin(uid);
+    C.audit(S.user.uid, 'subadmin.revoke', sa?.email || uid, {
+      targetUid: uid,
+      note: `Revoked sub-admin access for ${name}`
+    });
+    toast(`Revoked sub-admin access for ${name}`, 'info');
+    await reload();
+  } catch(err){
+    toast(err.message, 'error');
+  }
+}
+
+/* =====================================================================
    Global delegated actions
    ===================================================================== */
 document.addEventListener('click', async e => {
   const ov = e.target.closest('[data-open-view]'); if(ov){ nav(`#/view/${ov.dataset.openView}`); return; }
   const vh = e.target.closest('[data-view-host]'); if(vh){ viewHostModal(vh.dataset.viewHost); return; }
-  const eh = e.target.closest('[data-edit-host]'); if(eh){ const p = S.hosts.find(x => x.uid === eh.dataset.editHost); if(p) editHostModal(p); return; }
-  const bh = e.target.closest('[data-ban-host]'); if(bh){ const p = S.hosts.find(x => x.uid === bh.dataset.banHost); if(p) toggleBan(p.uid, 'host', !(p.hostBlocked || p.banned), p.displayName || p.org || 'Host'); return; }
+  const eh = e.target.closest('[data-edit-host]'); if(eh){ if(!can('edit_profile')) return toast('Permission required: Edit Profiles', 'error'); const p = S.hosts.find(x => x.uid === eh.dataset.editHost); if(p) editHostModal(p); return; }
+  const bh = e.target.closest('[data-ban-host]'); if(bh){ if(!can('ban_unban')) return toast('Permission required: Ban & Unban Users', 'error'); const p = S.hosts.find(x => x.uid === bh.dataset.banHost); if(p) toggleBan(p.uid, 'host', !(p.hostBlocked || p.banned), p.displayName || p.org || 'Host'); return; }
   const vp = e.target.closest('[data-view-part]'); if(vp){ viewParticipantModal(vp.dataset.viewPart, vp.dataset.hid || ''); return; }
-  const ep = e.target.closest('[data-edit-part]'); if(ep){ const p = buildParticipantsList().find(x => x.uid === ep.dataset.editPart); if(p) editParticipantModal(p); return; }
-  const bp = e.target.closest('[data-ban-part]'); if(bp){ const p = buildParticipantsList().find(x => x.uid === bp.dataset.banPart); if(p) toggleBan(p.uid, 'participant', !p._banned, p.displayName || 'Participant'); return; }
+  const ep = e.target.closest('[data-edit-part]'); if(ep){ if(!can('edit_profile')) return toast('Permission required: Edit Profiles', 'error'); const p = buildParticipantsList().find(x => x.uid === ep.dataset.editPart); if(p) editParticipantModal(p); return; }
+  const bp = e.target.closest('[data-ban-part]'); if(bp){ if(!can('ban_unban')) return toast('Permission required: Ban & Unban Users', 'error'); const p = buildParticipantsList().find(x => x.uid === bp.dataset.banPart); if(p) toggleBan(p.uid, 'participant', !p._banned, p.displayName || 'Participant'); return; }
 
-  const d = e.target.closest('[data-dec]'); if(d) return decide(d.dataset.id, d.dataset.dec);
-  const f = e.target.closest('[data-feat]'); if(f){ const h = S.all.find(x => x.id === f.dataset.feat); return patch(h.id, { featured: !h.featured }, 'hackathon.feature', h.featured ? 'Unfeatured' : 'Featured'); }
-  const c = e.target.closest('[data-close]'); if(c){ if(confirm('Close this hackathon? It will disappear from students.')) patch(c.dataset.close, { status: 'closed' }, 'hackathon.close', 'Closed'); return; }
-  const ro = e.target.closest('[data-reopen]'); if(ro) return patch(ro.dataset.reopen, { status: 'approved' }, 'hackathon.reopen', 'Reopened');
-  const rm = e.target.closest('[data-rm]'); if(rm){ if(!isAdmin()) return toast('Only platform admins can delete.', 'error'); if(confirm('Delete permanently? Registrations remain but the hackathon is removed.')){ try { await C.deleteHackathon(rm.dataset.rm); C.audit(S.user.uid, 'hackathon.delete', rm.dataset.rm); toast('Deleted', 'info'); await reload(); } catch(err){ toast(err.message, 'error'); } } return; }
-  const v = e.target.closest('[data-verify]'); if(v){ const h = S.hosts.find(x => x.uid === v.dataset.verify); return hostFlag(h.uid, { hostVerified: !h.hostVerified }, 'host.verify', h.hostVerified ? 'Unverified' : 'Verified'); }
-  const b = e.target.closest('[data-block]'); if(b){ const h = S.hosts.find(x => x.uid === b.dataset.block); return hostFlag(h.uid, { hostBlocked: !h.hostBlocked }, 'host.block', h.hostBlocked ? 'Host restored' : 'Host paused'); }
+  const saAct = e.target.closest('[data-view-sa-activity]'); if(saAct){ viewSubAdminActivityModal(saAct.dataset.viewSaActivity); return; }
+  const saEd = e.target.closest('[data-edit-sa]'); if(saEd){ const sa = S.subAdmins.find(x => x.uid === saEd.dataset.editSa); if(sa) editSubAdminModal(sa); return; }
+  const saRev = e.target.closest('[data-revoke-sa]'); if(saRev){ revokeSubAdmin(saRev.dataset.revokeSa); return; }
+
+  const d = e.target.closest('[data-dec]'); if(d){ if(!can('approve')) return toast('Permission required: Approve & Decisions', 'error'); return decide(d.dataset.id, d.dataset.dec); }
+  const f = e.target.closest('[data-feat]'); if(f){ if(!can('approve')) return toast('Permission required: Approve & Decisions', 'error'); const h = S.all.find(x => x.id === f.dataset.feat); return patch(h.id, { featured: !h.featured }, 'hackathon.feature', h.featured ? 'Unfeatured' : 'Featured'); }
+  const c = e.target.closest('[data-close]'); if(c){ if(!can('approve')) return toast('Permission required: Approve & Decisions', 'error'); if(confirm('Close this hackathon? It will disappear from students.')) patch(c.dataset.close, { status: 'closed' }, 'hackathon.close', 'Closed'); return; }
+  const ro = e.target.closest('[data-reopen]'); if(ro){ if(!can('approve')) return toast('Permission required: Approve & Decisions', 'error'); return patch(ro.dataset.reopen, { status: 'approved' }, 'hackathon.reopen', 'Reopened'); }
+  const rm = e.target.closest('[data-rm]'); if(rm){
+    if(!isAdmin() && !can('view_delete')) return toast('Permission required: Inspection & Delete to remove hackathons.', 'error');
+    if(confirm('Delete permanently? Registrations remain but the hackathon is removed.')){
+      try {
+        await C.deleteHackathon(rm.dataset.rm);
+        C.audit(S.user.uid, 'hackathon.delete', rm.dataset.rm);
+        toast('Deleted', 'info');
+        await reload();
+      } catch(err){ toast(err.message, 'error'); }
+    }
+    return;
+  }
+  const v = e.target.closest('[data-verify]'); if(v){ if(!can('ban_unban') && !isAdmin()) return toast('Permission required: Ban & Unban / Verify', 'error'); const h = S.hosts.find(x => x.uid === v.dataset.verify); return hostFlag(h.uid, { hostVerified: !h.hostVerified }, 'host.verify', h.hostVerified ? 'Unverified' : 'Verified'); }
+  const b = e.target.closest('[data-block]'); if(b){ if(!can('ban_unban') && !isAdmin()) return toast('Permission required: Ban & Unban', 'error'); const h = S.hosts.find(x => x.uid === b.dataset.block); return hostFlag(h.uid, { hostBlocked: !h.hostBlocked }, 'host.block', h.hostBlocked ? 'Host restored' : 'Host paused'); }
   if(e.target.closest('[data-csvall]')){
     const t = id => S.all.find(h => h.id === id)?.title || '';
     C.csv('hackathon-registrations.csv', [['Hackathon', 'Name', 'Email', 'Phone', 'College', 'Team', 'Status', 'Registered'], ...S.regs.map(r => [t(r.hackathonId), r.name, r.email, r.phone, r.college, r.teamMode === 'solo' ? 'Solo' : r.teamName, r.status, new Date(r.createdAtMs).toISOString()])]); return;
@@ -1122,11 +1653,27 @@ document.addEventListener('click', async e => {
 C.watchUser(async (user, { site, hk }) => {
   if(S.booted) return;
   if(!user){ location.replace('login-hackthons.html'); return; }
-  if(!C.isStaff(site)){ view.innerHTML = `<div class="hk-view">${empty('shield-alert', 'Admins only', 'Your account does not have access to the hackathons admin portal.', '<a class="hk-btn primary" href="hackthons-portal.html">Go to portal</a>')}</div>`; $('#side').innerHTML = ''; icons(); return; }
-  S.booted = true; Object.assign(S, { user, site, hk });
-  const img = $('#avatar'); img.src = C.safeUrl(site.photoURL || user.photoURL) || 'icon.png'; img.onerror = () => { img.onerror = null; img.src = 'icon.png'; };
-  $('#uName').textContent = site.displayName || user.displayName || 'Admin';
-  $('#uRole').textContent = site.role === 'platformAdmin' ? 'Platform admin' : 'Moderator';
-  try { await load(); } catch(e){ console.error(e); view.innerHTML = `<div class="hk-view">${empty('triangle-alert', /permission|insufficient/i.test(e.message) ? 'Rules not deployed' : 'Could not load', /permission|insufficient/i.test(e.message) ? 'Deploy the updated firestore.rules, then refresh.' : e.message)}</div>`; icons(); return; }
+  let mySubAdmin = null;
+  if(!C.isStaff(site)){
+    try { mySubAdmin = await C.fetchSubAdmin(user.uid); } catch(e){ console.warn('subadmin check', e); }
+    if(!mySubAdmin){
+      view.innerHTML = `<div class="hk-view">${empty('shield-alert', 'Admins only', 'Your account does not have access to the hackathons admin portal.', '<a class="hk-btn primary" href="hackthons-portal.html">Go to portal</a>')}</div>`;
+      $('#side').innerHTML = ''; icons(); return;
+    }
+  } else {
+    try { mySubAdmin = await C.fetchSubAdmin(user.uid); } catch {}
+  }
+  S.booted = true;
+  Object.assign(S, { user, site, hk, subAdmin: mySubAdmin });
+  const img = $('#avatar');
+  img.src = C.safeUrl(site?.photoURL || user.photoURL) || 'icon.png';
+  img.onerror = () => { img.onerror = null; img.src = 'icon.png'; };
+  $('#uName').textContent = site?.displayName || user.displayName || 'Admin';
+  $('#uRole').textContent = isAdmin() ? 'Platform admin' : (isSubAdmin() ? 'Sub-admin' : (site?.role === 'moderator' ? 'Moderator' : 'Staff'));
+  try { await load(); } catch(e){
+    console.error(e);
+    view.innerHTML = `<div class="hk-view">${empty('triangle-alert', /permission|insufficient/i.test(e.message) ? 'Rules not deployed' : 'Could not load', /permission|insufficient/i.test(e.message) ? 'Deploy the updated firestore.rules, then refresh.' : e.message)}</div>`;
+    icons(); return;
+  }
   route();
 });
