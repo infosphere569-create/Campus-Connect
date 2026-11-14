@@ -436,7 +436,11 @@ service cloud.firestore {
     }
 
     match /hkProfiles/{uid} {
-      allow read: if self(uid) || staff();
+      allow read: if self(uid)
+        || staff()
+        || (signedIn()
+            && exists(/databases/$(database)/documents/hkProfiles/$(request.auth.uid))
+            && hkProfile(request.auth.uid).hostOnboarded == true);
 
       // A user can only create their own profile and cannot self-verify or self-unblock.
       allow create: if self(uid)

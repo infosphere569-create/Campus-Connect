@@ -104,7 +104,9 @@ export async function ensureHkProfile(user, site, role, extra = {}){
     const data = {
       uid: user.uid, displayName: extra.displayName || user.displayName || site?.displayName || '', email: user.email || '',
       photoURL: user.photoURL || site?.photoURL || '', college: extra.college || site?.college || '', city: extra.city || '',
-      phone: '', bio: '', org: '', roles: [role], activeRole: role, hostVerified: false, hostBlocked: false, onboarded: false, hostOnboarded: false,
+      course: site?.course || '', branch: site?.branch || '', year: site?.year || '', bio: site?.bio || '',
+      github: site?.githubURL || '', linkedin: site?.linkedinURL || '', portfolio: site?.websiteURL || '',
+      phone: '', org: '', roles: [role], activeRole: role, hostVerified: false, hostBlocked: false, onboarded: false, hostOnboarded: false,
       createdAtMs: Date.now(), createdAt: FS.serverTimestamp(), updatedAt: FS.serverTimestamp()
     };
     await FS.setDoc(rf, data);
@@ -116,6 +118,13 @@ export async function ensureHkProfile(user, site, role, extra = {}){
   return { uid: user.uid, ...cur, roles, activeRole: role };
 }
 export const updateHkProfile = (uid, patch) => FS.updateDoc(FS.doc(db, 'hkProfiles', uid), { ...patch, updatedAt: FS.serverTimestamp() });
+export async function fetchParticipantProfile(uid){
+  if(!uid) return null;
+  try {
+    const s = await FS.getDoc(FS.doc(db, 'hkProfiles', uid));
+    return s.exists() ? { uid: s.id, ...s.data() } : null;
+  } catch { return null; }
+}
 
 /* ---------------- geo ---------------- */
 export const CITIES = {
@@ -324,6 +333,10 @@ export async function submitForApproval(h, user, hk){
 }
 
 export async function myRegistrations(uid){ return mapDocs(await FS.getDocs(FS.query(FS.collection(db, 'hkRegistrations'), FS.where('uid', '==', uid), FS.limit(200)))).sort((a, b) => b.createdAtMs - a.createdAtMs); }
+export function watchMyRegistrations(uid, cb){
+  return FS.onSnapshot(FS.query(FS.collection(db, 'hkRegistrations'), FS.where('uid', '==', uid), FS.limit(200)),
+    s => cb(mapDocs(s).sort((a, b) => b.createdAtMs - a.createdAtMs)), e => { console.warn('myRegistrations', e); cb([]); });
+}
 export async function hackathonRegistrations(hid, hostUid){ return mapDocs(await FS.getDocs(FS.query(FS.collection(db, 'hkRegistrations'), FS.where('hackathonId', '==', hid), FS.where('hostUid', '==', hostUid), FS.limit(1000)))).sort((a, b) => b.createdAtMs - a.createdAtMs); }
 export async function allRegistrations(){ return mapDocs(await FS.getDocs(FS.query(FS.collection(db, 'hkRegistrations'), FS.limit(1500)))); }
 
@@ -421,3 +434,82 @@ export const updateRegistration = (id, patch) => FS.updateDoc(FS.doc(db, 'hkRegi
 export const getRegistration = async (hid, uid) => { try { const s = await FS.getDoc(FS.doc(db, 'hkRegistrations', `${hid}_${uid}`)); return s.exists() ? { id: s.id, ...s.data() } : null; } catch { return null; } };
 export const roundsOf = h => (h.rounds || []).filter(r => r.name);
 export const REG_STATUS = ['registered', 'shortlisted', 'selected', 'waitlisted', 'rejected'];
+
+/* ---------------- public URLs & live countdown ---------------- */
+export const publicShareUrl = id => `${location.origin}/hackathon.html?id=${encodeURIComponent(id)}`;
+export function countdownText(targetMs, now = Date.now()){
+  const diff = Math.max(0, Math.floor((targetMs - now) / 1000));
+  if(!diff) return '0s';
+  const d = Math.floor(diff / 86400), h = Math.floor((diff % 86400) / 3600), m = Math.floor((diff % 3600) / 60), s = diff % 60;
+  const p = n => String(n).padStart(2, '0');
+  return d > 0 ? `${d}d ${p(h)}h ${p(m)}m ${p(s)}s` : `${p(h)}h ${p(m)}m ${p(s)}s`;
+}
+export function nextMilestone(h, reg = null, now = Date.now()){
+  if(!h) return null;
+  const rounds = roundsOf(h);
+  const curRound = reg && rounds[reg.stage || 0];
+  if(curRound?.endMs && curRound.endMs > now && (!curRound.startMs || now >= curRound.startMs)){
+    return { label: `${curRound.name} ends in`, targetMs: curRound.endMs };
+  }
+  if(curRound?.startMs && curRound.startMs > now){
+    return { label: `${curRound.name} starts in`, targetMs: curRound.startMs };
+  }
+  if(h.submission?.open !== false && h.submission?.deadlineMs && h.submission.deadlineMs > now && (!reg || reg.status !== 'rejected')){
+    return { label: 'Submission closes in', targetMs: h.submission.deadlineMs };
+  }
+  if(!reg && h.regDeadlineMs && h.regDeadlineMs > now && !h.registrationClosed){
+    return { label: 'Registration closes in', targetMs: h.regDeadlineMs };
+  }
+  if(h.startMs && h.startMs > now){
+    return { label: 'Starts in', targetMs: h.startMs };
+  }
+  if(h.endMs && h.endMs > now){
+    return { label: 'Ends in', targetMs: h.endMs };
+  }
+  return null;
+}
+
+export async function shareHackathon(h, role = 'participant'){
+  if(!h || !h.id) return false;
+  const url = publicShareUrl(h.id);
+  const title = h.title || 'Hackathon on Campus Connect One';
+  const where = h.mode === 'online' ? 'Online' : [h.college, h.city].filter(Boolean).join(', ') || 'Campus';
+  const when = dateRange(h.startMs, h.endMs);
+  const prize = h.prizePool ? `Prize pool: ${money(h.prizePool)}` : 'Prizes & perks';
+  const lead = role === 'host'
+    ? `We're hosting ${title} on Campus Connect One!`
+    : `Check out ${title} on Campus Connect One!`;
+  const cta = role === 'host'
+    ? 'Explore rounds, prizes & register your team:'
+    : 'View full details, schedule & join:';
+  const text = `${lead}\n${h.tagline ? h.tagline + '\n' : ''}${when} · ${where} · ${prize}\n\n${cta}`;
+  const imgUrl = safeUrl(h.bannerURL || h.thumbURL);
+
+  try {
+    if(navigator.share){
+      const payload = { title, text, url };
+      if(imgUrl && navigator.canShare){
+        try {
+          const res = await fetch(imgUrl, { mode: 'cors' });
+          if(res.ok){
+            const blob = await res.blob();
+            const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+            const file = new File([blob], `${(title.replace(/[^\w]+/g, '-').toLowerCase() || 'hackathon')}.${ext}`, { type: blob.type || 'image/jpeg' });
+            if(navigator.canShare({ ...payload, files: [file] })){
+              await navigator.share({ ...payload, files: [file] });
+              return true;
+            }
+          }
+        } catch {}
+      }
+      await navigator.share(payload);
+      return true;
+    }
+    await navigator.clipboard.writeText(`${text}\n${url}`);
+    toast('Hackathon link and details copied');
+    return true;
+  } catch(e){
+    if(e?.name === 'AbortError') return false;
+    try { await navigator.clipboard.writeText(url); toast('Link copied'); return true; } catch { return false; }
+  }
+}

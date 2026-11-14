@@ -1,5 +1,5 @@
-// Shared renderers: hackathon card, detail body, status badges, empty/skeleton states.
-import { esc, safeUrl, money, dateRange, fmtDT, fmtKm, phase, ago } from './hk-core.js';
+// Shared renderers: hackathon card, detail body, status badges, countdown, empty/skeleton states.
+import { esc, safeUrl, money, dateRange, fmtDT, fmtKm, phase, ago, canRegister, nextMilestone, countdownText } from './hk-core.js';
 
 export const MODE = { online: ['Online', 'wifi'], offline: ['In-person', 'map-pin'], hybrid: ['Hybrid', 'globe'] };
 export const STATUS = {
@@ -7,6 +7,24 @@ export const STATUS = {
   changes_requested: ['Changes requested', 'warn', 'message-square-warning'], rejected: ['Rejected', 'bad', 'circle-x'], closed: ['Closed', 'neutral', 'lock']
 };
 export const statusBadge = s => { const [l, t, i] = STATUS[s] || STATUS.draft; return `<span class="hk-chip ${t}"><i data-lucide="${i}"></i>${l}</span>`; };
+
+export function countdownHtml(h, reg = null, gold = false){
+  const m = nextMilestone(h, reg);
+  if(!m) return '';
+  return `<div class="hk-countdown ${gold ? 'gold' : ''}"><i data-lucide="timer"></i><span>${esc(m.label)}</span><span class="tval" data-countdown="${m.targetMs}">${countdownText(m.targetMs)}</span></div>`;
+}
+export function startCountdowns(root = document){
+  const tick = () => {
+    const now = Date.now();
+    root.querySelectorAll('[data-countdown]').forEach(el => {
+      const target = +el.dataset.countdown;
+      el.textContent = target > now ? countdownText(target, now) : '00h 00m 00s';
+    });
+  };
+  tick();
+  const id = setInterval(tick, 1000);
+  return () => clearInterval(id);
+}
 
 function hue(str = ''){ let h = 0; for(const c of str) h = (h * 31 + c.charCodeAt(0)) % 360; return 118 + (h % 60); } // stays in the green→teal range
 export function mediaStyle(h, which = 'thumb'){
@@ -17,19 +35,38 @@ export function mediaStyle(h, which = 'thumb'){
 }
 export const initials = (t = '') => (t.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase()).join('') || 'H');
 
-export function card(h, i = 0){
+export function card(h, i = 0, opts = {}){
   const ph = h._phase || phase(h), [ml, mi] = MODE[h.mode] || MODE.offline, hasImg = !!safeUrl(h.thumbURL || h.bannerURL);
-  return `<article class="hk-card" data-open="${esc(h.id)}" tabindex="0" role="link" aria-label="${esc(h.title)}" style="animation-delay:${Math.min(i, 12) * 45}ms">
-    <div class="hk-card-media ${hasImg ? '' : 'hk-ph'}" style="${mediaStyle(h)}">${hasImg ? '' : esc(initials(h.title))}
+  const regOpen = canRegister(h);
+  const isReg = !!opts.registered;
+  const pub = !!opts.publicLinks;
+  const leftBtn = pub
+    ? `<a class="hk-btn sm" href="hackathon.html?id=${esc(h.id)}"><i data-lucide="info"></i>Details</a>`
+    : `<button type="button" class="hk-btn sm" data-open="${esc(h.id)}"><i data-lucide="info"></i>Details</button>`;
+  let rightBtn;
+  if(isReg){
+    rightBtn = `<a class="hk-btn sm primary" href="#/my/${esc(h.id)}"><i data-lucide="check-circle-2"></i>Registered</a>`;
+  } else if(opts.role === 'host'){
+    rightBtn = `<button type="button" class="hk-btn sm gold" data-open="${esc(h.id)}"><i data-lucide="eye"></i>View</button>`;
+  } else if(regOpen){
+    rightBtn = pub
+      ? `<a class="hk-btn sm primary" href="login-hackthons.html?role=participant&next=${encodeURIComponent('#/h/' + h.id)}"><i data-lucide="ticket-check"></i>Apply</a>`
+      : `<button type="button" class="hk-btn sm primary" data-act="register" data-id="${esc(h.id)}"><i data-lucide="ticket-check"></i>Apply</button>`;
+  } else {
+    rightBtn = `<button type="button" class="hk-btn sm" disabled>${esc(ph.label)}</button>`;
+  }
+  return `<article class="hk-card" style="animation-delay:${Math.min(i, 12) * 45}ms">
+    <div class="hk-card-media ${hasImg ? '' : 'hk-ph'}" ${pub ? `data-pub-open="${esc(h.id)}"` : `data-open="${esc(h.id)}"`} style="${mediaStyle(h)};cursor:pointer">${hasImg ? '' : esc(initials(h.title))}
       <div class="tl">${h._campus ? '<span class="hk-chip gold"><i data-lucide="graduation-cap"></i>Your campus</span>' : ''}<span class="hk-chip"><i data-lucide="${mi}"></i>${ml}</span></div>
       <div class="tr">${ph.key !== 'open' ? `<span class="hk-chip ${ph.tone}">${ph.label}</span>` : ''}</div>
     </div>
     <div class="hk-card-body">
       <div class="hk-card-host">${h.hostVerified ? '<i data-lucide="badge-check"></i>' : ''}<span>${esc(h.brandName || h.hostName || 'Host')}</span></div>
-      <h3 class="hk-clamp2">${esc(h.title)}</h3>
+      <h3 class="hk-clamp2" ${pub ? `data-pub-open="${esc(h.id)}"` : `data-open="${esc(h.id)}"`} style="cursor:pointer">${esc(h.title)}</h3>
       <p class="hk-clamp2">${esc(h.tagline || '')}</p>
       <div class="hk-meta"><span><i data-lucide="calendar-days"></i>${dateRange(h.startMs, h.endMs)}</span><span><i data-lucide="map-pin"></i>${esc(h.mode === 'online' ? 'Online' : (h.city || 'TBA'))}${h._dist != null && h.mode !== 'online' ? ` · ${fmtKm(h._dist)}` : ''}</span></div>
       <div class="hk-card-foot"><span class="hk-prize"><i data-lucide="trophy"></i>${h.prizePool ? money(h.prizePool) : 'Perks & swag'}</span><span class="hk-reg"><i data-lucide="users"></i>${h.regCount || 0}</span></div>
+      ${opts.hideActions ? '' : `<div class="hk-card-acts">${leftBtn}${rightBtn}</div>`}
     </div></article>`;
 }
 export function spot(h){

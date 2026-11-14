@@ -119,7 +119,20 @@ function allList(){
   $('#ast').onchange = e => { S.st = e.target.value; allList(); icons(); };
 }
 async function patch(id, data, action, msg){
-  try { await FS.updateDoc(FS.doc(C.db, 'hkHackathons', id), { ...data, updatedAtMs: Date.now(), updatedAt: FS.serverTimestamp() }); C.audit(S.user.uid, action, id); toast(msg); await reload(); } catch(e){ toast(e.message, 'error'); }
+  try {
+    await FS.updateDoc(FS.doc(C.db, 'hkHackathons', id), { ...data, updatedAtMs: Date.now(), updatedAt: FS.serverTimestamp() });
+    const h = S.all.find(x => x.id === id);
+    if(h?.hostUid){
+      const nMap = {
+        'hackathon.feature': { type: 'featured', title: data.featured ? 'Hackathon featured' : 'Featured badge updated', body: data.featured ? `${h.title} is now featured in Trending.` : `${h.title} is no longer featured.` },
+        'hackathon.close': { type: 'closed', title: 'Hackathon closed by admin', body: `${h.title} has been closed and hidden from new listings.` },
+        'hackathon.reopen': { type: 'reopened', title: 'Hackathon reopened', body: `${h.title} is live again for participants.` }
+      };
+      const meta = nMap[action];
+      if(meta) C.notify({ toUid: h.hostUid, fromUid: S.user.uid, hackathonId: id, ...meta }).catch(() => {});
+    }
+    C.audit(S.user.uid, action, id); toast(msg); await reload();
+  } catch(e){ toast(e.message, 'error'); }
 }
 
 /* ---------- Review one ---------- */
@@ -143,7 +156,14 @@ function hosts(){
 }
 async function hostFlag(uid, data, action, msg){
   if(!isAdmin()) return toast('Only platform admins can change host status.', 'error');
-  try { await FS.updateDoc(FS.doc(C.db, 'hkProfiles', uid), { ...data, updatedAt: FS.serverTimestamp() }); C.audit(S.user.uid, action, uid); toast(msg); await reload(); } catch(e){ toast(e.message, 'error'); }
+  try {
+    await FS.updateDoc(FS.doc(C.db, 'hkProfiles', uid), { ...data, updatedAt: FS.serverTimestamp() });
+    const meta = action === 'host.verify'
+      ? { type: 'verified', title: data.hostVerified ? 'Host profile verified' : 'Host verification updated', body: data.hostVerified ? 'Your organiser profile now carries the verified host badge.' : 'Your verified host badge was removed.' }
+      : { type: data.hostBlocked ? 'rejected' : 'approved', title: data.hostBlocked ? 'Hosting paused' : 'Hosting access restored', body: data.hostBlocked ? 'Your hosting access has been paused by an admin.' : 'Your hosting access has been restored.' };
+    C.notify({ toUid: uid, fromUid: S.user.uid, ...meta }).catch(() => {});
+    C.audit(S.user.uid, action, uid); toast(msg); await reload();
+  } catch(e){ toast(e.message, 'error'); }
 }
 
 /* ---------- Registrations ---------- */

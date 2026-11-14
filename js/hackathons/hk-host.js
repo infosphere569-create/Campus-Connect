@@ -39,8 +39,7 @@ export async function hostDash(cx){
       <div class="hk-kpi"><div class="ki"><i data-lucide="radio"></i></div><strong>${liveN}</strong><span>Live / upcoming</span></div>
       <div class="hk-kpi s"><div class="ki"><i data-lucide="users"></i></div><strong>${regs}</strong><span>Total registrations</span></div></div>
     <div class="hk-sec"><h2><i data-lucide="list-checks"></i>All hackathons</h2></div>
-    ${mine.length ? `<div class="hk-stack">${mine.map(row).join('')}</div>` : empty('rocket', 'Create your first hackathon', 'Add a banner, the details, schedule and prizes, then submit it for approval. It takes about 10 minutes.', '<a class="hk-btn gold" href="#/host/new">Start creating</a>')}
-    <div class="hk-card-s" style="margin-top:26px"><b>How approval works</b><div class="hk-steps-l" style="--tc:var(--hk-p);margin-top:12px;counter-reset:s"><li><div><b>Create &amp; submit</b><span>Fill the 5 steps, then submit for approval.</span></div></li><li><div><b>Admin review</b><span>We check dates, details and contact info. You're notified of the decision.</span></div></li><li><div><b>Go live</b><span>Approved hackathons appear to students instantly. Track registrations here.</span></div></li></div></div></div>`;
+    ${mine.length ? `<div class="hk-stack">${mine.map(row).join('')}</div>` : empty('rocket', 'Create your first hackathon', 'Add a banner, the details, schedule and prizes, then publish your event. It takes about 10 minutes.', '<a class="hk-btn gold" href="#/host/new">Start creating</a>')}</div>`;
 
   view.onclick = async e => {
     if(e.target.closest('[data-setup]')) return setupModal(cx, () => cx.nav('#/host'));
@@ -147,9 +146,9 @@ export async function wizard(cx, id){
       <div class="hk-grid2">${fText('Contact person', 'contactName', { max: 60 })}${fText('Contact email', 'contactEmail', { type: 'email' })}</div>${fText('Contact phone', 'contactPhone', { ph: 'Optional', hint: 'optional' })}
       <div class="hk-field"><label>FAQs <small>optional</small></label>${listEd('faqs', [{ f: 'q', ph: 'Question' }, { f: 'a', ph: 'Answer', area: true }], 'Add FAQ')}</div></div>`,
     6: () => { errs = C.validateForSubmit({ ...D, agree: true }); const ok = !errs.length;
-      return `<h2 style="margin-bottom:4px">Review & submit</h2><p class="hk-muted hk-sm" style="margin-bottom:18px">${live ? 'Saving changes sends this live hackathon back for approval.' : 'An admin will review your hackathon. You will be notified of the decision.'}</p>
+      return `<h2 style="margin-bottom:4px">Review & submit</h2><p class="hk-muted hk-sm" style="margin-bottom:18px">${live ? 'Saving updated details will re-verify your live listing.' : 'Check your details carefully before submitting your hackathon.'}</p>
       <div class="hk-form"><div class="hk-card-s" style="padding:16px"><b>Checklist</b><div class="hk-checklist" style="margin-top:10px">${ok ? '<div class="ok"><i data-lucide="circle-check"></i>Everything looks good. Ready to submit.</div>' : errs.map(e => `<div class="no"><i data-lucide="circle-x"></i><span>${esc(e.msg)} · <a href="#" data-jump="${e.step}">fix in step ${e.step}</a></span></div>`).join('')}</div></div>
-      ${live ? '<div class="hk-banner" style="margin:0"><i data-lucide="triangle-alert" style="color:var(--hk-warn)"></i><div class="grow"><b>This hackathon is live</b><div class="hk-sm hk-muted">It will be hidden from students until an admin re-approves your changes.</div></div></div>' : ''}
+      ${live ? '<div class="hk-banner" style="margin:0"><i data-lucide="triangle-alert" style="color:var(--hk-warn)"></i><div class="grow"><b>This hackathon is live</b><div class="hk-sm hk-muted">Updated details are verified before returning to the live feed.</div></div></div>' : ''}
       <label class="hk-check"><input type="checkbox" ${attr('agree', 'bool')} ${D.agree ? 'checked' : ''}><span>I confirm the details are accurate, I'm authorised to host this event and I'll follow the platform's community guidelines.</span></label></div>`; }
   }[n]());
   const locText = () => D.lat != null ? `<span style="color:var(--hk-ok);font-weight:700"><i data-lucide="circle-check" class="hk-ic" style="vertical-align:-4px"></i> Located · ${(+D.lat).toFixed(4)}, ${(+D.lng).toFixed(4)}</span>` : '<span class="hk-muted">Not located yet. Tap “Locate venue” so nearby students can find you.</span>';

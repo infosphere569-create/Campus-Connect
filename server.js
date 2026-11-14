@@ -83,6 +83,11 @@ app.use(express.static(__dirname, {
   index: 'index.html'
 }));
 
+// Clean public URLs for shared hackathons
+app.get(['/h/:id', '/hackathon/:id'], (req, res) => {
+  res.sendFile(path.join(__dirname, 'hackathon.html'));
+});
+
 // Route fallback for extensionless navigation or unknown routes
 app.get('*', (req, res) => {
   const possibleHtml = path.join(__dirname, `${req.path}.html`);

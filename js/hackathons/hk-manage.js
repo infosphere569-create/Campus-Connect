@@ -24,13 +24,13 @@ export async function manage(cx, id){
     : `<button class="hk-mailbtn" data-mail="${esc(r.id)}" title="Notify team leader" aria-label="Notify team"><i data-lucide="mail"></i></button>`;
   const row = r => { const s = subOf(r.uid), a = attOf(r.uid); return `<tr class="${sel.has(r.id) ? 'sel' : ''}">
     <td><input type="checkbox" data-sel="${esc(r.id)}" ${sel.has(r.id) ? 'checked' : ''} aria-label="Select ${esc(r.name)}"></td>
-    <td><b>${esc(r.name)}</b><div class="hk-xs hk-muted">${esc(r.email)} · ${esc(r.phone)}</div></td>
+    <td><button type="button" data-prof="${esc(r.id)}" style="background:none;border:0;padding:0;text-align:left;font:inherit;color:inherit;cursor:pointer"><b style="text-decoration:underline;text-underline-offset:2px">${esc(r.name)}</b></button><div class="hk-xs hk-muted">${esc(r.email)} · ${esc(r.phone)}</div></td>
     <td>${r.teamMode === 'solo' ? '<span class="hk-chip neutral">Solo</span>' : `<b>${esc(r.teamName || 'Team')}</b><div class="hk-xs hk-muted">${(r.members || []).length + 1} members</div>`}</td>
     <td>${esc(r.college)}<div class="hk-xs hk-muted">${esc(r.year || '')}</div></td>
     <td><select class="hk-select sm" data-stage="${esc(r.id)}" aria-label="Round">${(rounds.length ? rounds : [{ name: 'Registered' }]).map((x, i) => `<option value="${i}" ${(r.stage || 0) === i ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></td>
     <td><select class="hk-select sm" data-st="${esc(r.id)}" aria-label="Status">${STS.map(x => `<option ${x === r.status ? 'selected' : ''}>${x}</option>`).join('')}</select></td>
     <td class="hk-xs">${s ? `<span class="hk-chip">${s.score != null ? 'Score ' + esc(s.score) : 'Submitted'}</span>` : '<span class="hk-muted">—</span>'}${a?.submittedAtMs ? `<div class="hk-muted" style="margin-top:4px">Test ${a.score}/${a.total}</div>` : ''}</td>
-    <td style="text-align:right">${mailBtn(r)}</td></tr>`; };
+    <td style="text-align:right;white-space:nowrap"><button type="button" class="hk-btn sm" data-prof="${esc(r.id)}" title="View full applicant profile"><i data-lucide="user-round"></i>Profile</button> ${mailBtn(r)}</td></tr>`; };
 
   const regsTab = () => { const l = filtered(); return `
     <div class="hk-toolbar"><div class="hk-search"><i data-lucide="search"></i><input class="hk-input" id="rq" value="${esc(q)}" placeholder="Search name, email, college, team…"></div>
@@ -40,7 +40,7 @@ export async function manage(cx, id){
       <select class="hk-select sm" id="bSt"><option value="">Set status…</option>${STS.map(x => `<option>${x}</option>`).join('')}</select>
       ${rounds.length ? `<select class="hk-select sm" id="bRd"><option value="">Move to round…</option>${rounds.map((x, i) => `<option value="${i}">${esc(x.name)}</option>`).join('')}</select>` : ''}
       <button class="hk-btn sm" data-bulkmail><i data-lucide="mail"></i>Notify selected</button></div>
-    ${l.length ? `<div class="hk-tablewrap"><table class="hk-table"><thead><tr><th><input type="checkbox" id="selAll" aria-label="Select all"></th><th>Team leader</th><th>Team</th><th>College</th><th>Round</th><th>Status</th><th>Work</th><th style="text-align:right">Mail</th></tr></thead><tbody id="rb">${l.map(row).join('')}</tbody></table></div>` : empty('users', regs.length ? 'No matches' : 'No registrations yet', regs.length ? 'Try clearing the filters.' : 'Registrations appear here as soon as teams sign up. Share your hackathon link to get started.', regs.length ? '' : '<button class="hk-btn gold" data-share>Copy link</button>')}`; };
+    ${l.length ? `<div class="hk-tablewrap"><table class="hk-table"><thead><tr><th><input type="checkbox" id="selAll" aria-label="Select all"></th><th>Team leader</th><th>Team</th><th>College</th><th>Round</th><th>Status</th><th>Work</th><th style="text-align:right">Profile &amp; mail</th></tr></thead><tbody id="rb">${l.map(row).join('')}</tbody></table></div>` : empty('users', regs.length ? 'No matches' : 'No registrations yet', regs.length ? 'Try clearing the filters.' : 'Registrations appear here as soon as teams sign up. Share your hackathon link to get started.', regs.length ? '' : '<button class="hk-btn gold" data-share>Copy link</button>')}`; };
 
   const link = (u, l) => u ? `<a class="hk-chip btn" href="${esc(C.safeUrl(u))}" target="_blank" rel="noopener noreferrer"><i data-lucide="external-link"></i>${l}</a>` : '';
   const subsTab = () => subs.length ? `<div class="hk-stack">${subs.map(s => `<div class="hk-card-s" data-sub="${esc(s.id)}"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><b>${esc(s.title)}</b><div class="hk-sm hk-muted">${esc(s.teamName || s.leaderName)} · ${C.ago(s.updatedAtMs)}</div></div>${s.reviewStatus === 'reviewed' ? '<span class="hk-chip">Reviewed</span>' : '<span class="hk-chip warn">To review</span>'}</div>
@@ -98,6 +98,114 @@ export async function manage(cx, id){
     } });
   }
 
+  /* ---------- full applicant profile modal ---------- */
+  async function viewApplicantModal(r){
+    const sub = subOf(r.uid), att = attOf(r.uid);
+    modal(`Applicant Profile · ${r.name}`, `<div class="hk-stack"><div class="hk-sm hk-muted"><span class="hk-spin"></span> Loading full profile…</div></div>`, {
+      wide: true,
+      async onMount(b, close){
+        const live = await C.fetchParticipantProfile(r.uid);
+        const p = {
+          ...r, ...(live || {}),
+          name: r.name || live?.displayName || 'Participant',
+          email: r.email || live?.email || '',
+          phone: r.phone || live?.phone || '',
+          college: r.college || live?.college || '',
+          year: r.year || [live?.course, live?.year].filter(Boolean).join(' · '),
+          course: live?.course || r.course || '',
+          branch: live?.branch || r.branch || '',
+          city: live?.city || r.city || '',
+          skills: live?.skills || r.skills || '',
+          level: live?.level || r.level || '',
+          gender: live?.gender || r.gender || '',
+          github: live?.github || r.github || '',
+          linkedin: live?.linkedin || r.linkedin || '',
+          portfolio: live?.portfolio || r.portfolio || '',
+          bio: live?.bio || r.bio || '',
+          photoURL: live?.photoURL || r.photoURL || ''
+        };
+        const extLink = (u, ic, label) => C.safeUrl(u)
+          ? `<a class="hk-chip btn" href="${esc(C.safeUrl(u))}" target="_blank" rel="noopener noreferrer"><i data-lucide="${ic}"></i>${label}</a>`
+          : `<span class="hk-chip neutral"><i data-lucide="${ic}"></i>${label}: Not added</span>`;
+        const kv = (k, v) => v ? `<div class="hk-kv-item"><small>${k}</small><b>${esc(v)}</b></div>` : '';
+        const body = $('[data-body]', b);
+        body.innerHTML = `<div class="hk-stack">
+          <div class="hk-prof-head">
+            <img class="hk-avatar" style="width:64px;height:64px" src="${esc(C.safeUrl(p.photoURL) || 'icon.png')}" alt="" onerror="this.src='icon.png'">
+            <div class="grow">
+              <h3 style="font-size:1.2rem;margin-bottom:2px">${esc(p.name)}</h3>
+              <div class="hk-sm hk-muted">${esc(p.email)}${p.phone ? ' · ' + esc(p.phone) : ''}</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+                <span class="hk-chip ${r.status === 'selected' ? 'gold' : r.status === 'rejected' ? 'bad' : r.status === 'waitlisted' ? 'warn' : ''}">${esc(r.status)}</span>
+                <span class="hk-chip neutral">${esc(roundName(r.stage || 0))}</span>
+                <span class="hk-chip neutral">${r.teamMode === 'solo' ? 'Solo' : 'Team: ' + esc(r.teamName || '')}</span>
+              </div>
+            </div>
+            <button type="button" class="hk-btn sm primary" id="appMailBtn"><i data-lucide="mail"></i>Send email</button>
+          </div>
+
+          <div class="hk-kv-grid">
+            ${kv('College / Institute', p.college)}
+            ${kv('City', p.city)}
+            ${kv('Course / Year', p.year || p.course)}
+            ${kv('Branch / Stream', p.branch)}
+            ${kv('Experience level', p.level)}
+            ${kv('Gender', p.gender)}
+            ${kv('Registered', C.fmtDT(r.createdAtMs))}
+            ${kv('Skills', p.skills)}
+          </div>
+
+          ${p.bio ? `<div class="hk-card-s" style="padding:12px 14px"><small class="hk-eyebrow" style="display:block;margin-bottom:4px">Bio</small><p class="hk-sm hk-prose" style="margin:0">${esc(p.bio)}</p></div>` : ''}
+
+          <div>
+            <small class="hk-eyebrow" style="display:block;margin-bottom:8px">Social &amp; developer links</small>
+            <div class="hk-prof-links">
+              ${extLink(p.github, 'github', 'GitHub')}
+              ${extLink(p.linkedin, 'linkedin', 'LinkedIn')}
+              ${extLink(p.portfolio, 'globe', 'Portfolio / Website')}
+            </div>
+          </div>
+
+          ${(r.members || []).length ? `<div class="hk-card-s" style="padding:12px 14px"><small class="hk-eyebrow" style="display:block;margin-bottom:6px">Team members (${r.members.length + 1} total)</small>
+            ${r.members.map(m => `<div class="hk-sm" style="padding:4px 0;border-bottom:1px dashed var(--hk-line)"><b>${esc(m.name)}</b>${m.email ? ' · ' + esc(m.email) : ''}${m.phone ? ' · ' + esc(m.phone) : ''}</div>`).join('')}
+          </div>` : ''}
+
+          ${(sub || att?.submittedAtMs) ? `<div class="hk-card-s" style="padding:12px 14px">
+            <small class="hk-eyebrow" style="display:block;margin-bottom:6px">Evaluation</small>
+            ${att?.submittedAtMs ? `<div class="hk-sm" style="margin-bottom:6px"><b>Test score:</b> ${att.score} / ${att.total} (${C.ago(att.submittedAtMs)})</div>` : ''}
+            ${sub ? `<div class="hk-sm"><b>Project:</b> ${esc(sub.title)}${sub.score != null ? ` · Score <b>${esc(sub.score)}</b>` : ''}</div>
+              <div class="hk-prof-links" style="margin-top:8px">${link(sub.pptUrl, 'PPT')}${link(sub.repoUrl, 'Repo')}${link(sub.demoUrl, 'Demo')}${link(sub.videoUrl, 'Video')}${link(sub.extraUrl, 'Other')}</div>` : ''}
+          </div>` : ''}
+
+          <form id="hostNoteForm" class="hk-card-s hk-form" style="padding:12px 14px;gap:8px">
+            <label for="hnIn" style="font-size:.82rem;font-weight:700">Note visible to applicant <small class="hk-muted">updates live on their dashboard</small></label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <input class="hk-input" id="hnIn" name="hostNote" maxlength="300" placeholder="e.g. Great prototype! Report at Room 204 by 10 AM." value="${esc(r.hostNote || '')}" style="flex:1;min-width:200px">
+              <button type="submit" class="hk-btn sm primary">Save note</button>
+            </div>
+          </form>
+        </div>`;
+        icons();
+        $('#appMailBtn', b).onclick = () => { close(); compose([r]); };
+        $('#hostNoteForm', b).onsubmit = async ev => {
+          ev.preventDefault();
+          const note = $('#hnIn', b).value.trim();
+          const btn = $('button[type=submit]', ev.target);
+          btn.disabled = true; btn.textContent = 'Saving…';
+          try {
+            await C.updateRegistration(r.id, { hostNote: note });
+            r.hostNote = note;
+            if(note){
+              C.notify({ toUid: r.uid, fromUid: S.user.uid, hackathonId: h.id, type: 'status', title: `Note from ${h.title}`, body: note }).catch(() => {});
+            }
+            toast('Note saved');
+          } catch(e){ toast(e.message, 'error'); }
+          btn.disabled = false; btn.textContent = 'Save note';
+        };
+      }
+    });
+  }
+
   /* ---------- exports ---------- */
   const flat = r => [r.name, r.email, r.phone, r.college, r.year || '', r.teamMode === 'solo' ? 'Solo' : 'Team', r.teamName || '', (r.members || []).map(m => `${m.name}${m.email ? ' <' + m.email + '>' : ''}`).join('; '), roundName(r.stage || 0), r.status, subOf(r.uid)?.title || '', subOf(r.uid)?.score ?? '', attOf(r.uid)?.submittedAtMs ? `${attOf(r.uid).score}/${attOf(r.uid).total}` : '', C.fmtDT(r.createdAtMs)];
   const HEAD = ['Leader', 'Email', 'Phone', 'College', 'Year', 'Mode', 'Team', 'Members', 'Round', 'Status', 'Project', 'Score', 'Test', 'Registered'];
@@ -130,7 +238,19 @@ export async function manage(cx, id){
         ev.preventDefault(); const f = new FormData(ev.target), l = read(), er = $('#tErr', b), fail = x => { er.classList.remove('hk-hidden'); er.innerHTML = `<i data-lucide="circle-alert"></i><span>${esc(x)}</span>`; icons(); };
         if(l.some(x => x.text.trim().length < 3 || x.options.some(o => !o.trim()))) return fail('Every question needs text and four options.');
         const stM = C.fromLocalInput(f.get('st')), enM = C.fromLocalInput(f.get('en')); if(stM && enM && enM <= stM) return fail('Closing time must be after opening time.');
-        try { await C.saveTest(h, S.user, { title: f.get('title').trim() || 'Screening test', durationMin: +f.get('dur') || 30, startMs: stM, endMs: enM }, l); meta = await C.getTestMeta(id); close(); toast('Test saved'); paint(); }
+        try {
+          const hadMeta = !!meta;
+          await C.saveTest(h, S.user, { title: f.get('title').trim() || 'Screening test', durationMin: +f.get('dur') || 30, startMs: stM, endMs: enM }, l);
+          meta = await C.getTestMeta(id);
+          if(!hadMeta && regs.length){
+            for(let i = 0; i < regs.length; i += 400){
+              const wb = FS.writeBatch(C.db);
+              regs.slice(i, i + 400).forEach(r => wb.set(FS.doc(FS.collection(C.db, 'hkNotifications')), { toUid: r.uid, fromUid: S.user.uid, hackathonId: h.id, type: 'test', title: `Screening test · ${h.title}`, body: `${meta.title} (${meta.durationMin} min) is published. Open your dashboard to view timings.`, read: false, createdAtMs: Date.now(), createdAt: FS.serverTimestamp() }));
+              await wb.commit();
+            }
+          }
+          close(); toast('Test saved'); paint();
+        }
         catch(e){ fail(e.message); }
       };
     } });
@@ -168,18 +288,24 @@ export async function manage(cx, id){
   };
   view.onclick = async e => {
     const t = e.target;
+    const pb = t.closest('[data-prof]'); if(pb){ const r = regs.find(x => x.id === pb.dataset.prof); if(r) viewApplicantModal(r); return; }
     const tb = t.closest('[data-tab]'); if(tb) return setTab(tb.dataset.tab);
     const mb = t.closest('[data-mail]'); if(mb){ const r = regs.find(x => x.id === mb.dataset.mail); if(r) compose([r]); return; }
     if(t.closest('[data-bulkmail]')){ const l = regs.filter(r => sel.has(r.id)); return l.length ? compose(l) : toast('Select teams first.', 'error'); }
     if(t.closest('[data-csv]')) return C.csv(`${slug}-registrations.csv`, [HEAD, ...filtered().map(flat)]);
     if(t.closest('[data-pdf]')) return pdf();
-    if(t.closest('[data-share]')){ try { await navigator.clipboard.writeText(location.origin + location.pathname + '#/h/' + h.id); toast('Link copied'); } catch { toast('Copy failed', 'error'); } return; }
+    if(t.closest('[data-share]')){ try { await navigator.clipboard.writeText(C.publicShareUrl(h.id)); toast('Public link copied'); } catch { toast('Copy failed', 'error'); } return; }
     if(t.closest('[data-test]')) return testBuilder();
     if(t.closest('[data-rmtest]')){ if(confirm('Remove the test and all questions?')){ try { await C.removeTest(id); meta = null; paint(); toast('Test removed', 'info'); } catch(err){ toast(err.message, 'error'); } } return; }
     const rv = t.closest('[data-review]');
     if(rv){
       const card = rv.closest('[data-sub]'), s = subs.find(x => x.id === rv.dataset.review), sc = $('[data-score]', card).value, fb = $('[data-fb]', card).value.trim();
-      try { const patch = { score: sc === '' ? null : Math.max(0, Math.min(100, +sc)), feedback: fb, reviewStatus: 'reviewed' }; await C.reviewSubmission(s.id, patch); Object.assign(s, patch); toast('Review saved'); paint(); } catch(err){ toast(err.message, 'error'); }
+      try {
+        const patch = { score: sc === '' ? null : Math.max(0, Math.min(100, +sc)), feedback: fb, reviewStatus: 'reviewed' };
+        await C.reviewSubmission(s.id, patch); Object.assign(s, patch);
+        C.notify({ toUid: s.uid, fromUid: S.user.uid, hackathonId: h.id, type: 'submission_review', title: `Project reviewed · ${h.title}`, body: `Your submission "${s.title}" was reviewed${patch.score != null ? ` (Score: ${patch.score}/100)` : ''}${fb ? ': ' + fb : '.'}` }).catch(() => {});
+        toast('Review saved'); paint();
+      } catch(err){ toast(err.message, 'error'); }
       return;
     }
     if(t.closest('[data-toggle]')){

@@ -2,7 +2,7 @@
 // Host views (dashboard, create wizard, manage) live in hk-host.js.
 import { initBg } from './hk-bg.js';
 import * as C from './hk-core.js';
-import { card, spot, empty, skeletonCards, detailHeader, detailBody, factsCard, bindTabs, statusBadge } from './hk-ui.js';
+import { card, spot, empty, skeletonCards, detailHeader, detailBody, factsCard, bindTabs, statusBadge, countdownHtml, startCountdowns, mediaStyle } from './hk-ui.js';
 import { hostDash, wizard } from './hk-host.js';
 import { manage } from './hk-manage.js';
 import { dash } from './hk-dash.js';
@@ -106,6 +106,15 @@ function guardPart(t, fn){
 async function route(){
   const path = curPath(); const t = ++S.rt;
   S.cleanup?.(); S.cleanup = null; closeDrawer(); paintNav();
+  if(S.booted){
+    const gate = S.role === 'host' ? !C.hostComplete(S.hk) : !C.participantComplete(S.hk);
+    if(gate){
+      const f = S.role === 'host' ? organiserForm : participantForm;
+      f({ S, view }, () => { paintHeader(); paintNav(); location.hash.length > 2 ? route() : nav(S.role === 'host' ? '#/host' : '#/home'); });
+      icons();
+      return;
+    }
+  }
   for(const [re, fn] of ROUTES){
     const m = path.match(re); if(!m) continue;
     view.innerHTML = `<div class="hk-view">${skeletonCards(3)}</div>`;
@@ -120,7 +129,7 @@ addEventListener('hashchange', route);
 /* ---------- Home ---------- */
 const secH = (ic, t, right = '') => `<div class="hk-sec"><h2><i data-lucide="${ic}"></i>${t}</h2>${right}</div>`;
 async function home(t){
-  await ensureAll(); if(stale(t)) return;
+  await Promise.all([ensureAll(), S.role !== 'host' ? ensureRegs() : Promise.resolve()]); if(stale(t)) return;
   if(!S.loc){
     const pc = C.findCity(S.hk?.city); if(pc) S.loc = { lat: pc.lat, lng: pc.lng, city: pc.city, state: pc.state, source: 'profile' };
     if(!sessionStorage.getItem('hk-geo-asked')){
@@ -129,6 +138,8 @@ async function home(t){
     }
   }
   const all = active(enriched()), college = myCollege();
+  const regIds = new Set((S.regs || []).map(r => r.hackathonId));
+  const cardOpts = h => ({ registered: regIds.has(h.id), role: S.role });
   const mine = all.filter(h => h._campus).sort((a, b) => (a.startMs || 9e15) - (b.startMs || 9e15));
   const trending = [...all].sort((a, b) => b._trend - a._trend).slice(0, 8);
   const near = all.filter(h => h._dist != null && h.mode !== 'online').sort((a, b) => a._dist - b._dist).slice(0, 8);
@@ -143,18 +154,18 @@ async function home(t){
     <div class="hk-search" style="margin-bottom:6px"><i data-lucide="search"></i><input class="hk-input" id="homeQ" placeholder="Search hackathons, colleges, cities, tags…" aria-label="Search hackathons"></div>
     ${secH('graduation-cap', 'Your campus', mine.length ? `<span class="hk-chip gold">${mine.length} at ${esc(college.length > 24 ? college.slice(0, 22) + '…' : college)}</span>` : '')}${campusBlock}
     ${secH('flame', 'Trending now', '<a class="hk-btn ghost sm" href="#/explore">See all <i data-lucide="arrow-right"></i></a>')}
-    ${trending.length ? `<div class="hk-rail">${trending.map(card).join('')}</div>` : empty('rocket', 'No hackathons live yet', S.role === 'host' ? 'Create one for your campus from your dashboard.' : 'Check back soon, or ask your club to host one.', S.role === 'host' ? '<a class="hk-btn gold" href="#/host/new">Create hackathon</a>' : '')}
+    ${trending.length ? `<div class="hk-rail">${trending.map((h, i) => card(h, i, cardOpts(h))).join('')}</div>` : empty('rocket', 'No hackathons live yet', S.role === 'host' ? 'Create one for your campus from your dashboard.' : 'Check back soon, or ask your club to host one.', S.role === 'host' ? '<a class="hk-btn gold" href="#/host/new">Create hackathon</a>' : '')}
     ${secH('navigation', 'Nearest to you', locChip())}
-    ${S.loc ? (near.length ? `<div class="hk-rail">${near.map(card).join('')}</div>` : empty('map-pinned', 'Nothing nearby yet', `No in-person hackathons found around ${S.loc.city}. Check Explore for online events.`, '<a class="hk-btn" href="#/explore">Explore all</a>')) : empty('map-pin', 'Turn on location to see nearby events', 'Allow location access or pick your city to rank hackathons by distance.', '<button class="hk-btn primary" data-act="loc">Set location</button>')}
-    ${closing.length ? `${secH('timer', 'Closing soon')}<div class="hk-cards">${closing.map(card).join('')}</div>` : ''}
+    ${S.loc ? (near.length ? `<div class="hk-rail">${near.map((h, i) => card(h, i, cardOpts(h))).join('')}</div>` : empty('map-pinned', 'Nothing nearby yet', `No in-person hackathons found around ${S.loc.city}. Check Explore for online events.`, '<a class="hk-btn" href="#/explore">Explore all</a>')) : empty('map-pin', 'Turn on location to see nearby events', 'Allow location access or pick your city to rank hackathons by distance.', '<button class="hk-btn primary" data-act="loc">Set location</button>')}
+    ${closing.length ? `${secH('timer', 'Closing soon')}<div class="hk-cards">${closing.map((h, i) => card(h, i, cardOpts(h))).join('')}</div>` : ''}
   </div>`;
   $('#homeQ').addEventListener('keydown', e => { if(e.key === 'Enter'){ S.f = { ...S.f, q: e.target.value.trim() }; nav('#/explore'); } });
 }
 
 /* ---------- Explore ---------- */
 async function explore(t){
-  await ensureAll(); if(stale(t)) return;
-  const all = enriched(), tagCount = {};
+  await Promise.all([ensureAll(), S.role !== 'host' ? ensureRegs() : Promise.resolve()]); if(stale(t)) return;
+  const all = enriched(), tagCount = {}, regIds = new Set((S.regs || []).map(r => r.hackathonId));
   all.forEach(h => (h.tags || []).forEach(x => tagCount[x] = (tagCount[x] || 0) + 1));
   const tags = Object.entries(tagCount).sort((a, b) => b[1] - a[1]).slice(0, 12).map(x => x[0]);
   const sel = (id, opts, v) => `<select class="hk-select" id="${id}" style="min-height:46px;width:auto;min-width:130px">${opts.map(([k, l]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
@@ -180,7 +191,7 @@ async function explore(t){
     });
     const by = { trending: (a, b) => b._trend - a._trend, nearest: (a, b) => (a._dist ?? 1e9) - (b._dist ?? 1e9), soonest: (a, b) => (a.startMs || 9e15) - (b.startMs || 9e15), prize: (a, b) => (b.prizePool || 0) - (a.prizePool || 0), newest: (a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0) };
     l.sort(by[f.sort] || by.trending);
-    $('#exGrid').innerHTML = l.length ? `<div class="hk-cards">${l.map(card).join('')}</div>` : empty('search-x', 'No hackathons match', 'Try clearing a filter or searching something broader.', '<button class="hk-btn" data-act="clear-filters">Clear filters</button>');
+    $('#exGrid').innerHTML = l.length ? `<div class="hk-cards">${l.map((h, i) => card(h, i, { registered: regIds.has(h.id), role: S.role })).join('')}</div>` : empty('search-x', 'No hackathons match', 'Try clearing a filter or searching something broader.', '<button class="hk-btn" data-act="clear-filters">Clear filters</button>');
     icons();
   };
   const bind = (id, k) => $(id).addEventListener('input', e => { S.f[k] = e.target.value; draw(); });
@@ -213,12 +224,15 @@ async function detail(t, id){
   else cta = `<button class="hk-btn" disabled>${ph.label}</button>`;
   const notice = h.status !== 'approved' ? `<div class="hk-banner" style="margin:14px 0 0"><i data-lucide="eye"></i><div class="grow"><b>Preview</b><div class="hk-sm hk-muted">Status: ${statusBadge(h.status)} ${h.adminNote ? '· ' + esc(h.adminNote) : ''}</div></div></div>` : '';
   const regNote = reg ? `<div class="hk-banner" style="margin:14px 0 0"><i data-lucide="party-popper" style="color:var(--hk-p)"></i><div class="grow"><b>You're registered</b><div class="hk-sm hk-muted">${reg.teamMode === 'solo' ? 'Solo' : 'Team ' + esc(reg.teamName || '')} · status: ${esc(reg.status)}</div></div></div>` : '';
+  const cd = countdownHtml(h, reg, reg?.status === 'selected');
   view.innerHTML = `<div class="hk-view"><button class="hk-btn ghost sm" data-act="back" style="margin-bottom:12px"><i data-lucide="arrow-left"></i>Back</button>
-    ${detailHeader(h)}${notice}${regNote}
+    ${detailHeader(h)}${notice}${regNote}${cd ? `<div style="margin:14px 0 0">${cd}</div>` : ''}
     <div class="hk-detail"><div>${detailBody(h)}</div>${factsCard(h, `<div class="hk-cta-inline" style="display:grid;gap:10px">${cta}</div>`)}</div>
     <div class="hk-sticky-cta">${cta}</div>
     <div style="margin-top:18px"><button class="hk-btn sm" data-act="share" data-id="${h.id}" data-title="${esc(h.title)}"><i data-lucide="share-2"></i>Share</button></div></div>`;
   bindTabs(view);
+  const stopTimer = startCountdowns(view);
+  S.cleanup = () => { stopTimer?.(); };
   S.cur = h;
 }
 
@@ -260,7 +274,14 @@ function registerModal(h){
       if(!d.agree) return err('Please accept the rules to continue.');
       const btn = $('button[type=submit]', b); btn.disabled = true; btn.innerHTML = '<span class="hk-spin"></span> Registering…';
       try {
-        await C.registerFor(h, S.user, { name: d.name.trim(), phone: d.phone.replace(/\D/g, '').slice(-10), email: S.user.email || '', college: d.college.trim(), year: (d.year || '').trim(), skills: S.hk.skills || '', teamMode: d.teamMode, teamName: d.teamMode === 'team' ? d.teamName.trim() : '', members, teamSize: members.length + 1 });
+        await C.registerFor(h, S.user, {
+          name: d.name.trim(), phone: d.phone.replace(/\D/g, '').slice(-10), email: S.user.email || '',
+          college: d.college.trim(), year: (d.year || '').trim(), course: hk.course || S.site?.course || '', branch: hk.branch || S.site?.branch || '',
+          city: hk.city || '', level: hk.level || '', gender: hk.gender || '', skills: hk.skills || '', bio: hk.bio || S.site?.bio || '',
+          github: hk.github || S.site?.githubURL || '', linkedin: hk.linkedin || S.site?.linkedinURL || '', portfolio: hk.portfolio || S.site?.websiteURL || '',
+          photoURL: hk.photoURL || S.site?.photoURL || S.user?.photoURL || '',
+          teamMode: d.teamMode, teamName: d.teamMode === 'team' ? d.teamName.trim() : '', members, teamSize: members.length + 1
+        });
         S.regs = null; S.all = null; close(); toast('You are registered! Check your email.'); nav('#/my/' + h.id);
       } catch(e){ err(/permission|insufficient/i.test(e.message) ? 'Registration is not available right now.' : e.message); btn.disabled = false; btn.textContent = 'Confirm registration'; }
     };
@@ -269,20 +290,85 @@ function registerModal(h){
 
 /* ---------- My hackathons ---------- */
 async function myHacks(t){
-  const regs = await ensureRegs(true); if(stale(t)) return;
-  const rows = regs.map(r => `<div class="hk-lrow"><div class="info"><b>${esc(r.hackathonTitle || 'Hackathon')}</b><span class="hk-sm hk-muted">${r.teamMode === 'solo' ? 'Solo' : 'Team ' + esc(r.teamName || '')} · registered ${C.ago(r.createdAtMs)}</span></div>
-    <span class="hk-chip ${r.status === 'rejected' ? 'bad' : r.status === 'waitlisted' ? 'warn' : ''}">${esc(r.status)}</span><div class="acts"><a class="hk-btn sm primary" href="#/my/${esc(r.hackathonId)}">Dashboard</a><a class="hk-btn sm" href="#/h/${esc(r.hackathonId)}">View</a></div></div>`).join('');
-  view.innerHTML = `<div class="hk-view"><div class="hk-page-h"><div><span class="hk-eyebrow">Your activity</span><h1>My hackathons</h1><p>Everything you've registered for.</p></div><a class="hk-btn primary" href="#/explore"><i data-lucide="compass"></i>Find more</a></div>
-    ${regs.length ? `<div class="hk-stack">${rows}</div>` : empty('ticket', 'No registrations yet', 'Register for a hackathon and it will show up here.', '<a class="hk-btn primary" href="#/explore">Explore hackathons</a>')}</div>`;
+  await ensureAll(); if(stale(t)) return;
+  const hMap = new Map((S.all || []).map(h => [h.id, h]));
+  let stopTimers = null, unsubRegs = null;
+  const ST_MAP = {
+    selected: { cls: 'selected', ic: 'trophy', label: 'Selected' },
+    shortlisted: { cls: 'shortlisted', ic: 'sparkles', label: 'Shortlisted' },
+    waitlisted: { cls: 'waitlisted', ic: 'hourglass', label: 'Waitlisted' },
+    rejected: { cls: 'rejected', ic: 'circle-x', label: 'Not Selected' },
+    registered: { cls: 'registered', ic: 'ticket-check', label: 'Registered' }
+  };
+
+  const renderRegs = async regs => {
+    if(stale(t) || curPath() !== '/my') return;
+    S.regs = regs;
+    const missingIds = [...new Set(regs.map(r => r.hackathonId).filter(id => id && !hMap.has(id)))];
+    if(missingIds.length){
+      const extra = await Promise.all(missingIds.map(id => C.fetchOne(id).catch(() => null)));
+      extra.forEach(x => { if(x) hMap.set(x.id, x); });
+      if(stale(t) || curPath() !== '/my') return;
+    }
+
+    const cardsHtml = regs.map(r => {
+      const h = hMap.get(r.hackathonId) || { id: r.hackathonId, title: r.hackathonTitle || 'Hackathon' };
+      const st = ST_MAP[r.status] || ST_MAP.registered;
+      const rounds = C.roundsOf(h);
+      const curIdx = r.stage || 0;
+      const curRound = rounds[curIdx]?.name || '';
+      const roundLine = rounds.length
+        ? `<div class="hk-sm hk-muted">Process: <b>${esc(curRound || 'Completed')}</b> (Step ${Math.min(curIdx + 1, rounds.length)} of ${rounds.length})</div>`
+        : '';
+      const cd = countdownHtml(h, r, r.status === 'selected');
+      return `<article class="hk-my-card">
+        <div class="hk-my-banner ${st.cls}">
+          <span style="display:inline-flex;align-items:center;gap:6px"><i data-lucide="${st.ic}"></i>${st.label}</span>
+          <span>${curRound ? esc(curRound) : esc(r.teamMode === 'solo' ? 'Solo' : 'Team ' + (r.teamName || ''))}</span>
+        </div>
+        <div class="hk-my-body">
+          <div class="hk-my-top">
+            <div class="th" style="${mediaStyle(h)}"></div>
+            <div class="info">
+              <h3>${esc(h.title || r.hackathonTitle || 'Hackathon')}</h3>
+              <div class="hk-sm hk-muted">${esc(h.brandName || h.hostName || 'Organiser')}${h.city ? ' · ' + esc(h.city) : ''} · ${r.teamMode === 'solo' ? 'Solo' : 'Team ' + esc(r.teamName || '')} · ${C.ago(r.createdAtMs)}</div>
+              ${roundLine}
+            </div>
+          </div>
+          ${r.hostNote ? `<div class="hk-msg ok" style="padding:8px 12px"><i data-lucide="message-square-text"></i><span><b>Organiser note:</b> ${esc(r.hostNote)}</span></div>` : ''}
+          ${cd || ''}
+          <div class="hk-my-acts">
+            <button type="button" class="hk-btn sm" data-act="share" data-id="${esc(r.hackathonId)}" data-title="${esc(h.title || r.hackathonTitle || '')}"><i data-lucide="share-2"></i>Share</button>
+            <a class="hk-btn sm" href="#/h/${esc(r.hackathonId)}"><i data-lucide="info"></i>View</a>
+            <a class="hk-btn sm primary" href="#/my/${esc(r.hackathonId)}"><i data-lucide="layout-dashboard"></i>Open dashboard</a>
+          </div>
+        </div>
+      </article>`;
+    }).join('');
+
+    view.innerHTML = `<div class="hk-view"><div class="hk-page-h"><div><span class="hk-eyebrow">Your activity</span><h1>My hackathons</h1><p>Track selection updates, round progress, live countdowns, and submissions.</p></div><a class="hk-btn primary" href="#/explore"><i data-lucide="compass"></i>Find more</a></div>
+      ${regs.length ? `<div class="hk-stack">${cardsHtml}</div>` : empty('ticket', 'No registrations yet', 'Register for a hackathon and it will show up here.', '<a class="hk-btn primary" href="#/explore">Explore hackathons</a>')}</div>`;
+    stopTimers?.();
+    stopTimers = startCountdowns(view);
+    icons();
+  };
+
+  unsubRegs = C.watchMyRegistrations(S.user.uid, regs => { renderRegs(regs); });
+  S.cleanup = () => { stopTimers?.(); unsubRegs?.(); };
 }
 
 /* ---------- Notifications ---------- */
 async function alerts(t){
-  const ic = { approved: 'badge-check', rejected: 'circle-x', changes_requested: 'message-square-warning', registration: 'user-plus', announcement: 'megaphone', status: 'refresh-cw' };
+  const ic = {
+    approved: 'badge-check', rejected: 'circle-x', changes_requested: 'message-square-warning',
+    registration: 'user-plus', announcement: 'megaphone', status: 'refresh-cw',
+    submission: 'lightbulb', submission_review: 'message-square-text', test: 'clipboard-check',
+    verified: 'shield-check', featured: 'sparkles', closed: 'lock', reopened: 'unlock'
+  };
   const draw = () => {
     if(curPath() !== '/alerts') return;
-    view.innerHTML = `<div class="hk-view"><div class="hk-page-h"><div><span class="hk-eyebrow">Inbox</span><h1>Notifications</h1><p>Approvals, registrations and host announcements.</p></div>${S.notifs.some(n => !n.read) ? '<button class="hk-btn" data-act="read-all"><i data-lucide="check-check"></i>Mark all read</button>' : ''}</div>
-      ${S.notifs.length ? `<div class="hk-stack">${S.notifs.map(n => `<button class="hk-notif ${n.read ? '' : 'un'}" data-notif="${esc(n.id)}" data-h="${esc(n.hackathonId || '')}"><span class="ni"><i data-lucide="${ic[n.type] || 'bell'}"></i></span><span><b>${esc(n.title)}</b><span class="hk-sm hk-muted" style="display:block">${esc(n.body)}</span><span class="hk-xs hk-muted">${C.ago(n.createdAtMs)}</span></span></button>`).join('')}</div>` : empty('bell', 'You are all caught up', 'Approval decisions, registrations and announcements will appear here.')}</div>`;
+    view.innerHTML = `<div class="hk-view"><div class="hk-page-h"><div><span class="hk-eyebrow">Inbox</span><h1>Notifications</h1><p>Updates from hosts, selection status changes, reviews and announcements.</p></div>${S.notifs.some(n => !n.read) ? '<button class="hk-btn" data-act="read-all"><i data-lucide="check-check"></i>Mark all read</button>' : ''}</div>
+      ${S.notifs.length ? `<div class="hk-stack">${S.notifs.map(n => `<button class="hk-notif ${n.read ? '' : 'un'}" data-notif="${esc(n.id)}" data-h="${esc(n.hackathonId || '')}" data-type="${esc(n.type || '')}"><span class="ni"><i data-lucide="${ic[n.type] || 'bell'}"></i></span><span><b>${esc(n.title)}</b><span class="hk-sm hk-muted" style="display:block">${esc(n.body)}</span><span class="hk-xs hk-muted">${C.ago(n.createdAtMs)}</span></span></button>`).join('')}</div>` : empty('bell', 'You are all caught up', 'Updates from organisers, registrations and announcements will appear here.')}</div>`;
     icons();
   };
   draw(); S.redrawAlerts = draw; S.cleanup = () => { S.redrawAlerts = null; };
@@ -290,36 +376,165 @@ async function alerts(t){
 
 /* ---------- Profile ---------- */
 async function profile(t){
-  const h = S.hk, cities = Object.keys(C.CITIES).map(c => `<option value="${c}">`).join('');
-  view.innerHTML = `<div class="hk-view"><div class="hk-page-h"><div><span class="hk-eyebrow">Account</span><h1>Profile & settings</h1><p>Your campus is used to highlight hackathons at your college.</p></div></div>
-    <div class="hk-detail" style="margin-top:0"><form class="hk-glass hk-form" id="pf" style="padding:clamp(18px,3vw,28px)">
-      <div style="display:flex;gap:14px;align-items:center"><img class="hk-avatar" style="width:68px;height:68px" src="${esc(C.safeUrl(h.photoURL || S.site?.photoURL || S.user.photoURL) || 'icon.png')}" alt="" onerror="this.src='icon.png'"><div><b>${esc(S.user.email || '')}</b><div class="hk-sm hk-muted">Photo comes from your Campus Connect One / Google account.</div></div></div>
-      <div class="hk-grid2"><div class="hk-field"><label>Full name</label><input class="hk-input" name="displayName" value="${esc(h.displayName || '')}" required></div><div class="hk-field"><label>Phone</label><input class="hk-input" name="phone" inputmode="tel" value="${esc(h.phone || '')}"></div></div>
-      <div class="hk-grid2"><div class="hk-field"><label>College / institute</label><input class="hk-input" name="college" value="${esc(h.college || S.site?.college || '')}" placeholder="e.g. IIT Delhi"></div><div class="hk-field"><label>City</label><input class="hk-input" name="city" list="pc" value="${esc(h.city || '')}"><datalist id="pc">${cities}</datalist></div></div>
-      ${S.role === 'host' ? `<div class="hk-grid2"><div class="hk-field"><label>Organiser name <small>signed on emails</small></label><input class="hk-input" name="organiserName" value="${esc(h.organiserName || '')}"></div><div class="hk-field"><label>Organisation / club</label><input class="hk-input" name="org" value="${esc(h.org || '')}"></div></div><div class="hk-grid2"><div class="hk-field"><label>Contact email</label><input class="hk-input" name="orgEmail" type="email" value="${esc(h.orgEmail || S.user.email || '')}"></div><div class="hk-field"><label>Contact phone</label><input class="hk-input" name="orgPhone" inputmode="tel" value="${esc(h.orgPhone || '')}"></div></div>` : `<div class="hk-grid3"><div class="hk-field"><label>Course</label><input class="hk-input" name="course" value="${esc(h.course || '')}"></div><div class="hk-field"><label>Branch</label><input class="hk-input" name="branch" value="${esc(h.branch || '')}"></div><div class="hk-field"><label>Year</label><input class="hk-input" name="year" value="${esc(h.year || '')}"></div></div><div class="hk-field"><label>Skills</label><input class="hk-input" name="skills" value="${esc(h.skills || '')}"></div>`}
-      <div class="hk-field"><label>Bio <small>optional</small></label><textarea class="hk-textarea" name="bio" style="min-height:90px" maxlength="280">${esc(h.bio || '')}</textarea></div>
-      <button class="hk-btn primary" type="submit">Save changes</button></form>
-    <aside class="hk-stack"><div class="hk-card-s"><b>Logged in as</b><p style="margin-top:8px"><span class="hk-chip ${S.role === 'host' ? 'gold' : ''}">${S.role === 'host' ? 'Organiser' : 'Participant'}</span></p><p class="hk-sm hk-muted" style="margin-top:10px">To use the other side, log out and log in again with that role.</p>${S.role === 'host' ? `<p class="hk-sm hk-muted" style="margin-top:6px">${h.hostVerified ? '<span class="hk-chip"><i data-lucide="badge-check"></i>Verified organiser</span>' : 'Verification is done by admins after your first approved hackathon.'}</p>` : ''}</div>
-      <div class="hk-card-s"><b>Location</b><p class="hk-sm hk-muted" style="margin:6px 0 12px">${esc(locLabel())}</p><button class="hk-btn sm" data-act="loc">Change</button></div>
-      <div class="hk-card-s"><button class="hk-btn block danger" data-act="logout"><i data-lucide="log-out"></i>Log out</button></div></aside></div></div>`;
-  $('#pf').onsubmit = async e => {
-    e.preventDefault(); const d = Object.fromEntries(new FormData(e.target).entries()); const btn = $('button[type=submit]', e.target);
-    if((d.displayName || '').trim().length < 2) return toast('Enter your name.', 'error');
-    btn.disabled = true;
-    const T = k => (d[k] || '').trim(), extra = S.role === 'host' ? { organiserName: T('organiserName'), org: T('org'), orgEmail: T('orgEmail'), orgPhone: T('orgPhone').replace(/\D/g, '').slice(-10) } : { course: T('course'), branch: T('branch'), year: T('year'), skills: T('skills') };
-    try { await C.updateHkProfile(S.user.uid, { displayName: d.displayName.trim(), phone: (d.phone || '').trim(), college: (d.college || '').trim(), city: (d.city || '').trim(), bio: (d.bio || '').trim(), ...extra });
-      Object.assign(S.hk, { displayName: d.displayName.trim(), phone: d.phone, college: d.college.trim(), city: d.city.trim(), bio: d.bio, ...extra });
-      const c = C.findCity(d.city); if(c && S.loc?.source !== 'gps') S.loc = C.saveLocation({ lat: c.lat, lng: c.lng, city: c.city, state: c.state, source: 'profile' });
-      paintHeader(); toast('Profile saved'); } catch(err){ toast(err.message, 'error'); }
-    btn.disabled = false;
+  const cities = Object.keys(C.CITIES).map(c => `<option value="${c}">`).join('');
+  let editing = false;
+
+  const paintProfile = () => {
+    if(stale(t) || curPath() !== '/profile') return;
+    const h = S.hk, name = h.displayName || S.site?.displayName || S.user.displayName || 'User';
+    const email = S.user.email || h.email || '';
+    const photo = C.safeUrl(h.photoURL || S.site?.photoURL || S.user.photoURL) || 'icon.png';
+    const kv = (k, v) => `<div class="hk-kv-item"><small>${k}</small><b>${v ? esc(v) : '<span class="hk-muted" style="font-weight:500">Not added</span>'}</b></div>`;
+    const linkChip = (u, ic, label) => C.safeUrl(u)
+      ? `<a class="hk-chip btn" href="${esc(C.safeUrl(u))}" target="_blank" rel="noopener noreferrer"><i data-lucide="${ic}"></i>${label}</a>`
+      : `<span class="hk-chip neutral"><i data-lucide="${ic}"></i>${label}: Not added</span>`;
+
+    const mainCard = !editing ? `
+      <div class="hk-glass hk-stack" style="padding:clamp(18px,3vw,28px)">
+        <div class="hk-prof-head">
+          <img class="hk-avatar" style="width:68px;height:68px" src="${esc(photo)}" alt="" onerror="this.src='icon.png'">
+          <div class="grow">
+            <h2 style="font-size:1.3rem;margin-bottom:2px">${esc(name)}</h2>
+            <div class="hk-sm hk-muted">${esc(email)}</div>
+            <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">
+              <span class="hk-chip ${S.role === 'host' ? 'gold' : ''}">${S.role === 'host' ? 'Organiser' : 'Participant'}</span>
+              ${S.role === 'host' && h.hostVerified ? '<span class="hk-chip"><i data-lucide="badge-check"></i>Verified</span>' : ''}
+            </div>
+          </div>
+          <button type="button" class="hk-btn primary sm" id="editProfBtn"><i data-lucide="pencil"></i>Edit profile</button>
+        </div>
+
+        <div class="hk-kv-grid">
+          ${kv('Full name', name)}
+          ${kv('Email', email)}
+          ${kv('Phone', h.phone)}
+          ${kv('College / institute', h.college || S.site?.college)}
+          ${kv('City', h.city)}
+          ${S.role === 'host'
+            ? `${kv('Organiser name', h.organiserName)}${kv('Designation', h.designation)}${kv('Organisation / club', h.org)}${kv('Organiser email', h.orgEmail)}${kv('Organiser phone', h.orgPhone)}`
+            : `${kv('Course', h.course || S.site?.course)}${kv('Branch / stream', h.branch || S.site?.branch)}${kv('Year', h.year || S.site?.year)}${kv('Experience level', h.level)}${kv('Gender', h.gender)}${kv('Skills', h.skills)}`
+          }
+        </div>
+
+        ${(S.role === 'host' ? (h.about || h.bio) : (h.bio || S.site?.bio))
+          ? `<div class="hk-card-s" style="padding:12px 14px"><small class="hk-eyebrow" style="display:block;margin-bottom:4px">Bio</small><p class="hk-sm hk-prose" style="margin:0">${esc(S.role === 'host' ? (h.about || h.bio) : (h.bio || S.site?.bio))}</p></div>`
+          : ''}
+
+        <div>
+          <small class="hk-eyebrow" style="display:block;margin-bottom:8px">Links</small>
+          <div class="hk-prof-links">
+            ${S.role === 'host'
+              ? `${linkChip(h.website, 'globe', 'Website')}${linkChip(h.social, 'share-2', 'Instagram / LinkedIn')}${linkChip(h.proofUrl, 'file-check', 'Affiliation link')}`
+              : `${linkChip(h.github || S.site?.githubURL, 'github', 'GitHub')}${linkChip(h.linkedin || S.site?.linkedinURL, 'linkedin', 'LinkedIn')}${linkChip(h.portfolio || S.site?.websiteURL, 'globe', 'Portfolio / Website')}`
+            }
+          </div>
+        </div>
+      </div>
+    ` : `
+      <form class="hk-glass hk-form" id="pf" style="padding:clamp(18px,3vw,28px)">
+        <div class="hk-prof-head">
+          <img class="hk-avatar" style="width:68px;height:68px" src="${esc(photo)}" alt="" onerror="this.src='icon.png'">
+          <div class="grow">
+            <b>Edit profile details</b>
+            <div class="hk-sm hk-muted">Your registered Name and Email are locked for verification consistency.</div>
+          </div>
+          <button type="button" class="hk-btn ghost sm" id="cancelEditBtn">Cancel</button>
+        </div>
+
+        <div class="hk-grid2">
+          <div class="hk-field"><label>Full name <small>locked</small></label><input class="hk-input" value="${esc(name)}" disabled></div>
+          <div class="hk-field"><label>Account email <small>locked</small></label><input class="hk-input" value="${esc(email)}" disabled></div>
+        </div>
+
+        <div class="hk-grid2">
+          <div class="hk-field"><label>Phone</label><input class="hk-input" name="phone" inputmode="tel" value="${esc(h.phone || '')}" placeholder="10-digit mobile"></div>
+          <div class="hk-field"><label>City</label><input class="hk-input" name="city" list="pc" value="${esc(h.city || '')}" placeholder="e.g. Prayagraj"><datalist id="pc">${cities}</datalist></div>
+        </div>
+        <div class="hk-field"><label>College / institute</label><input class="hk-input" name="college" value="${esc(h.college || S.site?.college || '')}" placeholder="e.g. IIT Delhi"></div>
+
+        ${S.role === 'host' ? `
+          <div class="hk-grid2"><div class="hk-field"><label>Organiser name <small>signed on emails</small></label><input class="hk-input" name="organiserName" value="${esc(h.organiserName || '')}"></div><div class="hk-field"><label>Designation</label><input class="hk-input" name="designation" value="${esc(h.designation || '')}"></div></div>
+          <div class="hk-grid2"><div class="hk-field"><label>Organisation / club</label><input class="hk-input" name="org" value="${esc(h.org || '')}"></div><div class="hk-field"><label>Contact email</label><input class="hk-input" name="orgEmail" type="email" value="${esc(h.orgEmail || email)}"></div></div>
+          <div class="hk-grid2"><div class="hk-field"><label>Contact phone</label><input class="hk-input" name="orgPhone" inputmode="tel" value="${esc(h.orgPhone || '')}"></div><div class="hk-field"><label>Website <small>optional</small></label><input class="hk-input" name="website" type="url" placeholder="https://…" value="${esc(h.website || '')}"></div></div>
+          <div class="hk-grid2"><div class="hk-field"><label>Instagram / LinkedIn <small>optional</small></label><input class="hk-input" name="social" type="url" placeholder="https://…" value="${esc(h.social || '')}"></div><div class="hk-field"><label>Affiliation link <small>optional</small></label><input class="hk-input" name="proofUrl" type="url" placeholder="https://…" value="${esc(h.proofUrl || '')}"></div></div>
+          <div class="hk-field"><label>About / bio <small>optional</small></label><textarea class="hk-textarea" name="about" style="min-height:90px" maxlength="400">${esc(h.about || h.bio || '')}</textarea></div>
+        ` : `
+          <div class="hk-grid3"><div class="hk-field"><label>Course</label><input class="hk-input" name="course" value="${esc(h.course || S.site?.course || '')}"></div><div class="hk-field"><label>Branch</label><input class="hk-input" name="branch" value="${esc(h.branch || S.site?.branch || '')}"></div><div class="hk-field"><label>Year</label><input class="hk-input" name="year" value="${esc(h.year || S.site?.year || '')}"></div></div>
+          <div class="hk-grid2"><div class="hk-field"><label>Skills</label><input class="hk-input" name="skills" value="${esc(h.skills || '')}" placeholder="React, Python, UI…"></div><div class="hk-field"><label>Experience level <small>optional</small></label><select class="hk-select" name="level"><option value="">Select</option>${['beginner', 'intermediate', 'advanced'].map(l => `<option value="${l}" ${h.level === l ? 'selected' : ''}>${l[0].toUpperCase() + l.slice(1)}</option>`).join('')}</select></div></div>
+          <div class="hk-grid2"><div class="hk-field"><label>GitHub URL <small>optional</small></label><input class="hk-input" name="github" type="url" placeholder="https://github.com/you" value="${esc(h.github || S.site?.githubURL || '')}"></div><div class="hk-field"><label>LinkedIn URL <small>optional</small></label><input class="hk-input" name="linkedin" type="url" placeholder="https://linkedin.com/in/you" value="${esc(h.linkedin || S.site?.linkedinURL || '')}"></div></div>
+          <div class="hk-field"><label>Portfolio / website <small>optional</small></label><input class="hk-input" name="portfolio" type="url" placeholder="https://…" value="${esc(h.portfolio || S.site?.websiteURL || '')}"></div>
+          <div class="hk-field"><label>Bio <small>optional</small></label><textarea class="hk-textarea" name="bio" style="min-height:90px" maxlength="280">${esc(h.bio || S.site?.bio || '')}</textarea></div>
+        `}
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="hk-btn primary" type="submit">Save changes</button>
+          <button class="hk-btn ghost" type="button" id="cancelEditBtn2">Cancel</button>
+        </div>
+      </form>
+    `;
+
+    view.innerHTML = `<div class="hk-view"><div class="hk-page-h"><div><span class="hk-eyebrow">Account</span><h1>Profile &amp; settings</h1><p>Manage your details and links shared with organisers or participants.</p></div></div>
+      <div class="hk-detail" style="margin-top:0">${mainCard}
+      <aside class="hk-stack"><div class="hk-card-s"><b>Logged in as</b><p style="margin-top:8px"><span class="hk-chip ${S.role === 'host' ? 'gold' : ''}">${S.role === 'host' ? 'Organiser' : 'Participant'}</span></p><p class="hk-sm hk-muted" style="margin-top:10px">To use the other side, log out and log in again with that role.</p>${S.role === 'host' ? `<p class="hk-sm hk-muted" style="margin-top:6px">${h.hostVerified ? '<span class="hk-chip"><i data-lucide="badge-check"></i>Verified organiser</span>' : 'Verification is granted to trusted organisers after hosting live events.'}</p>` : ''}</div>
+        <div class="hk-card-s"><b>Location</b><p class="hk-sm hk-muted" style="margin:6px 0 12px">${esc(locLabel())}</p><button class="hk-btn sm" data-act="loc">Change</button></div>
+        <div class="hk-card-s"><button class="hk-btn block danger" data-act="logout"><i data-lucide="log-out"></i>Log out</button></div></aside></div></div>`;
+    icons();
+
+    if(!editing){
+      $('#editProfBtn')?.addEventListener('click', () => { editing = true; paintProfile(); });
+      return;
+    }
+    const cancel = () => { editing = false; paintProfile(); };
+    $('#cancelEditBtn')?.addEventListener('click', cancel);
+    $('#cancelEditBtn2')?.addEventListener('click', cancel);
+    $('#pf').onsubmit = async e => {
+      e.preventDefault();
+      const d = Object.fromEntries(new FormData(e.target).entries());
+      const T = k => (d[k] || '').trim();
+      const urlsToCheck = S.role === 'host' ? [T('website'), T('social'), T('proofUrl')] : [T('github'), T('linkedin'), T('portfolio')];
+      if(urlsToCheck.some(u => u && !C.isUrl(u))) return toast('All URLs must start with https://', 'error');
+      const btn = $('button[type=submit]', e.target);
+      btn.disabled = true;
+      const extra = S.role === 'host'
+        ? { organiserName: T('organiserName'), designation: T('designation'), org: T('org'), orgEmail: T('orgEmail'), orgPhone: T('orgPhone').replace(/\D/g, '').slice(-10), website: T('website'), social: T('social'), proofUrl: T('proofUrl'), about: T('about') }
+        : { course: T('course'), branch: T('branch'), year: T('year'), skills: T('skills'), level: T('level'), github: T('github'), linkedin: T('linkedin'), portfolio: T('portfolio'), bio: T('bio') };
+      const patch = { phone: T('phone').replace(/\D/g, '').slice(-10), college: T('college'), city: T('city'), ...extra };
+      try {
+        await C.updateHkProfile(S.user.uid, patch);
+        Object.assign(S.hk, patch);
+        const c = C.findCity(patch.city);
+        if(c && S.loc?.source !== 'gps') S.loc = C.saveLocation({ lat: c.lat, lng: c.lng, city: c.city, state: c.state, source: 'profile' });
+        paintHeader();
+        toast('Profile updated');
+        editing = false;
+        paintProfile();
+      } catch(err){
+        toast(err.message, 'error');
+        btn.disabled = false;
+      }
+    };
   };
+
+  paintProfile();
 }
 
 /* ---------- global click actions ---------- */
 document.addEventListener('click', async e => {
   const open = e.target.closest('[data-open]'); if(open){ nav('#/h/' + open.dataset.open); return; }
   const n = e.target.closest('[data-notif]');
-  if(n){ const id = n.dataset.notif; const it = S.notifs.find(x => x.id === id); if(it && !it.read){ it.read = true; C.markRead(id).catch(() => {}); paintNav(); S.redrawAlerts?.(); } if(n.dataset.h) nav('#/h/' + n.dataset.h); return; }
+  if(n){
+    const id = n.dataset.notif, hid = n.dataset.h, tp = n.dataset.type;
+    const it = S.notifs.find(x => x.id === id);
+    if(it && !it.read){ it.read = true; C.markRead(id).catch(() => {}); paintNav(); S.redrawAlerts?.(); }
+    if(S.role === 'host'){
+      if(['registration', 'submission'].includes(tp) && hid) nav('#/host/manage/' + hid);
+      else if(hid) nav('#/h/' + hid);
+      else nav('#/host');
+    } else if(hid){
+      if(['status', 'submission_review', 'test'].includes(tp)) nav('#/my/' + hid);
+      else nav('#/h/' + hid);
+    }
+    return;
+  }
   const a = e.target.closest('[data-act]'); if(!a) return; const act = a.dataset.act;
   if(act === 'loc') locModal();
   else if(act === 'theme') toggleTheme();
@@ -332,8 +547,8 @@ document.addEventListener('click', async e => {
     try { await C.cancelRegistration(S.cur, S.user); S.regs = null; S.all = null; toast('Registration cancelled', 'info'); route(); } catch(err){ toast(err.message, 'error'); }
   }
   else if(act === 'share'){
-    const url = location.origin + location.pathname + '#/h/' + a.dataset.id;
-    try { if(navigator.share) await navigator.share({ title: a.dataset.title, url }); else { await navigator.clipboard.writeText(url); toast('Link copied'); } } catch {}
+    const h = S.cur?.id === a.dataset.id ? S.cur : (S.all?.find(x => x.id === a.dataset.id) || await getH(a.dataset.id) || { id: a.dataset.id, title: a.dataset.title });
+    await C.shareHackathon(h, S.role);
   }
   else if(act === 'read-all'){ S.notifs.filter(x => !x.read).forEach(x => { x.read = true; C.markRead(x.id).catch(() => {}); }); paintNav(); S.redrawAlerts?.(); }
 });

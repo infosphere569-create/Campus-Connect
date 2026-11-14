@@ -1,5 +1,6 @@
 User-agent: *
 Allow: /
 Disallow: /admin.html
+Disallow: /hackthons-admin.html
 Disallow: /notifications.html
 Sitemap: https://campusconnectone.online/sitemap.xml

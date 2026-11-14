@@ -1,9 +1,15 @@
 // Participant dashboard for one hackathon: round tracker, screening test, project submission, team.
 import * as C from './hk-core.js';
-import { empty, statusBadge } from './hk-ui.js';
+import { empty, countdownHtml, startCountdowns } from './hk-ui.js';
 
-const { $, $$, esc, icons, toast } = C;
-const STATUS_TXT = { registered: ['Registered', ''], shortlisted: ['Shortlisted', ''], selected: ['Selected', 'gold'], waitlisted: ['Waitlisted', 'warn'], rejected: ['Not selected', 'bad'] };
+const { $, $$, esc, icons, toast, FS } = C;
+const STATUS_TXT = {
+  registered: ['Registered', '', 'ticket-check'],
+  shortlisted: ['Shortlisted', '', 'sparkles'],
+  selected: ['Selected', 'gold', 'trophy'],
+  waitlisted: ['Waitlisted', 'warn', 'hourglass'],
+  rejected: ['Not selected', 'bad', 'circle-x']
+};
 
 export async function dash(cx, hid){
   const { S, view } = cx;
@@ -14,7 +20,9 @@ export async function dash(cx, hid){
   const subCfg = h.submission || {}, subOpen = subCfg.open !== false && (!subCfg.deadlineMs || now <= subCfg.deadlineMs) && reg.status !== 'rejected';
   const members = reg.members || [];
 
-  const tracker = rounds.length ? `<ol class="hk-rounds">${rounds.map((r, i) => `<li class="${i < reg.stage ? 'done' : i === reg.stage ? 'cur' : ''}"><span class="n">${i < reg.stage ? '<i data-lucide="check"></i>' : i + 1}</span><b>${esc(r.name)}</b>${r.startMs ? `<small>${C.fmtDate(r.startMs)}</small>` : ''}</li>`).join('')}</ol>` : '<p class="hk-sm hk-muted">The organiser has not defined rounds for this hackathon.</p>';
+  const tracker = rounds.length
+    ? `<ol class="hk-rounds">${rounds.map((r, i) => `<li class="${i < (reg.stage || 0) ? 'done' : i === (reg.stage || 0) ? 'cur' : ''}"><span class="n">${i < (reg.stage || 0) ? '<i data-lucide="check"></i>' : i + 1}</span><b>${esc(r.name)}</b>${r.desc ? `<small>${esc(r.desc)}</small>` : ''}${r.startMs ? `<small>${C.fmtDate(r.startMs)}${r.endMs ? ' → ' + C.fmtDate(r.endMs) : ''}</small>` : ''}</li>`).join('')}</ol>`
+    : '<p class="hk-sm hk-muted">The organiser has not defined separate rounds for this hackathon.</p>';
 
   /* screening test card */
   let testCard = '';
@@ -51,12 +59,36 @@ export async function dash(cx, hid){
     <p class="hk-xs hk-muted" style="margin-top:8px">All updates are emailed to the team leader from team@campusconnectone.online.</p></section>`;
 
   const org = h.organiser || {};
+  const cd = countdownHtml(h, reg, reg.status === 'selected');
+  const curRound = rounds[reg.stage || 0]?.name || '';
+  const statusBanner = `<div class="hk-my-card" style="margin-bottom:14px">
+    <div class="hk-my-banner ${esc(reg.status || 'registered')}"><span style="display:inline-flex;align-items:center;gap:6px"><i data-lucide="${st[2]}"></i>Status: ${st[0]}</span>${curRound ? `<span class="hk-xs">${esc(curRound)}</span>` : ''}</div>
+    ${reg.hostNote ? `<div class="hk-my-body" style="padding:12px 16px"><div class="hk-sm"><b>Note from organiser:</b> ${esc(reg.hostNote)}</div></div>` : ''}
+  </div>`;
+
   view.innerHTML = `<div class="hk-view"><a class="hk-btn ghost sm" href="#/my" style="margin-bottom:12px"><i data-lucide="arrow-left"></i>My hackathons</a>
     <div class="hk-page-h"><div><span class="hk-eyebrow">My dashboard</span><h1>${esc(h.title)}</h1><p>Hosted by ${esc(org.name || h.hostName || 'the organiser')}${org.org ? ' · ' + esc(org.org) : ''}</p></div><span class="hk-chip ${st[1]}">${st[0]}</span></div>
-    <section class="hk-card-s hk-dcard"><div class="dh"><i data-lucide="list-ordered"></i><h3>Round progress</h3></div>${tracker}</section>
+    ${statusBanner}
+    ${cd ? `<div style="margin-bottom:14px">${cd}</div>` : ''}
+    <section class="hk-card-s hk-dcard"><div class="dh"><i data-lucide="list-ordered"></i><h3>Process &amp; round timeline</h3></div>${tracker}</section>
     <div class="hk-dgrid"><div class="hk-stack">${testCard}${subCard}</div><aside class="hk-stack">${team}
       <section class="hk-card-s hk-dcard"><div class="dh"><i data-lucide="calendar-days"></i><h3>Key dates</h3></div><ul class="hk-kv"><li><span>Starts</span><b>${C.fmtDT(h.startMs)}</b></li><li><span>Ends</span><b>${C.fmtDT(h.endMs)}</b></li>${subCfg.deadlineMs ? `<li><span>Submission</span><b>${C.fmtDT(subCfg.deadlineMs)}</b></li>` : ''}</ul>
       ${org.email ? `<a class="hk-btn sm block" style="margin-top:10px" href="mailto:${esc(org.email)}"><i data-lucide="mail"></i>Contact organiser</a>` : ''}<a class="hk-btn sm block" style="margin-top:8px" href="#/h/${esc(h.id)}">View hackathon page</a></section></aside></div></div>`;
+
+  const stopTimer = startCountdowns(view);
+  let unsubReg = null;
+  unsubReg = FS.onSnapshot(FS.doc(C.db, 'hkRegistrations', `${hid}_${S.user.uid}`), snap => {
+    if(!snap.exists() || cx.stale()) return;
+    const live = snap.data();
+    if(live.status !== reg.status || (live.stage || 0) !== (reg.stage || 0) || (live.hostNote || '') !== (reg.hostNote || '')){
+      const activeTag = document.activeElement?.tagName;
+      if(['INPUT', 'TEXTAREA'].includes(activeTag)){
+        toast(`Status updated: ${(STATUS_TXT[live.status] || STATUS_TXT.registered)[0]}`, 'info');
+      } else {
+        dash(cx, hid);
+      }
+    }
+  }, () => {});
 
   const sf = $('#subForm');
   if(sf && subOpen) sf.onsubmit = async e => {
@@ -73,6 +105,7 @@ export async function dash(cx, hid){
     catch(ex){ err(/permission|insufficient/i.test(ex.message) ? 'Submissions are closed or not allowed right now.' : ex.message); btn.disabled = false; btn.textContent = sub ? 'Update submission' : 'Submit to organiser'; }
   };
   const sb = $('[data-start]'); if(sb) sb.onclick = () => runTest(cx, h, meta, () => dash(cx, hid).then(icons));
+  cx.S.cleanup = () => { stopTimer?.(); unsubReg?.(); };
   icons();
 }
 

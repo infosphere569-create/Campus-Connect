@@ -525,3 +525,42 @@ i[data-lucide]>svg{width:100%;height:100%;display:block}
 .hk-progress{height:6px;border-radius:99px;background:var(--hk-line);overflow:hidden;margin-bottom:18px}.hk-progress i{display:block;height:100%;background:var(--hk-p);transition:width .3s}
 .hk-fs{border:1px solid var(--hk-line);border-radius:16px;padding:16px;display:grid;gap:12px;min-width:0}.hk-fs legend{padding:0 8px;font-weight:800;font-size:.9rem;color:var(--hk-p)}
 @media (max-width:640px){.hk-mem .hk-grid3{grid-template-columns:1fr}.hk-test-nav .hk-btn{flex:1;margin:0 4px}}
+
+/* ---------- Card action buttons (Details + Apply/Register) ---------- */
+.hk-card-acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:10px}
+.hk-card-acts .hk-btn{min-height:38px;padding:0 10px;font-size:.82rem;border-radius:11px;width:100%}
+
+/* ---------- Live countdown strip ---------- */
+.hk-countdown{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;border-radius:12px;background:color-mix(in srgb,var(--hk-p) 9%,var(--hk-surface2));border:1px solid color-mix(in srgb,var(--hk-p) 22%,var(--hk-line));font-size:.82rem;font-weight:600;color:var(--hk-ink)}
+.hk-countdown i{width:15px;height:15px;color:var(--hk-p)}
+.hk-countdown .tval{margin-left:auto;font-family:var(--hk-mono);font-weight:700;color:var(--hk-p);font-variant-numeric:tabular-nums}
+.hk-countdown.gold{background:color-mix(in srgb,var(--hk-gold2) 16%,var(--hk-surface2));border-color:color-mix(in srgb,var(--hk-gold) 28%,var(--hk-line))}
+.hk-countdown.gold i,.hk-countdown.gold .tval{color:var(--hk-gold)}
+
+/* ---------- My Hackathons rich status cards ---------- */
+.hk-my-card{background:var(--hk-surface);border:1px solid var(--hk-line);border-radius:20px;overflow:hidden;transition:box-shadow .25s,border-color .25s}
+.hk-my-card:hover{border-color:color-mix(in srgb,var(--hk-p) 35%,var(--hk-line));box-shadow:var(--hk-shadow-sm)}
+.hk-my-banner{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 16px;font-size:.82rem;font-weight:800;border-bottom:1px solid var(--hk-line);background:color-mix(in srgb,var(--hk-p) 8%,var(--hk-surface2));color:var(--hk-p)}
+.hk-my-banner.selected{background:linear-gradient(90deg,color-mix(in srgb,var(--hk-gold2) 26%,var(--hk-surface)),color-mix(in srgb,var(--hk-p) 10%,var(--hk-surface)));color:var(--hk-gold)}
+.hk-my-banner.shortlisted{background:color-mix(in srgb,var(--hk-p) 14%,var(--hk-surface));color:var(--hk-p)}
+.hk-my-banner.waitlisted{background:color-mix(in srgb,var(--hk-warn) 14%,var(--hk-surface));color:var(--hk-warn)}
+.hk-my-banner.rejected{background:color-mix(in srgb,var(--hk-bad) 12%,var(--hk-surface));color:var(--hk-bad)}
+.hk-my-body{padding:16px;display:grid;gap:12px}
+.hk-my-top{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.hk-my-top .th{width:76px;height:56px;border-radius:12px;background:var(--hk-mint) center/cover;flex:none}
+.hk-my-top .info{flex:1;min-width:180px}
+.hk-my-top .info h3{font-size:1.08rem;margin-bottom:2px}
+.hk-my-acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
+
+/* ---------- Profile read-only overview & applicant modal ---------- */
+.hk-prof-head{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding-bottom:16px;border-bottom:1px solid var(--hk-line)}
+.hk-prof-head .grow{flex:1;min-width:180px}
+.hk-kv-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.hk-kv-item{padding:10px 12px;border-radius:12px;background:var(--hk-surface2);border:1px solid var(--hk-line);min-width:0}
+.hk-kv-item small{display:block;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--hk-muted);margin-bottom:2px}
+.hk-kv-item b{display:block;font-size:.9rem;overflow-wrap:anywhere}
+.hk-prof-links{display:flex;gap:8px;flex-wrap:wrap}
+@media (max-width:640px){.hk-kv-grid{grid-template-columns:1fr}}
+
+/* ---------- Public hackathon standalone bar ---------- */
+.hk-pub-main{padding:clamp(16px,3vw,30px) 0 calc(var(--hk-bar) + 32px + env(safe-area-inset-bottom))}

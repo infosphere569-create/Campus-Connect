@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>(function(){try{var v=localStorage.getItem("cc-theme")||"system";document.documentElement.dataset.theme=v==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):v;}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Hackathon Details — Campus Connect One Hackathons</title>
+<meta name="description" content="Explore hackathon schedule, tracks, prizes, rules, and register your team on Campus Connect One Hackathons.">
+<meta name="keywords" content="hackathon, campus hackathon, student coding event, team registration, prizes, Campus Connect One">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+<meta name="theme-color" content="#178a54">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Campus Connect One Hackathons">
+<meta property="og:title" content="Hackathon Details — Campus Connect One Hackathons">
+<meta property="og:description" content="View tracks, prizes, schedule and register solo or with your team on Campus Connect One.">
+<meta property="og:image" content="https://campusconnectone.online/icon.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Hackathon Details — Campus Connect One Hackathons">
+<meta name="twitter:description" content="View tracks, prizes, schedule and register solo or with your team on Campus Connect One.">
+<meta name="twitter:image" content="https://campusconnectone.online/icon.png">
+<link rel="icon" type="image/png" href="icon.png"><link rel="apple-touch-icon" href="icon.png"><link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/hackathons.css">
+</head>
+<body class="hk-body" data-page="hk-public">
+<canvas class="hk-bg" id="hkBg" aria-hidden="true"></canvas>
+<div class="hk-layer">
+  <header class="hk-nav stuck" id="nav">
+    <div class="hk-wrap hk-nav-in">
+      <a class="hk-brand" href="hackthons.html" aria-label="Campus Connect One Hackathons"><img src="icon.png" alt="Campus Connect One logo" width="38" height="38"><span>Campus Connect One<small>Hackathons</small></span></a>
+      <nav class="hk-links" aria-label="Navigation">
+        <a href="hackthons.html">Discover</a>
+        <a href="hackthons.html#featured">All Hackathons</a>
+        <a href="hackthons.html#faq">FAQ</a>
+      </nav>
+      <button class="hk-btn icon ghost" id="themeBtn" aria-label="Toggle theme"><i data-lucide="sun-moon"></i></button>
+      <a class="hk-btn primary sm" id="topAuthBtn" href="login-hackthons.html?role=participant">Log in</a>
+    </div>
+  </header>
+
+  <main class="hk-pub-main">
+    <div class="hk-wrap" id="pubView">
+      <div class="hk-skel" style="height:280px;border-radius:26px"></div>
+    </div>
+  </main>
+
+  <nav class="hk-bottom" id="pubBottom" aria-label="Primary"></nav>
+</div>
+<script src="js/hackathons/hk-icons.js"></script>
+<script type="module" src="js/hackathons/hk-public.js"></script>
+</body>
+</html>

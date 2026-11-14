@@ -1,5 +1,5 @@
 import { initBg } from './hk-bg.js';
-import { $, $$, initTheme, fetchApproved, enrich, trendScore, cachedLocation, publicStats } from './hk-core.js';
+import { $, $$, initTheme, fetchApproved, enrich, cachedLocation, publicStats, publicShareUrl, safeUrl } from './hk-core.js';
 import { card, empty, bindReveal, countUp } from './hk-ui.js';
 
 const toggleTheme = initTheme();
@@ -8,6 +8,37 @@ $('#themeBtn').onclick = toggleTheme;
 $('#yr').textContent = new Date().getFullYear();
 addEventListener('scroll', () => $('#nav').classList.toggle('stuck', scrollY > 8), { passive: true });
 bindReveal();
+
+function injectEventListLd(list){
+  if(!list.length) return;
+  const old = document.getElementById('hkListLd');
+  if(old) old.remove();
+  const ld = document.createElement('script');
+  ld.type = 'application/ld+json';
+  ld.id = 'hkListLd';
+  ld.textContent = JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'Live Student Hackathons on Campus Connect One',
+    itemListElement: list.slice(0, 20).map((h, idx) => ({
+      '@type': 'ListItem',
+      position: idx + 1,
+      item: {
+        '@type': 'Event',
+        name: h.title,
+        description: h.tagline || h.description || '',
+        url: publicShareUrl(h.id),
+        image: safeUrl(h.bannerURL || h.thumbURL) || 'https://campusconnectone.online/icon.png',
+        startDate: h.startMs ? new Date(h.startMs).toISOString() : undefined,
+        endDate: h.endMs ? new Date(h.endMs).toISOString() : undefined,
+        location: h.mode === 'online'
+          ? { '@type': 'VirtualLocation', url: publicShareUrl(h.id) }
+          : { '@type': 'Place', name: h.college || h.city || 'Campus' }
+      }
+    }))
+  });
+  document.head.appendChild(ld);
+}
 
 // Live counters: real numbers from the backend (cached server-side for 10 minutes). No fake fallback values.
 (async () => {
@@ -28,9 +59,15 @@ bindReveal();
   const now = Date.now();
   const live = items.filter(h => !(h.endMs && now > h.endMs));
   const ranked = enrich(live, { loc: cachedLocation() }).sort((a, b) => b._trend - a._trend);
+  injectEventListLd(ranked);
   list.innerHTML = ranked.length
-    ? ranked.slice(0, 6).map(card).join('')
+    ? ranked.slice(0, 6).map((h, i) => card(h, i, { publicLinks: true })).join('')
     : `<div style="grid-column:1/-1">${empty('rocket', 'No hackathon is live right now', 'Organisers can create one in minutes. Log in to host or to be among the first to register.', '<a class="hk-btn gold" href="login-hackthons.html?role=host">Host a hackathon</a>')}</div>`;
-  list.onclick = e => { const c = e.target.closest('[data-open]'); if(c) location.href = 'login-hackthons.html?next=' + encodeURIComponent('#/h/' + c.dataset.open); };
+  list.onclick = e => {
+    const p = e.target.closest('[data-pub-open]');
+    if(p){ location.href = `hackathon.html?id=${encodeURIComponent(p.dataset.pubOpen)}`; return; }
+    const c = e.target.closest('[data-open]');
+    if(c) location.href = `hackathon.html?id=${encodeURIComponent(c.dataset.open)}`;
+  };
   list.onkeydown = e => { if(e.key === 'Enter') e.target.click?.(); };
 })();
