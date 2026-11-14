@@ -217,11 +217,13 @@ export async function wizard(cx, id){
   const addTag = v => { const t = v.replace(/[#,]/g, '').trim().slice(0, 24); if(!t || D.tags.length >= 8 || D.tags.some(x => x.toLowerCase() === t.toLowerCase())) return; D.tags.push(t); $('#tagBox').innerHTML = tagsHtml(); dirty = true; backup(); preview(); icons(); };
   async function upload(inp){
     const kind = inp.dataset.up, f = inp.files[0]; if(!f) return;
-    const lab = inp.closest('.hk-drop'), dz = lab.querySelector('.dz'); dz.innerHTML = '<span class="hk-spin"></span><span>Uploading…</span>';
+    const lab = inp.closest('.hk-drop'), dz = lab.querySelector('.dz'); dz.innerHTML = '<span class="hk-spin"></span><span>Uploading… 0%</span>';
     try {
-      const r = await C.uploadImage(f, { uid: S.user.uid, hid: D.id, kind });
-      D[kind === 'banner' ? 'bannerURL' : 'thumbURL'] = r.url; if(r.inline) toast('Image saved inline. Deploy storage rules for faster loading.', 'info');
-      lab.classList.add('has'); lab.style.backgroundImage = `url('${r.url.replace(/'/g, '%27')}')`; dirty = true; backup(); preview();
+      const url = await C.uploadImage(f, { uid: S.user.uid, hid: D.id, kind }, pct => {
+        dz.innerHTML = `<span class="hk-spin"></span><span>Uploading… ${pct}%</span>`;
+      });
+      D[kind === 'banner' ? 'bannerURL' : 'thumbURL'] = url;
+      lab.classList.add('has'); lab.style.backgroundImage = `url('${url.replace(/'/g, '%27')}')`; dirty = true; backup(); preview();
       dz.innerHTML = `<i data-lucide="refresh-cw"></i><span>Change ${kind}</span><small>Uploaded ✓</small>`;
     } catch(e){ toast(e.message, 'error'); dz.innerHTML = `<i data-lucide="image-up"></i><span>Upload ${kind}</span><small>Try again</small>`; }
     inp.value = ''; icons();

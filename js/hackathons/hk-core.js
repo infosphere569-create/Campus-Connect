@@ -225,36 +225,51 @@ async function shrink(file, maxW, q, ratio){
 const CLOUDINARY_CLOUD_NAME = 'bqwj7eos';
 const CLOUDINARY_UPLOAD_PRESET = 'campus_connect_unsigned';
 
-// Uploads to Cloudinary (same as profile upload), falling back to Firebase Storage and inline data URL.
-export async function uploadImage(file, { uid, hid, kind }){
+// Uploads to Cloudinary (same secure profile photo upload logic), with progress reporting, Firebase Storage, and inline fallbacks.
+export async function uploadImage(file, pathOrOpts, onProgress){
   if(!file || !/^image\//.test(file.type)) throw new Error('Please choose an image file (JPG, PNG or WebP).');
   if(file.size > 8 * 1024 * 1024) throw new Error('Image is larger than 8 MB.');
+  
+  let kind = 'thumb';
+  if(typeof pathOrOpts === 'object' && pathOrOpts !== null){
+    kind = pathOrOpts.kind || 'thumb';
+  } else if(typeof pathOrOpts === 'string' && pathOrOpts.includes('banner')) {
+    kind = 'banner';
+  }
+  
   const cfg = kind === 'banner' ? { w: 1600, q: .82, ratio: 16 / 6 } : { w: 720, q: .8, ratio: 4 / 3 };
   const { blob } = await shrink(file, cfg.w, cfg.q, cfg.ratio);
+  onProgress?.(15);
   
   try {
     const body = new FormData();
     body.append('file', blob);
     body.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
     body.append('folder', 'campus-connect');
+    onProgress?.(45);
     const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, { method: 'POST', body });
     const data = await res.json();
-    if(res.ok && data.secure_url) {
-      return { url: data.secure_url, inline: false };
+    if(res.ok && (data.secure_url || data.url)) {
+      onProgress?.(100);
+      return data.secure_url || data.url;
     }
   } catch(clErr) {
     console.warn('Cloudinary upload fallback:', clErr);
   }
-
+  
+  onProgress?.(70);
   try {
-    const r = sRef(storage, `hackathons/${uid}/${hid}/${kind}-${Date.now()}.jpg`);
+    const pathStr = typeof pathOrOpts === 'string' ? pathOrOpts : `hackathons/${pathOrOpts?.uid || 'demo'}/${pathOrOpts?.hid || 'hack'}/${kind}-${Date.now()}.jpg`;
+    const r = sRef(storage, pathStr);
     await uploadBytes(r, blob, { contentType: 'image/jpeg' });
-    return { url: await getDownloadURL(r), inline: false };
+    onProgress?.(100);
+    return await getDownloadURL(r);
   } catch(e){
     console.warn('Storage upload failed, using inline fallback', e);
     const small = await shrink(file, kind === 'banner' ? 1100 : 520, .62, cfg.ratio);
     if(small.dataUrl.length > 330000) throw new Error('Image could not be uploaded. Try a smaller image.');
-    return { url: small.dataUrl, inline: true };
+    onProgress?.(100);
+    return small.dataUrl;
   }
 }
 
