@@ -268,7 +268,47 @@ export async function wizard(cx, id){
     ? `<textarea class="hk-textarea" style="min-height:64px" data-l="${name}" data-i="${i}" data-f="${c.f}" placeholder="${esc(c.ph)}">${esc(r[c.f] ?? '')}</textarea>`
     : `<input class="hk-input" data-l="${name}" data-i="${i}" data-f="${c.f}" ${c.num ? 'data-t="num" type="number" min="0" inputmode="numeric"' : 'type="text"'} placeholder="${esc(c.ph)}" value="${esc(r[c.f] ?? '')}">`).join('')}<button type="button" class="hk-btn icon ghost" data-del="${name}:${i}" aria-label="Remove row"><i data-lucide="trash-2"></i></button></div>`).join('')}
     <button type="button" class="hk-btn sm" data-add="${name}"><i data-lucide="plus"></i>${addLabel}</button></div>`;
-  const drop = (kind, label, hint) => { const u = C.safeUrl(kind === 'banner' ? D.bannerURL : D.thumbURL); return `<label class="hk-drop ${kind} ${u ? 'has' : ''}" style="${u ? `background-image:url('${u.replace(/'/g, '%27')}')` : ''}"><input type="file" accept="image/*" data-up="${kind}" aria-label="${label}"><span class="dz"><i data-lucide="${u ? 'refresh-cw' : 'image-up'}"></i><span>${u ? 'Change ' : 'Upload '}${label}</span><small>${hint}</small></span></label>`; };
+  const drop = (kind, label, hint) => {
+    const isBanner = kind === 'banner';
+    const u = C.safeUrl(isBanner ? D.bannerURL : D.thumbURL);
+    const otherUrl = C.safeUrl(isBanner ? D.thumbURL : D.bannerURL);
+    return `<div class="hk-drop-wrap ${kind}">
+      <div class="hk-drop-card ${u ? 'has' : ''}">
+        <label class="hk-drop ${kind} ${u ? 'has' : ''}" style="${u ? `background-image:url('${u.replace(/'/g, '%27')}')` : ''}">
+          <input type="file" accept="image/*" data-up="${kind}" aria-label="${label}">
+          <span class="dz">
+            <i data-lucide="${u ? 'refresh-cw' : 'image-up'}"></i>
+            <span>${u ? 'Change ' : 'Upload '}${label}</span>
+            <small>${u ? 'Uploaded ✓ · tap to replace' : hint}</small>
+          </span>
+        </label>
+        ${u ? `<button type="button" class="hk-drop-del-float" data-drop-del="${kind}" title="Delete ${label}" aria-label="Delete ${label}"><i data-lucide="trash-2"></i></button>` : ''}
+      </div>
+      <div class="hk-drop-bar">
+        ${u ? `
+          <button type="button" class="hk-btn sm danger" data-drop-del="${kind}">
+            <i data-lucide="trash-2"></i>Delete ${label}
+          </button>
+        ` : `
+          <span class="hk-xs hk-muted">No ${label} uploaded.</span>
+        `}
+        ${isBanner && !u && otherUrl ? `
+          <button type="button" class="hk-btn sm ghost" data-copy-img="thumb-to-banner" title="Use your uploaded thumbnail as the banner">
+            <i data-lucide="image-up"></i>Use thumbnail as banner
+          </button>
+          <span class="hk-chip sm neutral"><i data-lucide="circle-check"></i>Thumbnail will be used for card &amp; banner</span>
+        ` : ''}
+        ${!isBanner && !u && otherUrl ? `
+          <button type="button" class="hk-btn sm ghost" data-copy-img="banner-to-thumb" title="Use your uploaded banner as the thumbnail">
+            <i data-lucide="image-up"></i>Use banner as thumbnail
+          </button>
+        ` : ''}
+        ${isBanner && u && otherUrl ? `
+          <span class="hk-xs" style="color:var(--hk-p);font-weight:600"><i data-lucide="circle-check" style="width:12px;height:12px;vertical-align:-2px"></i> Thumbnail also saved</span>
+        ` : ''}
+      </div>
+    </div>`;
+  };
   const tagsHtml = () => D.tags.map((t, i) => `<span class="hk-chip">#${esc(t)} <button type="button" data-tagrm="${i}" aria-label="Remove ${esc(t)}"><i data-lucide="x"></i></button></span>`).join('');
 
   const customFieldsEd = (scope, list, types, addBtnAttr, addLabel) => `
@@ -449,8 +489,9 @@ export async function wizard(cx, id){
         dz.innerHTML = `<span class="hk-spin"></span><span>Uploading… ${pct}%</span>`;
       });
       D[kind === 'banner' ? 'bannerURL' : 'thumbURL'] = url;
-      lab.classList.add('has'); lab.style.backgroundImage = `url('${url.replace(/'/g, '%27')}')`; dirty = true; backup(); preview();
-      dz.innerHTML = `<i data-lucide="refresh-cw"></i><span>Change ${kind}</span><small>Uploaded ✓</small>`;
+      dirty = true; backup(); preview();
+      toast(`${kind.charAt(0).toUpperCase() + kind.slice(1)} uploaded!`, 'success');
+      paintStepKeep();
     } catch(e){ toast(e.message, 'error'); dz.innerHTML = `<i data-lucide="image-up"></i><span>Upload ${kind}</span><small>Try again</small>`; }
     inp.value = ''; icons();
   }
@@ -471,6 +512,43 @@ export async function wizard(cx, id){
   }
   root.onclick = async e => {
     const t = e.target;
+    const delDrop = t.closest('[data-drop-del]');
+    if(delDrop){
+      e.preventDefault();
+      e.stopPropagation();
+      const kind = delDrop.dataset.dropDel;
+      if(kind === 'banner'){
+        D.bannerURL = '';
+        toast(D.thumbURL ? 'Banner deleted. Your thumbnail is kept and will be used.' : 'Banner deleted.', 'info');
+      } else {
+        D.thumbURL = '';
+        toast('Thumbnail deleted.', 'info');
+      }
+      dirty = true;
+      backup();
+      preview();
+      paintStepKeep();
+      return;
+    }
+    const copyImg = t.closest('[data-copy-img]');
+    if(copyImg){
+      e.preventDefault();
+      e.stopPropagation();
+      const act = copyImg.dataset.copyImg;
+      if(act === 'thumb-to-banner' && D.thumbURL){
+        D.bannerURL = D.thumbURL;
+        toast('Thumbnail copied as banner', 'success');
+      } else if(act === 'banner-to-thumb' && D.bannerURL){
+        D.thumbURL = D.bannerURL;
+        toast('Banner copied as thumbnail', 'success');
+      }
+      dirty = true;
+      backup();
+      preview();
+      paintStepKeep();
+      return;
+    }
+
     const st = t.closest('[data-step]'); if(st) return go(+st.dataset.step);
     const g = t.closest('[data-go]'); if(g) return go(step + +g.dataset.go);
     const j = t.closest('[data-jump]'); if(j){ e.preventDefault(); return go(+j.dataset.jump); }

@@ -640,3 +640,11 @@ i[data-lucide]>svg{width:100%;height:100%;display:block}
 .hk-activity-item{padding:12px 14px;border-radius:14px;background:var(--hk-surface2);border:1px solid var(--hk-line);display:grid;gap:6px}
 .hk-activity-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .hk-activity-body b{font-size:.88rem;color:var(--hk-ink)}
+
+/* ---------- Hackathon Image Upload & Delete Controls ---------- */
+.hk-drop-wrap{display:grid;gap:8px}
+.hk-drop-card{position:relative}
+.hk-drop-del-float{position:absolute;top:10px;right:10px;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;background:rgba(220,38,38,0.88);color:#fff;border:1px solid rgba(255,255,255,0.4);cursor:pointer;z-index:10;transition:.2s;backdrop-filter:blur(4px);box-shadow:0 2px 8px rgba(0,0,0,0.3)}
+.hk-drop-del-float:hover{background:#dc2626;transform:scale(1.08)}
+.hk-drop-del-float i{width:16px;height:16px}
+.hk-drop-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}

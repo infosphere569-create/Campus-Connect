@@ -372,9 +372,13 @@ export async function saveHackathon(h, user, hk){
   const hostPhoto = hk?.photoURL || user?.photoURL || '';
   const hostDisplay = hk?.organiserName || hk?.displayName || user.displayName || '';
   const hostMail = hk?.orgEmail || user.email || '';
+  const bannerImg = (rest.bannerURL || rest.thumbURL || '').trim();
+  const thumbImg = (rest.thumbURL || rest.bannerURL || '').trim();
   if(!ex.exists()){
     const data = {
       ...rest,
+      bannerURL: bannerImg,
+      thumbURL: thumbImg,
       hostUid: user.uid,
       hostName: hk?.org || hostDisplay || 'Host',
       hostDisplayName: hostDisplay,
@@ -398,6 +402,8 @@ export async function saveHackathon(h, user, hk){
     const isOwner = existing.hostUid === user.uid;
     const data = {
       ...rest,
+      bannerURL: bannerImg,
+      thumbURL: thumbImg,
       hostUid: existing.hostUid,
       hostName: existing.hostName || hk?.org || hostDisplay || 'Host',
       hostDisplayName: existing.hostDisplayName || (isOwner ? hostDisplay : '') || existing.organiser?.name || '',
@@ -423,7 +429,7 @@ export function validateForSubmit(h){
   const e = [], need = (ok, step, msg) => { if(!ok) e.push({ step, msg }); };
   need((h.title || '').trim().length >= 6, 1, 'Add a clear title (6+ characters)');
   need((h.tagline || '').trim().length >= 10, 1, 'Add a one-line tagline (10+ characters)');
-  need(!!h.bannerURL, 1, 'Upload a banner image');
+  need(!!(h.bannerURL || h.thumbURL), 1, 'Upload a banner or thumbnail image');
   need(!!(h.brandName || '').trim(), 1, 'Add the organising brand / club name');
   need((h.description || '').trim().length >= 80, 2, 'Describe the hackathon (80+ characters)');
   need((h.rules || '').trim().length >= 20, 2, 'Add rules & eligibility');
@@ -706,16 +712,23 @@ export function nextMilestone(h, reg = null, now = Date.now()){
 }
 
 async function imageToShareFile(imgUrl, slug){
-  if(!imgUrl) return null;
   try {
-    const res = await fetch(imgUrl, imgUrl.startsWith('data:') ? undefined : { mode: 'cors' });
+    if(!imgUrl || imgUrl.startsWith('data:image/')) {
+      // If it's already a data URL or missing, handle directly
+      if(imgUrl && imgUrl.startsWith('data:image/')) {
+        const res = await fetch(imgUrl);
+        const blob = await res.blob();
+        return new File([blob], `${slug}.jpg`, { type: 'image/jpeg' });
+      }
+      return null;
+    }
+    const res = await fetch(imgUrl, { mode: 'cors' });
     if(!res.ok) return null;
     const blob = await res.blob();
     if(['image/jpeg', 'image/png'].includes(blob.type)){
       const ext = blob.type === 'image/png' ? 'png' : 'jpg';
       return new File([blob], `${slug}.${ext}`, { type: blob.type });
     }
-    // Convert WebP/GIF/other image formats to JPEG for maximum compatibility with native share sheets
     const objUrl = URL.createObjectURL(blob);
     try {
       const img = await new Promise((resolve, reject) => {
@@ -739,23 +752,116 @@ async function imageToShareFile(imgUrl, slug){
   }
 }
 
+function createDefaultHackathonBannerDataUrl(title, subtitle){
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1200;
+    canvas.height = 630;
+    const ctx = canvas.getContext('2d');
+    
+    const grad = ctx.createLinearGradient(0, 0, 1200, 630);
+    grad.addColorStop(0, '#0f172a');
+    grad.addColorStop(0.5, '#1e1b4b');
+    grad.addColorStop(1, '#312e81');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 1200, 630);
+    
+    ctx.fillStyle = 'rgba(99, 102, 241, 0.15)';
+    ctx.beginPath();
+    ctx.arc(1050, 100, 250, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(14, 165, 233, 0.1)';
+    ctx.beginPath();
+    ctx.arc(150, 530, 300, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = 'rgba(99, 102, 241, 0.25)';
+    ctx.strokeStyle = 'rgba(129, 140, 248, 0.5)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(80, 80, 360, 48, 24);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#818cf8';
+    ctx.font = 'bold 20px system-ui, -apple-system, sans-serif';
+    ctx.fillText('⚡ CAMPUS CONNECT ONE HACKATHON', 110, 112);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 52px system-ui, -apple-system, sans-serif';
+    let words = (title || 'Hackathon Event').split(' ');
+    let line = '';
+    let y = 220;
+    let lines = [];
+    for(let i = 0; i < words.length; i++) {
+      let testLine = line + words[i] + ' ';
+      let metrics = ctx.measureText(testLine);
+      if(metrics.width > 1040 && i > 0) {
+        lines.push(line);
+        line = words[i] + ' ';
+      } else {
+        line = testLine;
+      }
+    }
+    lines.push(line);
+    lines.slice(0, 3).forEach((l, idx) => {
+      ctx.fillText(l.trim(), 80, y + (idx * 68));
+    });
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '24px system-ui, -apple-system, sans-serif';
+    ctx.fillText(subtitle || 'Official Hackathon Portal', 80, 470);
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.fillRect(80, 520, 1040, 2);
+
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = 'bold 20px system-ui, -apple-system, sans-serif';
+    ctx.fillText('🚀 Register Now · Build, Innovate & Win Exciting Prizes', 80, 565);
+
+    return canvas.toDataURL('image/jpeg', 0.92);
+  } catch {
+    return '';
+  }
+}
+
 export async function shareHackathon(h, role = 'participant'){
   if(!h || !h.id) return false;
   const url = publicShareUrl(h.id);
   const title = h.title || 'Hackathon on Campus Connect One';
   const slug = title.replace(/[^\w]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'hackathon';
-  const where = h.mode === 'online' ? 'Online' : [h.college, h.city].filter(Boolean).join(', ') || 'Campus';
+  const where = h.mode === 'online' ? '🌐 Online' : `📍 ${[h.college, h.city].filter(Boolean).join(', ') || 'Campus Venue'}`;
   const when = dateRange(h.startMs, h.endMs);
-  const prize = h.prizePool ? `Prize Pool: ${money(h.prizePool)}` : 'Exciting Prizes & Perks';
+  const prize = h.prizePool ? `🏆 Prize Pool: ${money(h.prizePool)}` : '🏆 Exciting Prizes, Perks & Swag';
+  const organizer = h.hostName ? `🏢 Organized by: ${h.hostName}` : (h.college ? `🏢 Organized by: ${h.college}` : '🏢 Organized via Campus Connect One');
+  const tagline = h.tagline ? `✨ "${h.tagline}"` : '';
+  
   const lead = role === 'host'
-    ? `We're hosting ${title} on Campus Connect One!`
-    : `Check out ${title} on Campus Connect One!`;
+    ? `🚀 We're hosting ${title} on Campus Connect One!`
+    : `🚀 Join & participate in ${title} on Campus Connect One!`;
+  
   const cta = role === 'host'
-    ? 'Explore tracks, schedule & register your team now:'
-    : 'View full details, schedule & register your team:';
-  const textBody = `${lead}\n${h.tagline ? h.tagline + '\n\n' : '\n'}Date: ${when} · Venue: ${where} · ${prize}\n\n${cta}`;
+    ? '📌 Explore tracks, schedule, submissions & register your team here:'
+    : '📌 View full hackathon details, schedule, tracks & register here:';
+
+  const textBody = [
+    lead,
+    tagline,
+    organizer,
+    `📅 Date: ${when}`,
+    where,
+    prize,
+    '',
+    cta
+  ].filter(Boolean).join('\n');
+
   const fullText = `${textBody}\n${url}`;
-  const imgUrl = safeUrl(h.bannerURL || h.thumbURL) || safeUrl(h.thumbURL);
+  
+  let imgUrl = safeUrl(h.bannerURL || h.thumbURL) || safeUrl(h.thumbURL);
+  if(!imgUrl){
+    imgUrl = createDefaultHackathonBannerDataUrl(title, h.college || h.hostName || 'Campus Connect One');
+  }
 
   try {
     if(navigator.share){
@@ -776,7 +882,7 @@ export async function shareHackathon(h, role = 'participant'){
       return true;
     }
     await navigator.clipboard.writeText(fullText);
-    toast('Event details & link copied to clipboard');
+    toast('Professional event details & link copied to clipboard!');
     return true;
   } catch(e){
     if(e?.name === 'AbortError') return false;
