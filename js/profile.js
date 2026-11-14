@@ -20,8 +20,10 @@ function render(p) {
 }
 
 function edit() {
+  const userEmail = currentUser?.email || profile.email || 'student@campusconnectone.online';
   showModal('Edit profile', `<form class="form" id="profileForm">
-    <div class="field"><label>Name</label><input name="displayName" value="${escapeHtml(profile.displayName || '')}" required></div>
+    <div class="field"><label>Name (Locked)</label><input value="${escapeHtml(profile.displayName || '')}" disabled style="opacity:.7;cursor:not-allowed"><small class="muted">Name credentials are locked.</small></div>
+    <div class="field"><label>Email (Locked)</label><input value="${escapeHtml(userEmail)}" disabled style="opacity:.7;cursor:not-allowed"><small class="muted">Account email is locked.</small></div>
     <div class="field"><label>College / Institution</label><input name="college" value="${escapeHtml(profile.college || 'Nitra Technical Campus')}" required placeholder="e.g. Nitra Technical Campus"></div>
     <div class="field"><label>Bio</label><textarea name="bio" maxlength="250">${escapeHtml(profile.bio || '')}</textarea></div>
     <div class="field"><label>Profile photo</label><input id="profilePhoto" type="file" accept="image/*"><div id="profileUploadStatus" class="small muted">Use a clear image under 8 MB.</div></div>
@@ -31,6 +33,9 @@ function edit() {
       <div class="field"><label>Year</label><input name="year" value="${escapeHtml(profile.year || '1st Year')}"></div>
       <div class="field"><label>Section</label><input name="section" value="${escapeHtml(profile.section || 'A')}"></div>
     </div>
+    <div class="field"><label>GitHub Profile URL</label><input name="githubURL" type="url" value="${escapeHtml(profile.githubURL || '')}" placeholder="https://github.com/username"></div>
+    <div class="field"><label>LinkedIn Profile URL</label><input name="linkedinURL" type="url" value="${escapeHtml(profile.linkedinURL || '')}" placeholder="https://linkedin.com/in/username"></div>
+    <div class="field"><label>Website / Portfolio URL</label><input name="websiteURL" type="url" value="${escapeHtml(profile.websiteURL || '')}" placeholder="https://portfolio.dev"></div>
     <div style="text-align:right"><button class="btn primary" type="submit">Save changes</button></div>
   </form>`);
 
@@ -51,7 +56,6 @@ function edit() {
       }
       const collegeName = String(fd.get('college') || 'Nitra Technical Campus').trim();
       const values = {
-        displayName: String(fd.get('displayName')).trim(),
         college: collegeName,
         collegeKey: collegeName.toLowerCase(),
         bio: String(fd.get('bio') || '').trim(),
@@ -59,6 +63,9 @@ function edit() {
         branch: String(fd.get('branch') || '').trim(),
         year: String(fd.get('year') || '').trim(),
         section: String(fd.get('section') || '').trim(),
+        githubURL: String(fd.get('githubURL') || '').trim(),
+        linkedinURL: String(fd.get('linkedinURL') || '').trim(),
+        websiteURL: String(fd.get('websiteURL') || '').trim(),
         photoURL,
         updatedAt: serverTimestamp()
       };

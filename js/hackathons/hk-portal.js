@@ -51,7 +51,7 @@ function paintNav(){
   $('#side').innerHTML = `<div class="lbl">${S.role === 'host' ? 'Host space' : 'Participant space'}</div>` +
     NAV().map(([p, ic, l]) => `<a class="hk-nav-i ${isOn(p) ? 'on' : ''}" href="#${p}" title="${l}"><i data-lucide="${ic}"></i><span class="t">${l}</span>${p === '/alerts' && unread ? `<span class="badge">${unread}</span>` : ''}</a>`).join('') +
     `<div class="sp"></div><div class="lbl">More</div>
-     ${C.isStaff(S.site) ? '<a class="hk-nav-i" href="hackthons-admin.html" title="Admin portal"><i data-lucide="shield-check"></i><span class="t">Admin portal</span></a>' : ''}
+     ${C.isAdminUser(S.site) ? '<a class="hk-nav-i" href="hackthons-admin.html" title="Admin portal"><i data-lucide="shield-check"></i><span class="t">Admin portal</span></a>' : ''}
      <a class="hk-nav-i" href="home.html" title="Campus Connect One"><i data-lucide="school"></i><span class="t">Campus Connect One</span></a>
      <button class="hk-nav-i" data-act="theme" title="Theme"><i data-lucide="sun-moon"></i><span class="t">Theme</span></button>
      <button class="hk-nav-i" data-act="logout" title="Log out"><i data-lucide="log-out"></i><span class="t">Log out</span></button>`;

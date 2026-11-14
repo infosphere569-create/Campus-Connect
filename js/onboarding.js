@@ -81,7 +81,10 @@ if (!auth) {
         year: value("year") || "3rd Year",
         section: value("section") || "A",
         college: value("college") || "Campus Connect One",
-        bio: value("bio")
+        bio: value("bio"),
+        githubURL: value("githubURL"),
+        linkedinURL: value("linkedinURL"),
+        websiteURL: value("websiteURL")
       };
       try { localStorage.setItem('cc-demo-profile', JSON.stringify(demoData)); } catch (err) {}
       sessionStorage.setItem('cc-just-registered', '1');
@@ -130,6 +133,9 @@ if (!auth) {
             college,
             collegeKey: college ? college.toLowerCase() : 'campus connect',
             bio: value("bio"),
+            githubURL: value("githubURL"),
+            linkedinURL: value("linkedinURL"),
+            websiteURL: value("websiteURL"),
             searchName: displayName.toLowerCase(),
             updatedAt: serverTimestamp()
           }, { merge: true });
