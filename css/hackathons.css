@@ -526,9 +526,10 @@ i[data-lucide]>svg{width:100%;height:100%;display:block}
 .hk-fs{border:1px solid var(--hk-line);border-radius:16px;padding:16px;display:grid;gap:12px;min-width:0}.hk-fs legend{padding:0 8px;font-weight:800;font-size:.9rem;color:var(--hk-p)}
 @media (max-width:640px){.hk-mem .hk-grid3{grid-template-columns:1fr}.hk-test-nav .hk-btn{flex:1;margin:0 4px}}
 
-/* ---------- Card action buttons (Details + Apply/Register) ---------- */
-.hk-card-acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:10px}
+/* ---------- Card action buttons (Details + Apply/Register + Share) ---------- */
+.hk-card-acts{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;padding-top:10px}
 .hk-card-acts .hk-btn{min-height:38px;padding:0 10px;font-size:.82rem;border-radius:11px;width:100%}
+.hk-card-acts .hk-btn.share-ic{width:38px;min-width:38px;padding:0}
 
 /* ---------- Live countdown strip ---------- */
 .hk-countdown{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;border-radius:12px;background:color-mix(in srgb,var(--hk-p) 9%,var(--hk-surface2));border:1px solid color-mix(in srgb,var(--hk-p) 22%,var(--hk-line));font-size:.82rem;font-weight:600;color:var(--hk-ink)}

@@ -1,5 +1,5 @@
 import { initBg } from './hk-bg.js';
-import { $, $$, initTheme, fetchApproved, enrich, cachedLocation, publicStats, publicShareUrl, safeUrl } from './hk-core.js';
+import { $, $$, initTheme, fetchApproved, enrich, cachedLocation, publicStats, publicShareUrl, safeUrl, watchUser, shareHackathon, icons } from './hk-core.js';
 import { card, empty, bindReveal, countUp } from './hk-ui.js';
 
 const toggleTheme = initTheme();
@@ -8,6 +8,22 @@ $('#themeBtn').onclick = toggleTheme;
 $('#yr').textContent = new Date().getFullYear();
 addEventListener('scroll', () => $('#nav').classList.toggle('stuck', scrollY > 8), { passive: true });
 bindReveal();
+
+let currentUser = null;
+let currentHk = null;
+watchUser((user, { hk }) => {
+  currentUser = user;
+  currentHk = hk || null;
+});
+
+function shareRoleFor(h){
+  try {
+    if(sessionStorage.getItem('hk-role') === 'host') return 'host';
+  } catch {}
+  if(currentUser && h?.hostUid && h.hostUid === currentUser.uid) return 'host';
+  if(currentHk?.activeRole === 'host') return 'host';
+  return 'participant';
+}
 
 function injectEventListLd(list){
   if(!list.length) return;
@@ -63,7 +79,15 @@ function injectEventListLd(list){
   list.innerHTML = ranked.length
     ? ranked.slice(0, 6).map((h, i) => card(h, i, { publicLinks: true })).join('')
     : `<div style="grid-column:1/-1">${empty('rocket', 'No hackathon is live right now', 'Organisers can create one in minutes. Log in to host or to be among the first to register.', '<a class="hk-btn gold" href="login-hackthons.html?role=host">Host a hackathon</a>')}</div>`;
-  list.onclick = e => {
+  icons();
+  list.onclick = async e => {
+    const sh = e.target.closest('[data-act="share"]');
+    if(sh){
+      e.preventDefault(); e.stopPropagation();
+      const h = ranked.find(x => x.id === sh.dataset.id) || { id: sh.dataset.id, title: sh.dataset.title };
+      await shareHackathon(h, shareRoleFor(h));
+      return;
+    }
     const p = e.target.closest('[data-pub-open]');
     if(p){ location.href = `hackathon.html?id=${encodeURIComponent(p.dataset.pubOpen)}`; return; }
     const c = e.target.closest('[data-open]');

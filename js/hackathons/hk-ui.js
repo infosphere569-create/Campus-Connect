@@ -55,6 +55,7 @@ export function card(h, i = 0, opts = {}){
   } else {
     rightBtn = `<button type="button" class="hk-btn sm" disabled>${esc(ph.label)}</button>`;
   }
+  const shareBtn = `<button type="button" class="hk-btn sm share-ic" data-act="share" data-id="${esc(h.id)}" data-title="${esc(h.title)}" aria-label="Share ${esc(h.title)}" title="Share hackathon"><i data-lucide="share-2"></i></button>`;
   return `<article class="hk-card" style="animation-delay:${Math.min(i, 12) * 45}ms">
     <div class="hk-card-media ${hasImg ? '' : 'hk-ph'}" ${pub ? `data-pub-open="${esc(h.id)}"` : `data-open="${esc(h.id)}"`} style="${mediaStyle(h)};cursor:pointer">${hasImg ? '' : esc(initials(h.title))}
       <div class="tl">${h._campus ? '<span class="hk-chip gold"><i data-lucide="graduation-cap"></i>Your campus</span>' : ''}<span class="hk-chip"><i data-lucide="${mi}"></i>${ml}</span></div>
@@ -66,7 +67,7 @@ export function card(h, i = 0, opts = {}){
       <p class="hk-clamp2">${esc(h.tagline || '')}</p>
       <div class="hk-meta"><span><i data-lucide="calendar-days"></i>${dateRange(h.startMs, h.endMs)}</span><span><i data-lucide="map-pin"></i>${esc(h.mode === 'online' ? 'Online' : (h.city || 'TBA'))}${h._dist != null && h.mode !== 'online' ? ` · ${fmtKm(h._dist)}` : ''}</span></div>
       <div class="hk-card-foot"><span class="hk-prize"><i data-lucide="trophy"></i>${h.prizePool ? money(h.prizePool) : 'Perks & swag'}</span><span class="hk-reg"><i data-lucide="users"></i>${h.regCount || 0}</span></div>
-      ${opts.hideActions ? '' : `<div class="hk-card-acts">${leftBtn}${rightBtn}</div>`}
+      ${opts.hideActions ? '' : `<div class="hk-card-acts">${leftBtn}${rightBtn}${shareBtn}</div>`}
     </div></article>`;
 }
 export function spot(h){

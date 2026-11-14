@@ -469,47 +469,81 @@ export function nextMilestone(h, reg = null, now = Date.now()){
   return null;
 }
 
+async function imageToShareFile(imgUrl, slug){
+  if(!imgUrl) return null;
+  try {
+    const res = await fetch(imgUrl, imgUrl.startsWith('data:') ? undefined : { mode: 'cors' });
+    if(!res.ok) return null;
+    const blob = await res.blob();
+    if(['image/jpeg', 'image/png'].includes(blob.type)){
+      const ext = blob.type === 'image/png' ? 'png' : 'jpg';
+      return new File([blob], `${slug}.${ext}`, { type: blob.type });
+    }
+    // Convert WebP/GIF/other image formats to JPEG for maximum compatibility with native share sheets
+    const objUrl = URL.createObjectURL(blob);
+    try {
+      const img = await new Promise((resolve, reject) => {
+        const el = new Image();
+        el.onload = () => resolve(el);
+        el.onerror = reject;
+        el.src = objUrl;
+      });
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth || img.width || 1200;
+      canvas.height = img.naturalHeight || img.height || 630;
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      const jpgBlob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.9));
+      if(jpgBlob) return new File([jpgBlob], `${slug}.jpg`, { type: 'image/jpeg' });
+    } finally {
+      URL.revokeObjectURL(objUrl);
+    }
+    return new File([blob], `${slug}.jpg`, { type: blob.type || 'image/jpeg' });
+  } catch {
+    return null;
+  }
+}
+
 export async function shareHackathon(h, role = 'participant'){
   if(!h || !h.id) return false;
   const url = publicShareUrl(h.id);
   const title = h.title || 'Hackathon on Campus Connect One';
+  const slug = title.replace(/[^\w]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'hackathon';
   const where = h.mode === 'online' ? 'Online' : [h.college, h.city].filter(Boolean).join(', ') || 'Campus';
   const when = dateRange(h.startMs, h.endMs);
-  const prize = h.prizePool ? `Prize pool: ${money(h.prizePool)}` : 'Prizes & perks';
+  const prize = h.prizePool ? `Prize Pool: ${money(h.prizePool)}` : 'Exciting Prizes & Perks';
   const lead = role === 'host'
     ? `We're hosting ${title} on Campus Connect One!`
     : `Check out ${title} on Campus Connect One!`;
   const cta = role === 'host'
-    ? 'Explore rounds, prizes & register your team:'
-    : 'View full details, schedule & join:';
-  const text = `${lead}\n${h.tagline ? h.tagline + '\n' : ''}${when} · ${where} · ${prize}\n\n${cta}`;
-  const imgUrl = safeUrl(h.bannerURL || h.thumbURL);
+    ? 'Explore tracks, schedule & register your team now:'
+    : 'View full details, schedule & register your team:';
+  const textBody = `${lead}\n${h.tagline ? h.tagline + '\n\n' : '\n'}Date: ${when} · Venue: ${where} · ${prize}\n\n${cta}`;
+  const fullText = `${textBody}\n${url}`;
+  const imgUrl = safeUrl(h.bannerURL || h.thumbURL) || safeUrl(h.thumbURL);
 
   try {
     if(navigator.share){
-      const payload = { title, text, url };
-      if(imgUrl && navigator.canShare){
-        try {
-          const res = await fetch(imgUrl, { mode: 'cors' });
-          if(res.ok){
-            const blob = await res.blob();
-            const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
-            const file = new File([blob], `${(title.replace(/[^\w]+/g, '-').toLowerCase() || 'hackathon')}.${ext}`, { type: blob.type || 'image/jpeg' });
-            if(navigator.canShare({ ...payload, files: [file] })){
-              await navigator.share({ ...payload, files: [file] });
-              return true;
-            }
-          }
-        } catch {}
+      const file = await imageToShareFile(imgUrl, slug);
+      if(file && navigator.canShare){
+        const withUrl = { title, text: fullText, url, files: [file] };
+        if(navigator.canShare(withUrl)){
+          await navigator.share(withUrl);
+          return true;
+        }
+        const textOnlyWithFile = { title, text: fullText, files: [file] };
+        if(navigator.canShare(textOnlyWithFile)){
+          await navigator.share(textOnlyWithFile);
+          return true;
+        }
       }
-      await navigator.share(payload);
+      await navigator.share({ title, text: textBody, url });
       return true;
     }
-    await navigator.clipboard.writeText(`${text}\n${url}`);
-    toast('Hackathon link and details copied');
+    await navigator.clipboard.writeText(fullText);
+    toast('Event details & link copied to clipboard');
     return true;
   } catch(e){
     if(e?.name === 'AbortError') return false;
-    try { await navigator.clipboard.writeText(url); toast('Link copied'); return true; } catch { return false; }
+    try { await navigator.clipboard.writeText(fullText); toast('Event details & link copied'); return true; } catch { return false; }
   }
 }

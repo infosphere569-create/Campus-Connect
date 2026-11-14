@@ -9,8 +9,18 @@ $('#themeBtn').onclick = toggleTheme;
 
 const view = $('#pubView');
 let currentUser = null;
+let currentProfile = null;
 let currentHk = null;
 let stopTimers = null;
+
+function shareRoleFor(h){
+  try {
+    if(sessionStorage.getItem('hk-role') === 'host') return 'host';
+  } catch {}
+  if(currentUser && h?.hostUid && h.hostUid === currentUser.uid) return 'host';
+  if(currentProfile?.activeRole === 'host') return 'host';
+  return 'participant';
+}
 
 function getHackathonId(){
   const qs = new URLSearchParams(location.search);
@@ -115,7 +125,14 @@ async function render(){
     const enriched = C.enrich(items).sort((a, b) => b._trend - a._trend);
     view.innerHTML = `<div class="hk-page-h"><div><span class="hk-eyebrow">Directory</span><h1>All live hackathons</h1><p>Open any hackathon to inspect full rounds, prizes, tracks, and apply.</p></div><a class="hk-btn" href="hackthons.html"><i data-lucide="arrow-left"></i>Hackathons home</a></div>
       ${enriched.length ? `<div class="hk-cards">${enriched.map((h, i) => card(h, i, { publicLinks: true })).join('')}</div>` : empty('rocket', 'No hackathons live right now', 'Check back soon or log in to host one.', '<a class="hk-btn primary" href="login-hackthons.html">Get started</a>')}`;
-    view.onclick = e => {
+    view.onclick = async e => {
+      const sh = e.target.closest('[data-act="share"]');
+      if(sh){
+        e.preventDefault(); e.stopPropagation();
+        const item = enriched.find(x => x.id === sh.dataset.id) || { id: sh.dataset.id, title: sh.dataset.title };
+        await C.shareHackathon(item, shareRoleFor(item));
+        return;
+      }
       const p = e.target.closest('[data-pub-open]');
       if(p) location.href = `hackathon.html?id=${encodeURIComponent(p.dataset.pubOpen)}`;
     };
@@ -170,13 +187,14 @@ async function render(){
       return;
     }
     if(e.target.closest('[data-pub-share]')){
-      await C.shareHackathon(currentHk, 'participant');
+      await C.shareHackathon(currentHk, shareRoleFor(currentHk));
     }
   };
 }
 
-C.watchUser((user) => {
+C.watchUser((user, { hk }) => {
   currentUser = user;
+  currentProfile = hk || null;
   const topBtn = $('#topAuthBtn');
   if(user && topBtn){
     topBtn.textContent = 'Open portal';
