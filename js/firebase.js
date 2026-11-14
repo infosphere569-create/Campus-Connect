@@ -1,6 +1,12 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js';
 import { getAuth } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js';
-import { getFirestore } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js';
+import {
+  initializeFirestore,
+  getFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  memoryLocalCache
+} from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js';
 import { getStorage } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-storage.js';
 import { getFunctions } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-functions.js';
 
@@ -26,7 +32,23 @@ export let functions = null;
 if (isFirebaseConfigured) {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
-  db = getFirestore(app);
+  try {
+    db = initializeFirestore(app, {
+      experimentalForceLongPolling: true,
+      useFetchStreams: false,
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+    });
+  } catch (e1) {
+    try {
+      db = initializeFirestore(app, {
+        experimentalForceLongPolling: true,
+        useFetchStreams: false,
+        localCache: memoryLocalCache()
+      });
+    } catch (e2) {
+      db = getFirestore(app);
+    }
+  }
   storage = getStorage(app);
   functions = getFunctions(app);
 }

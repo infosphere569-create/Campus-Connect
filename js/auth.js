@@ -1,6 +1,6 @@
 import { auth, db, isFirebaseConfigured } from './firebase.js';
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, signOut, updateProfile } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js';
-import { doc, getDoc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js';
+import { doc, getDoc, getDocFromCache, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js';
 import { toast, demoProfile } from './utils.js';
 
 export let currentUser = null; 
@@ -13,8 +13,17 @@ export async function ensureProfile(user, extra = {}) {
     return currentProfile;
   }
   const ref = doc(db, 'users', user.uid);
-  const snap = await getDoc(ref);
-  if (snap.exists()) {
+  let snap = null;
+  let offline = false;
+  try {
+    snap = await getDoc(ref);
+  } catch (err) {
+    offline = true;
+    try {
+      snap = await getDocFromCache(ref);
+    } catch {}
+  }
+  if (snap && snap.exists()) {
     currentProfile = { uid: user.uid, ...snap.data() };
     return currentProfile;
   }
@@ -24,10 +33,17 @@ export async function ensureProfile(user, extra = {}) {
     photoURL: user.photoURL || '',
     role: 'student',
     isActive: true,
-    ...extra
+    ...extra,
+    ...(offline ? { _offlineFallback: true } : {})
   };
-  const searchName = String(currentProfile.displayName || '').trim().toLowerCase();
-  await setDoc(ref, { ...currentProfile, searchName, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  if (!offline) {
+    const searchName = String(currentProfile.displayName || '').trim().toLowerCase();
+    try {
+      await setDoc(ref, { ...currentProfile, searchName, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+    } catch (e) {
+      console.warn('[Auth] Profile write deferred:', e?.message || e);
+    }
+  }
   return currentProfile;
 }
 
@@ -66,7 +82,12 @@ export function subscribeAuth(cb) {
     }
 
     currentUser = user;
-    currentProfile = user ? await ensureProfile(user) : null;
+    try {
+      currentProfile = user ? await ensureProfile(user) : null;
+    } catch (e) {
+      console.warn('[Auth] ensureProfile error:', e?.message || e);
+      currentProfile = user ? { uid: user.uid, displayName: user.displayName || '', photoURL: user.photoURL || '', role: 'student', isActive: true, _offlineFallback: true } : null;
+    }
     const page = document.body.dataset.page;
 
     if (!currentUser && page && page !== 'login' && page !== 'landing' && !location.pathname.endsWith('index.html') && location.pathname !== '/') {
@@ -74,7 +95,7 @@ export function subscribeAuth(cb) {
       return;
     }
 
-    if (user && profileNeedsOnboarding(currentProfile) && page !== 'onboarding') {
+    if (user && !currentProfile?._offlineFallback && profileNeedsOnboarding(currentProfile) && page !== 'onboarding') {
       location.href = 'onboarding.html';
       return;
     }

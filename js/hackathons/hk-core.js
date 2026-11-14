@@ -86,20 +86,35 @@ export function initTheme(){
 export const isStaff = site => ['platformAdmin', 'moderator'].includes(site?.role);
 export const isAdminUser = site => site?.role === 'platformAdmin';
 
+async function safeGetDoc(ref){
+  try { return await FS.getDoc(ref); }
+  catch (e) {
+    try { return await FS.getDocFromCache(ref); } catch {}
+    throw e;
+  }
+}
+async function safeGetDocs(q){
+  try { return await FS.getDocs(q); }
+  catch (e) {
+    try { return await FS.getDocsFromCache(q); } catch {}
+    throw e;
+  }
+}
+
 // cb(user|null, { site, hk })  — site = main-site users/{uid} doc, hk = hkProfiles/{uid} doc
 export function watchUser(cb){
   return onAuthStateChanged(auth, async user => {
     if(!user) return cb(null, {});
     let site = null, hk = null;
     try { site = await ensureProfile(user); } catch(e){ console.warn('site profile', e); }
-    try { const s = await FS.getDoc(FS.doc(db, 'hkProfiles', user.uid)); hk = s.exists() ? { uid: user.uid, ...s.data() } : null; } catch(e){ console.warn('hk profile', e); }
+    try { const s = await safeGetDoc(FS.doc(db, 'hkProfiles', user.uid)); hk = s.exists() ? { uid: user.uid, ...s.data() } : null; } catch(e){ console.warn('hk profile', e); }
     cb(user, { site, hk });
   });
 }
 
 export async function ensureHkProfile(user, site, role, extra = {}){
   const rf = FS.doc(db, 'hkProfiles', user.uid);
-  const snap = await FS.getDoc(rf);
+  const snap = await safeGetDoc(rf);
   if(!snap.exists()){
     const data = {
       uid: user.uid, displayName: extra.displayName || user.displayName || site?.displayName || '', email: user.email || '',
@@ -121,7 +136,7 @@ export const updateHkProfile = (uid, patch) => FS.updateDoc(FS.doc(db, 'hkProfil
 export async function fetchParticipantProfile(uid){
   if(!uid) return null;
   try {
-    const s = await FS.getDoc(FS.doc(db, 'hkProfiles', uid));
+    const s = await safeGetDoc(FS.doc(db, 'hkProfiles', uid));
     return s.exists() ? { uid: s.id, ...s.data() } : null;
   } catch { return null; }
 }
@@ -284,10 +299,10 @@ export async function uploadImage(file, pathOrOpts, onProgress){
 
 /* ---------------- data layer ---------------- */
 const mapDocs = s => s.docs.map(d => ({ id: d.id, ...d.data() }));
-export async function fetchApproved(){ return mapDocs(await FS.getDocs(FS.query(FS.collection(db, 'hkHackathons'), FS.where('status', '==', 'approved'), FS.limit(300)))); }
-export async function fetchMine(uid){ return mapDocs(await FS.getDocs(FS.query(FS.collection(db, 'hkHackathons'), FS.where('hostUid', '==', uid), FS.limit(200)))).sort((a, b) => (b.updatedAtMs || 0) - (a.updatedAtMs || 0)); }
-export async function fetchAll(){ return mapDocs(await FS.getDocs(FS.query(FS.collection(db, 'hkHackathons'), FS.limit(500)))); }
-export async function fetchOne(id){ const s = await FS.getDoc(FS.doc(db, 'hkHackathons', id)); return s.exists() ? { id: s.id, ...s.data() } : null; }
+export async function fetchApproved(){ return mapDocs(await safeGetDocs(FS.query(FS.collection(db, 'hkHackathons'), FS.where('status', '==', 'approved'), FS.limit(300)))); }
+export async function fetchMine(uid){ return mapDocs(await safeGetDocs(FS.query(FS.collection(db, 'hkHackathons'), FS.where('hostUid', '==', uid), FS.limit(200)))).sort((a, b) => (b.updatedAtMs || 0) - (a.updatedAtMs || 0)); }
+export async function fetchAll(){ return mapDocs(await safeGetDocs(FS.query(FS.collection(db, 'hkHackathons'), FS.limit(500)))); }
+export async function fetchOne(id){ const s = await safeGetDoc(FS.doc(db, 'hkHackathons', id)); return s.exists() ? { id: s.id, ...s.data() } : null; }
 export const newId = () => FS.doc(FS.collection(db, 'hkHackathons')).id;
 
 export async function saveHackathon(h, user, hk){
@@ -431,7 +446,7 @@ export async function hackathonAttempts(hid, hostUid){ return mapDocs(await FS.g
 
 /* ---------------- registrations (host side) ---------------- */
 export const updateRegistration = (id, patch) => FS.updateDoc(FS.doc(db, 'hkRegistrations', id), { ...patch, updatedAtMs: Date.now() });
-export const getRegistration = async (hid, uid) => { try { const s = await FS.getDoc(FS.doc(db, 'hkRegistrations', `${hid}_${uid}`)); return s.exists() ? { id: s.id, ...s.data() } : null; } catch { return null; } };
+export const getRegistration = async (hid, uid) => { try { const s = await safeGetDoc(FS.doc(db, 'hkRegistrations', `${hid}_${uid}`)); return s.exists() ? { id: s.id, ...s.data() } : null; } catch { return null; } };
 export const roundsOf = h => (h.rounds || []).filter(r => r.name);
 export const REG_STATUS = ['registered', 'shortlisted', 'selected', 'waitlisted', 'rejected'];
 
