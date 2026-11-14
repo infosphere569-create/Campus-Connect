@@ -54,7 +54,9 @@ const seed = () => ({ hkHackathons: { h1: hk }, hkRegistrations: { h1_p1: reg },
   assert.strictEqual(Object.keys(db._data.hkMailLog).length, 1); assert.strictEqual(Object.keys(db._data.hkNotifications).length, 1);
   await rej(L.notifyTeamCore({ db, send, now: NOW + 5000, auth: { uid: 'host' }, data: { registrationId: 'h1_p1', kind: 'waitlisted' } }), 'resource-exhausted');
   await L.notifyTeamCore({ db, send, now: NOW + 60000, auth: { uid: 'admin' }, data: { registrationId: 'h1_p1', kind: 'waitlisted' } }); // staff may send
-  assert.strictEqual(sent.length, 2);
+  db._data.hkHackathons.h1.coHostEmails = ['cohost@gmail.com'];
+  await L.notifyTeamCore({ db, send, now: NOW + 120000, auth: { uid: 'co1', token: { email: 'cohost@gmail.com' } }, data: { registrationId: 'h1_p1', kind: 'shortlisted' } });
+  assert.strictEqual(sent.length, 3);
   console.log('notify team ok');
 
   // automatic emails

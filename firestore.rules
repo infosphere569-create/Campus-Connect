@@ -434,6 +434,15 @@ service cloud.firestore {
     function hkHack(id) {
       return get(/databases/$(database)/documents/hkHackathons/$(id)).data;
     }
+    function isHkHost(h) {
+      return signedIn() && (
+        h.hostUid == request.auth.uid
+        || (h.get('coHostUids', []) is list && request.auth.uid in h.get('coHostUids', []))
+        || (request.auth.token.email != null
+            && h.get('coHostEmails', []) is list
+            && request.auth.token.email.lower() in h.get('coHostEmails', []))
+      );
+    }
 
     match /hkProfiles/{uid} {
       allow read: if self(uid)
@@ -458,9 +467,9 @@ service cloud.firestore {
     }
 
     match /hkHackathons/{hid} {
-      // Public once approved. Owners see their own, staff see everything.
+      // Public once approved. Primary host & shared co-hosts see their own, staff see everything.
       allow read: if resource.data.status == 'approved'
-        || (signedIn() && resource.data.hostUid == request.auth.uid)
+        || isHkHost(resource.data)
         || staff();
 
       allow create: if signedIn()
@@ -472,15 +481,16 @@ service cloud.firestore {
         && hkProfile(request.auth.uid).hostBlocked == false;
 
       allow update: if staff()
-        // Owner editing / (re)submitting. Cannot self-approve, feature, or touch the counter.
-        || (signedIn()
-            && resource.data.hostUid == request.auth.uid
+        // Owner or invited co-host editing / (re)submitting. Cannot change primary owner, self-approve, feature, or touch regCount.
+        || (isHkHost(resource.data)
             && request.resource.data.hostUid == resource.data.hostUid
             && resource.data.status != 'closed'
             && hkProfile(request.auth.uid).hostBlocked == false
             && request.resource.data.regCount == resource.data.regCount
             && request.resource.data.featured == resource.data.featured
-            && request.resource.data.hostVerified == hkProfile(request.auth.uid).hostVerified
+            && request.resource.data.hostVerified == resource.data.hostVerified
+            && request.resource.data.get('coHostEmails', []) == resource.data.get('coHostEmails', [])
+            && request.resource.data.get('coHostUids', []) == resource.data.get('coHostUids', [])
             && (
               request.resource.data.status in ['draft', 'pending']
               || (resource.data.status == 'approved'
@@ -488,6 +498,18 @@ service cloud.firestore {
                   && request.resource.data.diff(resource.data).affectedKeys()
                        .hasOnly(['registrationClosed', 'announcement', 'announcementAtMs', 'autoEmail', 'rounds', 'submission', 'updatedAtMs', 'updatedAt'])))
           )
+        // Primary owner managing collaborator emails / UIDs for shared access.
+        || (signedIn()
+            && resource.data.hostUid == request.auth.uid
+            && hkProfile(request.auth.uid).hostBlocked == false
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['coHostEmails', 'coHostUids', 'updatedAtMs', 'updatedAt'])
+            && request.resource.data.get('coHostEmails', []) is list
+            && request.resource.data.get('coHostEmails', []).size() <= 20)
+        // Invited collaborator claiming their UID onto coHostUids upon login/invite open.
+        || (isHkHost(resource.data)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['coHostUids', 'updatedAtMs', 'updatedAt'])
+            && request.resource.data.get('coHostUids', []) is list
+            && request.auth.uid in request.resource.data.get('coHostUids', []))
         // Participants only bump the registration counter by exactly one, together with their registration doc.
         || (signedIn()
             && resource.data.status == 'approved'
@@ -510,6 +532,7 @@ service cloud.firestore {
       allow read: if signedIn()
         && (resource.data.uid == request.auth.uid
             || resource.data.hostUid == request.auth.uid
+            || isHkHost(hkHack(resource.data.hackathonId))
             || staff());
 
       allow create: if signedIn()
@@ -520,19 +543,24 @@ service cloud.firestore {
         && hkHack(request.resource.data.hackathonId).status == 'approved'
         && request.resource.data.hostUid == hkHack(request.resource.data.hackathonId).hostUid;
 
-      // Host (or staff) may change only review fields.
+      // Primary host, co-host, or staff may change only review fields.
       allow update: if signedIn()
-        && (resource.data.hostUid == request.auth.uid || staff())
+        && (resource.data.hostUid == request.auth.uid
+            || isHkHost(hkHack(resource.data.hackathonId))
+            || staff())
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'stage', 'hostNote', 'score', 'updatedAtMs']);
 
       // Participant cancels their own registration.
       allow delete: if signedIn() && (resource.data.uid == request.auth.uid || staff());
     }
 
-    // Project submissions: one per registration (team leader). Participant writes content, host writes review.
+    // Project submissions: one per registration (team leader). Participant writes content, host/co-host writes review.
     match /hkSubmissions/{sid} {
       allow read: if signedIn()
-        && (resource.data.uid == request.auth.uid || resource.data.hostUid == request.auth.uid || staff());
+        && (resource.data.uid == request.auth.uid
+            || resource.data.hostUid == request.auth.uid
+            || isHkHost(hkHack(resource.data.hackathonId))
+            || staff());
 
       allow create: if signedIn()
         && request.resource.data.uid == request.auth.uid
@@ -552,12 +580,14 @@ service cloud.firestore {
             && request.resource.data.diff(resource.data).affectedKeys()
                  .hasOnly(['title', 'idea', 'repoUrl', 'demoUrl', 'pptUrl', 'videoUrl', 'extraUrl', 'updatedAtMs'])
             && hkHack(resource.data.hackathonId).get('submission', {}).get('open', true) == true
-            && (hkHack(resource.data.hackathonId).get('submission', {}).get('deadlineMs', 0) == 0
-                || request.time.toMillis() <= hkHack(resource.data.hackathonId).get('submission', {}).get('deadlineMs', 0))
+            && (hkHack(request.resource.data.hackathonId).get('submission', {}).get('deadlineMs', 0) == 0
+                || request.time.toMillis() <= hkHack(request.resource.data.hackathonId).get('submission', {}).get('deadlineMs', 0))
             && request.resource.data.title.size() <= 140
             && request.resource.data.idea.size() <= 4000)
           ||
-          ((resource.data.hostUid == request.auth.uid || staff())
+          ((resource.data.hostUid == request.auth.uid
+              || isHkHost(hkHack(resource.data.hackathonId))
+              || staff())
             && request.resource.data.diff(resource.data).affectedKeys()
                  .hasOnly(['score', 'feedback', 'reviewStatus', 'reviewedAtMs']))
         );
@@ -565,31 +595,37 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Screening test: meta is visible to registrants, questions and answer key live in hkTestKeys (host only).
+    // Screening test: meta is visible to registrants, questions and answer key live in hkTestKeys (host/co-host only).
     // Starting / submitting / grading happens in Cloud Functions (hkStartTest / hkSubmitTest).
     match /hkTests/{hid} {
       allow read: if signedIn()
-        && (hkHack(hid).hostUid == request.auth.uid
+        && (isHkHost(hkHack(hid))
             || staff()
             || exists(/databases/$(database)/documents/hkRegistrations/$(hid + '_' + request.auth.uid)));
       allow create, update: if signedIn()
-        && hkHack(hid).hostUid == request.auth.uid
-        && request.resource.data.hostUid == request.auth.uid;
-      allow delete: if signedIn() && hkHack(hid).hostUid == request.auth.uid;
+        && isHkHost(hkHack(hid))
+        && request.resource.data.hostUid == hkHack(hid).hostUid;
+      allow delete: if signedIn() && isHkHost(hkHack(hid));
     }
     match /hkTestKeys/{hid} {
-      allow read: if signedIn() && (hkHack(hid).hostUid == request.auth.uid || staff());
-      allow create, update, delete: if signedIn() && hkHack(hid).hostUid == request.auth.uid;
+      allow read: if signedIn() && (isHkHost(hkHack(hid)) || staff());
+      allow create, update, delete: if signedIn() && isHkHost(hkHack(hid));
     }
     match /hkAttempts/{aid} {
       allow read: if signedIn()
-        && (resource.data.uid == request.auth.uid || resource.data.hostUid == request.auth.uid || staff());
+        && (resource.data.uid == request.auth.uid
+            || resource.data.hostUid == request.auth.uid
+            || isHkHost(hkHack(resource.data.hackathonId))
+            || staff());
       allow write: if false;
     }
 
     // Written only by Cloud Functions (admin SDK).
     match /hkMailLog/{lid} {
-      allow read: if signedIn() && (resource.data.hostUid == request.auth.uid || staff());
+      allow read: if signedIn()
+        && (resource.data.hostUid == request.auth.uid
+            || isHkHost(hkHack(resource.data.hackathonId))
+            || staff());
       allow write: if false;
     }
     match /publicStats/{doc} {
@@ -600,14 +636,15 @@ service cloud.firestore {
     match /hkNotifications/{nid} {
       allow read: if signedIn() && resource.data.toUid == request.auth.uid;
 
-      // Sender must be the host of the hackathon, the host's registrant, or staff.
+      // Sender must be the host/co-host of the hackathon, the host's registrant, or staff.
       allow create: if signedIn()
         && request.resource.data.fromUid == request.auth.uid
         && request.resource.data.read == false
         && (staff()
             || (request.resource.data.hackathonId != ''
-                && (hkHack(request.resource.data.hackathonId).hostUid == request.auth.uid
-                    || hkHack(request.resource.data.hackathonId).hostUid == request.resource.data.toUid)));
+                && (isHkHost(hkHack(request.resource.data.hackathonId))
+                    || hkHack(request.resource.data.hackathonId).hostUid == request.resource.data.toUid
+                    || request.resource.data.toUid in hkHack(request.resource.data.hackathonId).get('coHostUids', []))));
 
       allow update: if signedIn()
         && resource.data.toUid == request.auth.uid

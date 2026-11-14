@@ -27,7 +27,15 @@ async function deliver({ db, send, now, hk, reg, kind, note, roundName, by, auto
   return mail;
 }
 
-// Host presses "Notify Team": sends a status-update template to the team leader (the registrant).
+function isHkHostServer(hk, auth) {
+  if (!hk || !auth) return false;
+  if (hk.hostUid === auth.uid) return true;
+  if (Array.isArray(hk.coHostUids) && hk.coHostUids.includes(auth.uid)) return true;
+  const email = auth.token && auth.token.email ? String(auth.token.email).toLowerCase() : "";
+  return !!(email && Array.isArray(hk.coHostEmails) && hk.coHostEmails.includes(email));
+}
+
+// Host (or shared co-host) presses "Notify Team": sends a status-update template to the team leader (the registrant).
 async function notifyTeamCore({ db, send, now = Date.now(), auth, data }) {
   if (!auth) throw new HkError("unauthenticated", "Sign in required.");
   const d = data || {};
@@ -38,7 +46,7 @@ async function notifyTeamCore({ db, send, now = Date.now(), auth, data }) {
   if (!reg) throw new HkError("not-found", "Registration not found.");
   const hk = await getDoc(db, "hkHackathons", reg.hackathonId);
   if (!hk) throw new HkError("not-found", "Hackathon not found.");
-  if (hk.hostUid !== auth.uid && !(await isStaff(db, auth.uid))) throw new HkError("permission-denied", "Only the host of this hackathon can send team emails.");
+  if (!isHkHostServer(hk, auth) && !(await isStaff(db, auth.uid))) throw new HkError("permission-denied", "Only the host of this hackathon can send team emails.");
   if (!EMAIL.test(reg.email || "")) throw new HkError("failed-precondition", "This team leader has no valid email address.");
   if (reg.lastMailAtMs && now - reg.lastMailAtMs < MAIL_COOLDOWN_MS) throw new HkError("resource-exhausted", "An email was just sent to this team. Please wait a few seconds.");
   const note = clean(d.note, 1500);

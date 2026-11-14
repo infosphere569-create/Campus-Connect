@@ -18,16 +18,19 @@ export async function hostDash(cx){
   const needSetup = false; // organiser profile is collected right after login
 
   const row = h => {
+    const shared = h.hostUid !== S.user.uid;
+    const sharedBadge = shared ? '<span class="hk-chip sky"><i data-lucide="users"></i>Shared</span>' : '';
     const note = ['changes_requested', 'rejected'].includes(h.status) && h.adminNote ? `<div class="hk-msg err" style="margin-top:8px"><i data-lucide="message-square-warning"></i><span><b>Admin note:</b> ${esc(h.adminNote)}</span></div>` : '';
     const acts = {
-      draft: `<a class="hk-btn sm primary" href="#/host/edit/${h.id}">Continue</a><button class="hk-btn sm danger" data-del="${h.id}">Delete</button>`,
+      draft: `<a class="hk-btn sm primary" href="#/host/edit/${h.id}">Continue</a>`,
       changes_requested: `<a class="hk-btn sm primary" href="#/host/edit/${h.id}">Fix & resubmit</a>`,
-      rejected: `<a class="hk-btn sm" href="#/host/edit/${h.id}">Edit</a><button class="hk-btn sm danger" data-del="${h.id}">Delete</button>`,
+      rejected: `<a class="hk-btn sm" href="#/host/edit/${h.id}">Edit</a>`,
       pending: `<a class="hk-btn sm" href="#/h/${h.id}">Preview</a><a class="hk-btn sm" href="#/host/edit/${h.id}">Edit</a>`,
       approved: `<a class="hk-btn sm gold" href="#/host/manage/${h.id}"><i data-lucide="users"></i>Manage</a><a class="hk-btn sm" href="#/h/${h.id}">View</a><a class="hk-btn sm" href="#/host/edit/${h.id}">Edit</a>`,
       closed: `<a class="hk-btn sm" href="#/h/${h.id}">View</a>`
     }[h.status] || '';
-    return `<div class="hk-lrow"><div class="th" style="${mediaStyle(h)}"></div><div class="info"><b>${esc(h.title || 'Untitled hackathon')}</b><span class="hk-sm hk-muted">${C.dateRange(h.startMs, h.endMs)} · ${esc(h.mode === 'online' ? 'Online' : h.city || 'No city yet')} · ${h.regCount || 0} registered</span>${note}</div>${statusBadge(h.status)}<div class="acts">${acts}</div></div>`;
+    const moreBtn = `<button type="button" class="hk-btn icon sm ghost" data-more="${esc(h.id)}" title="Give access &amp; options" aria-label="Give access and options"><i data-lucide="more-vertical"></i></button>`;
+    return `<div class="hk-lrow"><div class="th" style="${mediaStyle(h)}"></div><div class="info"><b>${esc(h.title || 'Untitled hackathon')}</b><span class="hk-sm hk-muted">${C.dateRange(h.startMs, h.endMs)} · ${esc(h.mode === 'online' ? 'Online' : h.city || 'No city yet')} · ${h.regCount || 0} registered</span>${note}</div>${sharedBadge}${statusBadge(h.status)}<div class="acts">${acts}${moreBtn}</div></div>`;
   };
 
   view.innerHTML = `<div class="hk-view">
@@ -43,11 +46,145 @@ export async function hostDash(cx){
 
   view.onclick = async e => {
     if(e.target.closest('[data-setup]')) return setupModal(cx, () => cx.nav('#/host'));
+    const m = e.target.closest('[data-more]');
+    if(m){
+      const h = mine.find(x => x.id === m.dataset.more);
+      if(h) accessModal(cx, h, () => hostDash(cx));
+      return;
+    }
     const d = e.target.closest('[data-del]');
     if(d && confirm('Delete this hackathon permanently?')){
       try { await C.deleteHackathon(d.dataset.del); toast('Deleted', 'info'); await hostDash(cx); icons(); } catch(err){ toast(err.message, 'error'); }
     }
   };
+}
+
+function accessModal(cx, h, onChanged){
+  const { S } = cx;
+  const isOwner = h.hostUid === S.user.uid;
+  const canDelete = isOwner && ['draft', 'rejected', 'changes_requested'].includes(h.status);
+  let emails = [...new Set((h.coHostEmails || []).map(x => String(x).toLowerCase()))];
+  const inviteUrl = C.coHostInviteUrl(h.id);
+
+  modal(`Give access · ${h.title || 'Hackathon'}`, '<div id="accWrap" class="hk-form"></div>', {
+    onMount(b, close){
+      const render = () => {
+        const listHtml = emails.length
+          ? emails.map(em => `<div class="hk-cohost-item">
+              <div style="display:flex;align-items:center;gap:10px;min-width:0">
+                <i data-lucide="mail" style="color:var(--hk-p);flex:none"></i>
+                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;font-size:.88rem">${esc(em)}</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span class="hk-chip neutral">Co-host</span>
+                ${isOwner ? `<button type="button" class="hk-btn icon sm ghost" data-rm-email="${esc(em)}" aria-label="Remove ${esc(em)}"><i data-lucide="x"></i></button>` : ''}
+              </div>
+            </div>`).join('')
+          : '<div class="hk-sm hk-muted" style="padding:6px 0">No co-hosts added yet. Add a collaborator\'s Gmail below to grant full host access.</div>';
+
+        const inviteSection = emails.length || !isOwner
+          ? `<div class="hk-card-s" style="padding:14px;display:grid;gap:10px;background:var(--hk-surface2)">
+              <div>
+                <b style="font-size:.9rem">Share host invite link</b>
+                <div class="hk-xs hk-muted">Opening this link directs your collaborator straight to Host login and adds this hackathon under their dashboard as <b>Shared</b>.</div>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <input class="hk-input" id="invLink" readonly value="${esc(inviteUrl)}" style="flex:1;min-width:190px;font-size:.8rem;min-height:40px">
+                <button type="button" class="hk-btn sm" id="copyInv"><i data-lucide="copy"></i>Copy</button>
+                <button type="button" class="hk-btn sm gold" id="shareInv"><i data-lucide="share-2"></i>Share to invite</button>
+              </div>
+            </div>`
+          : `<div class="hk-hint">Add a Gmail address above to generate the dedicated host invite link.</div>`;
+
+        $('#accWrap', b).innerHTML = `
+          ${isOwner
+            ? `<form id="addCoForm" class="hk-form" style="gap:10px" novalidate>
+                <div class="hk-field">
+                  <label for="coEmail">Collaborator Gmail / Email <small>gets host edit &amp; manage access</small></label>
+                  <div style="display:flex;gap:8px;flex-wrap:wrap">
+                    <input class="hk-input" id="coEmail" name="email" type="email" required placeholder="teammate@gmail.com" style="flex:1;min-width:200px">
+                    <button type="submit" class="hk-btn primary" id="addCoBtn"><i data-lucide="user-plus"></i>Add</button>
+                  </div>
+                </div>
+              </form>`
+            : `<div class="hk-msg ok"><i data-lucide="users"></i><span>You have <b>Shared co-host</b> access to this hackathon (hosted by ${esc(h.hostName || 'Organiser')}).</span></div>`
+          }
+
+          <div class="hk-card-s" style="padding:14px;display:grid;gap:8px">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+              <b style="font-size:.88rem">Collaborators (${emails.length})</b>
+              <span class="hk-chip ${isOwner ? '' : 'sky'}">${isOwner ? 'Owner' : 'Shared'}</span>
+            </div>
+            <div class="hk-stack" style="gap:6px">${listHtml}</div>
+          </div>
+
+          ${inviteSection}
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap;padding-top:8px;border-top:1px solid var(--hk-line)">
+            ${h.status !== 'closed' ? `<a class="hk-btn sm" href="#/host/edit/${esc(h.id)}" data-close-nav><i data-lucide="pencil"></i>Edit</a>` : ''}
+            ${h.status === 'approved' ? `<a class="hk-btn sm gold" href="#/host/manage/${esc(h.id)}" data-close-nav><i data-lucide="users"></i>Manage</a>` : ''}
+            <button type="button" class="hk-btn sm" id="sharePubBtn"><i data-lucide="share-2"></i>Share public link</button>
+            ${canDelete ? `<button type="button" class="hk-btn sm danger" id="delHackBtn" style="margin-left:auto"><i data-lucide="trash-2"></i>Delete</button>` : ''}
+          </div>
+        `;
+        icons();
+
+        $('#addCoForm', b)?.addEventListener('submit', async ev => {
+          ev.preventDefault();
+          const inp = $('#coEmail', b), btn = $('#addCoBtn', b);
+          const em = (inp.value || '').trim().toLowerCase();
+          if(!/^\S+@\S+\.\S+$/.test(em)) return toast('Enter a valid email address.', 'error');
+          if(em === (S.user.email || '').trim().toLowerCase()) return toast('You are already the host of this hackathon.', 'info');
+          if(emails.includes(em)) return toast('This email already has access.', 'info');
+          if(emails.length >= 20) return toast('Maximum 20 collaborators allowed.', 'error');
+          btn.disabled = true; btn.innerHTML = '<span class="hk-spin"></span> Adding…';
+          const nextEmails = [...emails, em];
+          try {
+            await C.updateCoHosts(h.id, { coHostEmails: nextEmails });
+            emails = nextEmails;
+            h.coHostEmails = nextEmails;
+            S.mine = null;
+            toast(`Access granted to ${em}`);
+            render();
+            onChanged?.();
+          } catch(err){
+            toast(err.message, 'error');
+            btn.disabled = false; btn.innerHTML = '<i data-lucide="user-plus"></i>Add'; icons();
+          }
+        });
+
+        $$('[data-rm-email]', b).forEach(btn => {
+          btn.onclick = async () => {
+            const target = btn.dataset.rmEmail;
+            const nextEmails = emails.filter(x => x !== target);
+            try {
+              await C.updateCoHosts(h.id, { coHostEmails: nextEmails });
+              emails = nextEmails;
+              h.coHostEmails = nextEmails;
+              S.mine = null;
+              toast('Access removed', 'info');
+              render();
+              onChanged?.();
+            } catch(err){ toast(err.message, 'error'); }
+          };
+        });
+
+        $('#copyInv', b)?.addEventListener('click', async () => {
+          try { await navigator.clipboard.writeText(inviteUrl); toast('Invite link copied'); }
+          catch { $('#invLink', b)?.select(); toast('Press Ctrl+C to copy link'); }
+        });
+        $('#shareInv', b)?.addEventListener('click', () => C.shareCoHostInvite(h));
+        $('#sharePubBtn', b)?.addEventListener('click', () => C.shareHackathon(h, 'host'));
+        $$('[data-close-nav]', b).forEach(a => a.addEventListener('click', close));
+        $('#delHackBtn', b)?.addEventListener('click', async () => {
+          if(!confirm('Delete this hackathon permanently?')) return;
+          try { await C.deleteHackathon(h.id); S.mine = null; close(); toast('Deleted', 'info'); onChanged?.(); }
+          catch(err){ toast(err.message, 'error'); }
+        });
+      };
+      render();
+    }
+  });
 }
 
 function setupModal(cx, done){
@@ -84,7 +221,7 @@ export async function wizard(cx, id){
   let D, isNew = !id, restored = false;
   if(id){
     const h = await C.fetchOne(id); if(cx.stale()) return;
-    if(!h || h.hostUid !== S.user.uid){ view.innerHTML = `<div class="hk-view">${empty('search-x', 'Hackathon not found', 'You can only edit hackathons you created.', '<a class="hk-btn" href="#/host">Back to dashboard</a>')}</div>`; return; }
+    if(!h || !C.isHackHost(h, S.user)){ view.innerHTML = `<div class="hk-view">${empty('search-x', 'Hackathon not found', 'You can only edit hackathons you host or were invited to co-host.', '<a class="hk-btn" href="#/host">Back to dashboard</a>')}</div>`; return; }
     if(h.status === 'closed'){ view.innerHTML = `<div class="hk-view">${empty('lock', 'This hackathon is closed', 'Closed hackathons cannot be edited. Contact support if this is a mistake.', '<a class="hk-btn" href="#/host">Back</a>')}</div>`; return; }
     D = { ...blank(), ...h, agree: false };
     ['tracks', 'schedule', 'prizes', 'faqs', 'rounds'].forEach(k => { if(!D[k]?.length) D[k] = blank()[k]; });

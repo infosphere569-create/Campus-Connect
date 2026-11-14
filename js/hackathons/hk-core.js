@@ -297,23 +297,101 @@ export async function uploadImage(file, pathOrOpts, onProgress){
   }
 }
 
-/* ---------------- data layer ---------------- */
+/* ---------------- data layer & co-host collaboration ---------------- */
 const mapDocs = s => s.docs.map(d => ({ id: d.id, ...d.data() }));
+export function isHackHost(h, user){
+  if(!h || !user) return false;
+  if(h.hostUid === user.uid) return true;
+  if(Array.isArray(h.coHostUids) && h.coHostUids.includes(user.uid)) return true;
+  const em = (user.email || '').trim().toLowerCase();
+  return !!(em && Array.isArray(h.coHostEmails) && h.coHostEmails.includes(em));
+}
+export const coHostInviteUrl = id => `${location.origin}/login-hackthons.html?role=host&invite=${encodeURIComponent(id)}`;
+export async function updateCoHosts(hid, { coHostEmails, coHostUids }){
+  const patch = { updatedAtMs: Date.now(), updatedAt: FS.serverTimestamp() };
+  if(Array.isArray(coHostEmails)) patch.coHostEmails = [...new Set(coHostEmails.map(x => String(x).trim().toLowerCase()).filter(Boolean))].slice(0, 20);
+  if(Array.isArray(coHostUids)) patch.coHostUids = [...new Set(coHostUids.filter(Boolean))];
+  await FS.updateDoc(FS.doc(db, 'hkHackathons', hid), patch);
+}
+export async function claimCoHost(hid, user){
+  if(!hid || !user?.uid) return { ok: false, reason: 'invalid' };
+  const h = await fetchOne(hid);
+  if(!h) return { ok: false, reason: 'not-found' };
+  if(h.hostUid === user.uid) return { ok: true, alreadyOwner: true, h };
+  const em = (user.email || '').trim().toLowerCase();
+  const emails = Array.isArray(h.coHostEmails) ? h.coHostEmails.map(x => String(x).toLowerCase()) : [];
+  const uids = Array.isArray(h.coHostUids) ? h.coHostUids : [];
+  if(!emails.includes(em) && !uids.includes(user.uid)) return { ok: false, reason: 'not-invited', h };
+  if(!uids.includes(user.uid)){
+    await FS.updateDoc(FS.doc(db, 'hkHackathons', hid), {
+      coHostUids: FS.arrayUnion(user.uid),
+      updatedAtMs: Date.now(),
+      updatedAt: FS.serverTimestamp()
+    });
+  }
+  return { ok: true, h };
+}
 export async function fetchApproved(){ return mapDocs(await safeGetDocs(FS.query(FS.collection(db, 'hkHackathons'), FS.where('status', '==', 'approved'), FS.limit(300)))); }
-export async function fetchMine(uid){ return mapDocs(await safeGetDocs(FS.query(FS.collection(db, 'hkHackathons'), FS.where('hostUid', '==', uid), FS.limit(200)))).sort((a, b) => (b.updatedAtMs || 0) - (a.updatedAtMs || 0)); }
+export async function fetchMine(uid, email = ''){
+  const em = String(email || '').trim().toLowerCase();
+  const jobs = [
+    safeGetDocs(FS.query(FS.collection(db, 'hkHackathons'), FS.where('hostUid', '==', uid), FS.limit(200))).then(mapDocs).catch(() => []),
+    safeGetDocs(FS.query(FS.collection(db, 'hkHackathons'), FS.where('coHostUids', 'array-contains', uid), FS.limit(100))).then(mapDocs).catch(() => [])
+  ];
+  if(em){
+    jobs.push(safeGetDocs(FS.query(FS.collection(db, 'hkHackathons'), FS.where('coHostEmails', 'array-contains', em), FS.limit(100))).then(mapDocs).catch(() => []));
+  }
+  const lists = await Promise.all(jobs);
+  const byId = new Map();
+  lists.flat().forEach(h => {
+    if(!byId.has(h.id)) byId.set(h.id, { ...h, _shared: h.hostUid !== uid });
+  });
+  return [...byId.values()].sort((a, b) => (b.updatedAtMs || 0) - (a.updatedAtMs || 0));
+}
 export async function fetchAll(){ return mapDocs(await safeGetDocs(FS.query(FS.collection(db, 'hkHackathons'), FS.limit(500)))); }
 export async function fetchOne(id){ const s = await safeGetDoc(FS.doc(db, 'hkHackathons', id)); return s.exists() ? { id: s.id, ...s.data() } : null; }
 export const newId = () => FS.doc(FS.collection(db, 'hkHackathons')).id;
 
 export async function saveHackathon(h, user, hk){
-  const { id, ...rest } = h;
-  const data = { ...rest, hostUid: user.uid, hostName: hk?.org || hk?.organiserName || hk?.displayName || user.displayName || 'Host', hostVerified: !!hk?.hostVerified,
-    organiser: { name: hk?.organiserName || hk?.displayName || '', designation: hk?.designation || '', org: hk?.org || '', type: hk?.orgType || '', email: hk?.orgEmail || user.email || '', phone: hk?.orgPhone || hk?.phone || '' },
-    updatedAtMs: Date.now(), updatedAt: FS.serverTimestamp() };
+  const { id, _shared, _dist, _campus, _phase, _trend, ...rest } = h;
   const rf = FS.doc(db, 'hkHackathons', id);
-  const ex = await FS.getDoc(rf);
-  if(!ex.exists()) await FS.setDoc(rf, { ...data, regCount: 0, featured: false, autoEmail: data.autoEmail !== false, createdAtMs: Date.now(), createdAt: FS.serverTimestamp() });
-  else { delete data.featured; delete data.regCount; delete data.createdAtMs; await FS.updateDoc(rf, data); }
+  const ex = await safeGetDoc(rf);
+  if(!ex.exists()){
+    const data = {
+      ...rest,
+      hostUid: user.uid,
+      hostName: hk?.org || hk?.organiserName || hk?.displayName || user.displayName || 'Host',
+      hostVerified: !!hk?.hostVerified,
+      coHostEmails: Array.isArray(rest.coHostEmails) ? rest.coHostEmails : [],
+      coHostUids: [],
+      organiser: { name: hk?.organiserName || hk?.displayName || '', designation: hk?.designation || '', org: hk?.org || '', type: hk?.orgType || '', email: hk?.orgEmail || user.email || '', phone: hk?.orgPhone || hk?.phone || '' },
+      regCount: 0,
+      featured: false,
+      autoEmail: rest.autoEmail !== false,
+      createdAtMs: Date.now(),
+      createdAt: FS.serverTimestamp(),
+      updatedAtMs: Date.now(),
+      updatedAt: FS.serverTimestamp()
+    };
+    await FS.setDoc(rf, data);
+  } else {
+    const existing = ex.data();
+    const data = {
+      ...rest,
+      hostUid: existing.hostUid,
+      hostName: existing.hostName || hk?.org || hk?.organiserName || hk?.displayName || user.displayName || 'Host',
+      hostVerified: !!existing.hostVerified,
+      organiser: existing.organiser || { name: hk?.organiserName || hk?.displayName || '', designation: hk?.designation || '', org: hk?.org || '', type: hk?.orgType || '', email: hk?.orgEmail || user.email || '', phone: hk?.orgPhone || hk?.phone || '' },
+      updatedAtMs: Date.now(),
+      updatedAt: FS.serverTimestamp()
+    };
+    delete data.featured;
+    delete data.regCount;
+    delete data.createdAtMs;
+    delete data.coHostEmails;
+    delete data.coHostUids;
+    await FS.updateDoc(rf, data);
+  }
   return id;
 }
 export const deleteHackathon = id => FS.deleteDoc(FS.doc(db, 'hkHackathons', id));
@@ -436,9 +514,28 @@ export const isUrl = v => /^https?:\/\/[^\s]+\.[^\s]+$/i.test(String(v || '').tr
 export async function getTestMeta(hid){ try { const s = await FS.getDoc(FS.doc(db, 'hkTests', hid)); return s.exists() ? { id: s.id, ...s.data() } : null; } catch { return null; } }
 export async function getTestKeys(hid){ try { const s = await FS.getDoc(FS.doc(db, 'hkTestKeys', hid)); return s.exists() ? s.data() : null; } catch { return null; } }
 export async function saveTest(h, user, meta, questions){
+  const ownerUid = h.hostUid || user.uid;
   const answers = {}, qs = questions.map((q, i) => { const id = q.id || 'q' + (i + 1); answers[id] = +q.correct; return { id, text: q.text.trim(), options: q.options.map(o => o.trim()), marks: +q.marks || 1 }; });
-  await FS.setDoc(FS.doc(db, 'hkTestKeys', h.id), { hostUid: user.uid, questions: qs, answers });
-  await FS.setDoc(FS.doc(db, 'hkTests', h.id), { hostUid: user.uid, hackathonId: h.id, title: meta.title, durationMin: +meta.durationMin || 30, startMs: meta.startMs || 0, endMs: meta.endMs || 0, count: qs.length, total: qs.reduce((s, q) => s + q.marks, 0), updatedAtMs: Date.now() });
+  await FS.setDoc(FS.doc(db, 'hkTestKeys', h.id), { hostUid: ownerUid, questions: qs, answers });
+  await FS.setDoc(FS.doc(db, 'hkTests', h.id), { hostUid: ownerUid, hackathonId: h.id, title: meta.title, durationMin: +meta.durationMin || 30, startMs: meta.startMs || 0, endMs: meta.endMs || 0, count: qs.length, total: qs.reduce((s, q) => s + q.marks, 0), updatedAtMs: Date.now() });
+}
+export async function shareCoHostInvite(h){
+  if(!h?.id) return false;
+  const url = coHostInviteUrl(h.id);
+  const title = `Co-host Invite · ${h.title || 'Hackathon'}`;
+  const text = `You've been invited as a co-host for "${h.title || 'our hackathon'}" on Campus Connect One Hackathons.\nSign in as a Host with your invited Gmail to manage, edit, and review participants:`;
+  try {
+    if(navigator.share){
+      await navigator.share({ title, text, url });
+      return true;
+    }
+    await navigator.clipboard.writeText(`${text}\n${url}`);
+    toast('Host invite link copied to clipboard');
+    return true;
+  } catch(e){
+    if(e?.name === 'AbortError') return false;
+    try { await navigator.clipboard.writeText(`${text}\n${url}`); toast('Host invite link copied'); return true; } catch { return false; }
+  }
 }
 export async function removeTest(hid){ await FS.deleteDoc(FS.doc(db, 'hkTests', hid)); await FS.deleteDoc(FS.doc(db, 'hkTestKeys', hid)); }
 export async function myAttempt(hid, uid){ try { const s = await FS.getDoc(FS.doc(db, 'hkAttempts', `${hid}_${uid}`)); return s.exists() ? s.data() : null; } catch { return null; } }

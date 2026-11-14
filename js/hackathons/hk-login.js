@@ -11,7 +11,8 @@ icons();
 
 const qs = new URLSearchParams(location.search);
 const next = qs.get('next') && /^#\/[\w\-\/]*$/.test(qs.get('next')) ? qs.get('next') : '';
-let role = ['participant', 'host'].includes(qs.get('role')) ? qs.get('role') : '';
+const inviteId = (qs.get('invite') || '').trim();
+let role = ['participant', 'host'].includes(qs.get('role')) ? qs.get('role') : (inviteId ? 'host' : '');
 let mode = 'login', busy = false, current = null;
 
 const msg = (t, kind = 'err') => { const m = $('#msg'); if(!t){ m.classList.add('hk-hidden'); return; } m.className = `hk-msg ${kind}`; m.innerHTML = `<i data-lucide="${kind === 'ok' ? 'circle-check' : 'circle-alert'}"></i><span>${esc(t)}</span>`; icons(); };
@@ -33,8 +34,10 @@ function setRole(r){
   $$('.hk-role').forEach(b => { const on = b.dataset.role === r; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
   if(!current){
     $('#formWrap').classList.remove('hk-hidden');
-    $('#title').innerHTML = r === 'host' ? 'Host on <span class="hk-grad-text">Campus Connect</span>' : 'Join as a <span class="hk-grad-text">participant</span>';
-    $('#sub').textContent = r === 'host' ? 'Log in or create an account to start your hackathon.' : 'Log in or create an account to find hackathons near you.';
+    $('#title').innerHTML = r === 'host' ? 'Host on <span class="hk-grad-text">Campus Connect One</span>' : 'Join as a <span class="hk-grad-text">participant</span>';
+    $('#sub').textContent = inviteId && r === 'host'
+      ? 'You were invited as a co-host. Sign in with your invited Gmail to open the shared hackathon.'
+      : (r === 'host' ? 'Log in or create an account to start your hackathon.' : 'Log in or create an account to find hackathons near you.');
     $('#formWrap').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 }
@@ -51,7 +54,9 @@ async function finish(user, extra = {}){
   const site = await ensureProfile(user);
   await ensureHkProfile(user, site, role, extra);
   sessionStorage.setItem('hk-role', role);
-  location.replace('hackthons-portal.html' + next);
+  const invQ = inviteId ? '?invite=' + encodeURIComponent(inviteId) : '';
+  const targetHash = inviteId ? '#/host' : next;
+  location.replace('hackthons-portal.html' + invQ + targetHash);
 }
 
 $$('.hk-role').forEach(b => b.onclick = async () => {
@@ -108,5 +113,5 @@ watchUser((user, { site, hk }) => {
   $('#sub').textContent = 'Continue as a participant or a host.';
   $('#otherAcc').onclick = async ev => { ev.preventDefault(); await signOut(auth); location.reload(); };
   icons();
-  if(role && qs.get('role') && !busy){ busy = true; finish(user).catch(e => { busy = false; toast(friendly(e), 'error'); }); }
+  if(role && (qs.get('role') || inviteId) && !busy){ busy = true; finish(user).catch(e => { busy = false; toast(friendly(e), 'error'); }); }
 });

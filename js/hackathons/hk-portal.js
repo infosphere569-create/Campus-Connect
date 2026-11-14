@@ -30,7 +30,7 @@ async function ensureAll(force){
 const enriched = () => C.enrich(S.all || [], { loc: S.loc, college: myCollege() });
 const active = list => list.filter(h => h._phase.key !== 'ended' && h._phase.key !== 'closed');
 async function ensureRegs(force){ if(force || !S.regs) S.regs = await C.myRegistrations(S.user.uid); return S.regs; }
-async function ensureMine(force){ if(force || !S.mine) S.mine = await C.fetchMine(S.user.uid); return S.mine; }
+async function ensureMine(force){ if(force || !S.mine) S.mine = await C.fetchMine(S.user.uid, S.user.email || ''); return S.mine; }
 const refreshMine = async () => { S.mine = null; return ensureMine(true); };
 
 /* ---------- shell ---------- */
@@ -214,7 +214,7 @@ async function detail(t, id){
   const h = await getH(id); if(stale(t)) return;
   if(!h){ view.innerHTML = `<div class="hk-view">${empty('search-x', 'Hackathon not found', 'It may have been removed or is not published yet.', '<a class="hk-btn" href="#/home">Back to home</a>')}</div>`; return; }
   const reg = await getReg(id); if(stale(t)) return;
-  const own = h.hostUid === S.user.uid, ph = h._phase;
+  const own = C.isHackHost(h, S.user), ph = h._phase;
   let cta;
   if(own) cta = `<a class="hk-btn gold" href="#/host/manage/${h.id}"><i data-lucide="users"></i>Manage</a><a class="hk-btn" href="#/host/edit/${h.id}"><i data-lucide="pencil"></i>Edit</a>`;
   else if(S.role === 'host') cta = `<button class="hk-btn" disabled>Log in as participant to register</button>`;
@@ -554,15 +554,35 @@ document.addEventListener('click', async e => {
 });
 
 /* ---------- boot ---------- */
-C.watchUser((user, { site, hk }) => {
+C.watchUser(async (user, { site, hk }) => {
   if(S.booted) return;
-  const back = 'login-hackthons.html' + (location.hash.length > 2 ? '?next=' + encodeURIComponent(location.hash) : '');
+  const qs = new URLSearchParams(location.search);
+  const inviteId = (qs.get('invite') || '').trim();
+  const nextQuery = location.hash.length > 2 ? '&next=' + encodeURIComponent(location.hash) : '';
+  const back = inviteId
+    ? `login-hackthons.html?role=host&invite=${encodeURIComponent(inviteId)}${nextQuery}`
+    : 'login-hackthons.html' + (location.hash.length > 2 ? '?next=' + encodeURIComponent(location.hash) : '');
   if(!user || !hk){ location.replace(back); return; }
-  // The role is fixed at login (sessionStorage). No in-portal switching: log out and log in again to change side.
+  // The role is fixed at login (sessionStorage). An explicit invite targets the Host space.
   const chosen = sessionStorage.getItem('hk-role');
-  const role = ['participant', 'host'].includes(chosen) ? chosen : (hk.activeRole === 'host' ? 'host' : 'participant');
+  const role = inviteId ? 'host' : (['participant', 'host'].includes(chosen) ? chosen : (hk.activeRole === 'host' ? 'host' : 'participant'));
   S.booted = true; Object.assign(S, { user, site, hk, role });
   sessionStorage.setItem('hk-role', role);
+  if(inviteId){
+    try {
+      const cleanUrl = location.pathname + (location.hash || '#/host');
+      history.replaceState(null, '', cleanUrl);
+    } catch {}
+    try {
+      const res = await C.claimCoHost(inviteId, user);
+      S.mine = null;
+      if(res.ok){
+        toast(res.alreadyOwner ? `Opened "${res.h?.title || 'Hackathon'}"` : `Shared access activated for "${res.h?.title || 'Hackathon'}"`);
+      } else {
+        toast('Ask the hackathon owner to add your Gmail (' + (user.email || '') + ') under Give access first.', 'info');
+      }
+    } catch(e){ console.warn('claimCoHost', e); }
+  }
   paintHeader(); paintNav();
   C.watchNotifications(user.uid, list => { S.notifs = list; paintNav(); S.redrawAlerts?.(); });
   const gate = role === 'host' ? !C.hostComplete(hk) : !C.participantComplete(hk);
@@ -572,5 +592,6 @@ C.watchUser((user, { site, hk }) => {
     f({ S, view }, () => { paintHeader(); paintNav(); location.hash.length > 2 ? route() : nav(role === 'host' ? '#/host' : '#/home'); });
     icons(); return;
   }
-  route();
+  if(inviteId && location.hash !== '#/host') nav('#/host');
+  else route();
 });

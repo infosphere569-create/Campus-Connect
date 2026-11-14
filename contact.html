@@ -5,9 +5,9 @@
   <script>(function(){try{var v=localStorage.getItem("cc-theme")||"system";var r=v==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):v;document.documentElement.dataset.theme=r;document.documentElement.dataset.themePreference=v;}catch(e){}})();</script>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#5b5cf0">
-  <title>Contact Us · Campus Connect One</title>
-  <meta name="description" content="Get in touch with the Campus Connect One support team. We're here to help students and campus communities with technical issues, feedback, partnerships, and general inquiries.">
-  <meta name="keywords" content="CampusConnectOne, Campus Connect One, college community, student network, campus feed, university clubs, student discussions, college events, campus issues, anonymous reporting">
+  <title>Contact Us · Campus Connect One × Hackathons</title>
+  <meta name="description" content="Get in touch with the Campus Connect One × Hackathons support team for platform help, hackathon organiser support, bug reports, feedback, and campus partnerships.">
+  <meta name="keywords" content="CampusConnectOne, Campus Connect One, Campus Connect One Hackathons, college community, student network, campus feed, university clubs, student hackathons, college events, campus issues">
   <meta name="author" content="Campus Connect One">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <link rel="canonical" href="https://campusconnectone.online/contact.html">
@@ -19,16 +19,16 @@
   <link rel="manifest" href="manifest.json">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Campus Connect One">
-  <meta property="og:title" content="Contact Us · Campus Connect One">
-  <meta property="og:description" content="Get in touch with the Campus Connect One support team. We're here to help students and campus communities with technical issues, feedback, partnerships, and general inquiries.">
+  <meta property="og:title" content="Contact Us · Campus Connect One × Hackathons">
+  <meta property="og:description" content="Get in touch with the Campus Connect One × Hackathons support team for community and hackathon organiser assistance.">
   <meta property="og:url" content="https://campusconnectone.online/contact.html">
   <meta property="og:image" content="https://campusconnectone.online/icon.png">
   <meta property="og:image:width" content="512">
   <meta property="og:image:height" content="512">
   <meta property="og:locale" content="en_US">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Contact Us · Campus Connect One">
-  <meta name="twitter:description" content="Get in touch with the Campus Connect One support team. We're here to help students and campus communities with technical issues, feedback, partnerships, and general inquiries.">
+  <meta name="twitter:title" content="Contact Us · Campus Connect One × Hackathons">
+  <meta name="twitter:description" content="Get in touch with the Campus Connect One × Hackathons support team.">
   <meta name="twitter:image" content="https://campusconnectone.online/icon.png">
 </head>
 <body data-page="contact">
@@ -36,14 +36,14 @@
 
   <header class="topbar">
     <div class="topbar-inner">
-      <a class="brand" href="home.html">
+      <a class="brand" href="index.html">
         <span class="brand-mark"><i data-lucide="sparkles"></i></span>
         <span class="brand-name">Campus Connect One</span>
       </a>
       <div class="top-actions" style="margin-left:auto">
         <a class="btn ghost sm" href="home.html">Home</a>
-        <a class="btn ghost sm" href="feed.html">Feed</a>
-        <a class="btn ghost sm" href="issues.html">Issues</a>
+        <a class="btn ghost sm" href="hackthons.html" style="display:inline-flex;align-items:center;gap:4px"><i data-lucide="terminal" style="width:14px;height:14px"></i>Hackathons</a>
+        <a class="btn ghost sm" href="about.html">About</a>
         <a class="btn primary sm" href="login.html?mode=login" id="navAuthBtn">Sign In</a>
       </div>
     </div>
@@ -52,10 +52,10 @@
   <main class="main container" data-app-main style="max-width:960px;padding-block:36px">
     <div class="page-head" style="align-items:flex-start;flex-wrap:wrap;gap:20px;margin-bottom:28px">
       <div>
-        <div class="kicker">SUPPORT & CAMPUS COMMUNITY</div>
+        <div class="kicker">CAMPUS CONNECT ONE × HACKATHONS SUPPORT</div>
         <h1 style="margin:4px 0 8px">Get in Touch</h1>
-        <p class="muted" style="max-width:540px;font-size:1.05rem;line-height:1.6;margin:0">
-          We're here to help the campus community. Reach out to our team for platform support, bug reports, community concerns, or student organization partnerships.
+        <p class="muted" style="max-width:560px;font-size:1.05rem;line-height:1.6;margin:0">
+          We're here to help students, clubs, and hackathon organisers. Reach out to our team for platform support, hackathon inquiries, bug reports, or campus partnerships.
         </p>
       </div>
       <a href="mailto:support@campusconnectone.online" class="badge primary" style="padding:10px 18px;font-weight:700;display:inline-flex;align-items:center;gap:10px;text-decoration:none;border-radius:12px;font-size:.95rem;box-shadow:0 8px 24px -8px rgba(91,92,240,.4)" title="Email support@campusconnectone.online">
@@ -118,6 +118,7 @@
             <label for="contactCategory">Subject / Category <span style="color:var(--danger)">*</span></label>
             <select id="contactCategory" name="category" required>
               <option value="" disabled selected>Select a category...</option>
+              <option value="Hackathons & Organisers">Hackathons &amp; Organisers</option>
               <option value="Technical Issue">Technical Issue</option>
               <option value="Campus Community">Campus Community</option>
               <option value="Bug Report">Bug Report</option>
@@ -151,8 +152,10 @@
 
   <footer class="footer" style="margin-top:40px">
     <div class="container" style="text-align:center">
-      <span class="small muted">© 2026 Campus Connect One. Built for student life. All rights reserved.</span>
+      <span class="small muted">© 2026 Campus Connect One × Hackathons. Built for student life. All rights reserved.</span>
       <div class="toolbar" style="justify-content:center;margin-top:10px">
+        <a class="muted-link small" href="about.html">About</a>
+        <a class="muted-link small" href="hackthons.html">Hackathons</a>
         <a class="muted-link small" href="privacy.html">Privacy Policy</a>
         <a class="muted-link small" href="terms.html">Terms of Service</a>
         <a class="muted-link small" href="safety.html">Safety Guidelines</a>

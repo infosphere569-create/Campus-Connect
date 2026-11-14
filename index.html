@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <script>(function(){try{var v=localStorage.getItem("cc-theme")||"system";var r=v==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):v;document.documentElement.dataset.theme=r;document.documentElement.dataset.themePreference=v;}catch(e){}})();</script>
-  <title>Campus Connect One · Unified Student Community & Campus Network</title>
+  <title>Campus Connect One · Unified Student Community, Campus Network &amp; Hackathons</title>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#5b5cf0">
-  <meta name="description" content="Campus Connect One is the premier student community platform for discovering university clubs, sharing ideas, finding campus events, and anonymous issue reporting.">
-  <meta name="keywords" content="CampusConnectOne, Campus Connect One, college community, student network, campus feed, university clubs, student discussions, college events, campus issues, anonymous reporting">
+  <meta name="description" content="Campus Connect One is the unified student community platform for university clubs, campus feed, events, anonymous issue reporting, and Campus Connect One × Hackathons.">
+  <meta name="keywords" content="CampusConnectOne, Campus Connect One, Campus Connect One Hackathons, college community, student network, campus feed, university clubs, student discussions, college events, college hackathons India, student hackathons, coding competitions, hackathon registration, host campus hackathon, campus issues, anonymous reporting">
   <meta name="author" content="Campus Connect One">
   <meta name="robots" content="index, follow, max-image-preview:large">
   <link rel="canonical" href="https://campusconnectone.online/">
@@ -15,8 +15,8 @@
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="Campus Connect One">
-  <meta property="og:title" content="Campus Connect One · Unified Student Community & Campus Network">
-  <meta property="og:description" content="Campus Connect One is the premier student community platform for discovering university clubs, sharing ideas, finding campus events, and anonymous issue reporting.">
+  <meta property="og:title" content="Campus Connect One · Unified Student Community, Campus Network &amp; Hackathons">
+  <meta property="og:description" content="Campus Connect One brings together university clubs, peer discussions, campus events, anonymous issue reporting, and student hackathons in one platform.">
   <meta property="og:url" content="https://campusconnectone.online/">
   <meta property="og:image" content="https://campusconnectone.online/icon.png">
   <meta property="og:image:width" content="512">
@@ -26,8 +26,8 @@
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:site" content="@campusconnect">
-  <meta name="twitter:title" content="Campus Connect One · Unified Student Community & Campus Network">
-  <meta name="twitter:description" content="Campus Connect One is the premier student community platform for discovering university clubs, sharing ideas, finding campus events, and anonymous issue reporting.">
+  <meta name="twitter:title" content="Campus Connect One · Unified Student Community, Campus Network &amp; Hackathons">
+  <meta name="twitter:description" content="Campus Connect One brings together university clubs, peer discussions, campus events, anonymous issue reporting, and student hackathons in one platform.">
   <meta name="twitter:image" content="https://campusconnectone.online/icon.png">
 
   <!-- PWA & Favicon -->
@@ -51,7 +51,7 @@
         "name": "Campus Connect One",
         "url": "https://campusconnectone.online/",
         "logo": "https://campusconnectone.online/icon.png",
-        "description": "Campus Connect One is the premier unified student network and campus community platform for university clubs, events, peer discussions, and anonymous campus issue reporting.",
+        "description": "Campus Connect One is the unified student network and campus community platform for university clubs, events, student hackathons, peer discussions, and anonymous campus issue reporting.",
         "sameAs": [
           "https://instagram.com/campusconnect",
           "https://x.com/campusconnect",
@@ -475,16 +475,16 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:2;opac
         </button>
       </div><div class="hero-stat"><div><strong>Community-first</strong><span class="small muted">Designed around student life</span></div><div><strong>Privacy-conscious</strong><span class="small muted">Anonymous issue reporting</span></div></div></div><div class="hero-preview"><div class="preview-window"><div class="preview-bar"><strong>Campus Feed</strong><span class="badge primary">Live community</span></div><div class="preview-body"><div class="preview-post"><div class="row"><div class="avatar">AK</div><div><strong>Student Community</strong><div class="small muted">CSE · 18m</div></div></div><p>Anyone up for a weekend hackathon team?</p><div class="toolbar small muted"><span>♡ 42</span><span>◌ 12 comments</span><span>↗ Share</span></div></div><div class="grid grid-2"><div class="preview-post"><span class="badge success">Open</span><h3>Wi-Fi in Block A</h3><span class="small muted">Anonymous Student · 84 support</span></div><div class="preview-post"><span class="badge primary">SEP 18</span><h3>Campus Hacknight</h3><span class="small muted">Main Lab · 5:30 PM</span></div></div></div></div></div></div></section>
 
-<!-- Live Statistics Bar Section -->
+<!-- Live Statistics Bar Section (real live backend counts; never hardcoded dummy values) -->
 <section class="section" style="padding: 10px 0 32px">
   <div class="container">
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 20px; padding: 26px; box-shadow: 0 16px 40px -16px rgba(0,0,0,0.3)">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 20px; padding: 26px; box-shadow: 0 16px 40px -16px rgba(0,0,0,0.3)">
       <div style="display: flex; align-items: center; gap: 16px">
         <div style="width: 48px; height: 48px; border-radius: 14px; background: var(--cc-accent-soft); color: var(--cc-accent); display: grid; place-items: center">
           <i data-lucide="users" style="width: 24px; height: 24px"></i>
         </div>
         <div>
-          <div data-counter="14250" style="font-size: 1.8rem; font-weight: 800; color: var(--text); letter-spacing: -0.02em">0</div>
+          <div data-live-stat="students" style="font-size: 1.8rem; font-weight: 800; color: var(--text); letter-spacing: -0.02em">—</div>
           <div style="font-size: 0.85rem; color: var(--muted); font-weight: 600">Active Students</div>
         </div>
       </div>
@@ -493,8 +493,17 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:2;opac
           <i data-lucide="building-2" style="width: 24px; height: 24px"></i>
         </div>
         <div>
-          <div data-counter="85" style="font-size: 1.8rem; font-weight: 800; color: var(--text); letter-spacing: -0.02em">0</div>
+          <div data-live-stat="clubs" style="font-size: 1.8rem; font-weight: 800; color: var(--text); letter-spacing: -0.02em">—</div>
           <div style="font-size: 0.85rem; color: var(--muted); font-weight: 600">University Clubs</div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 16px">
+        <div style="width: 48px; height: 48px; border-radius: 14px; background: rgba(16, 185, 129, 0.12); color: #10b981; display: grid; place-items: center">
+          <i data-lucide="terminal" style="width: 24px; height: 24px"></i>
+        </div>
+        <div>
+          <div data-live-stat="hackathons" style="font-size: 1.8rem; font-weight: 800; color: var(--text); letter-spacing: -0.02em">—</div>
+          <div style="font-size: 0.85rem; color: var(--muted); font-weight: 600">Live Hackathons</div>
         </div>
       </div>
       <div style="display: flex; align-items: center; gap: 16px">
@@ -502,7 +511,7 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:2;opac
           <i data-lucide="check-circle-2" style="width: 24px; height: 24px"></i>
         </div>
         <div>
-          <div data-counter="1240" style="font-size: 1.8rem; font-weight: 800; color: var(--text); letter-spacing: -0.02em">0</div>
+          <div data-live-stat="resolvedIssues" style="font-size: 1.8rem; font-weight: 800; color: var(--text); letter-spacing: -0.02em">—</div>
           <div style="font-size: 0.85rem; color: var(--muted); font-weight: 600">Resolved Campus Issues</div>
         </div>
       </div>
@@ -512,21 +521,6 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:2;opac
 
 <script>
   document.addEventListener('DOMContentLoaded', () => {
-    const counters = document.querySelectorAll('[data-counter]');
-    counters.forEach(counter => {
-      const target = parseInt(counter.getAttribute('data-counter'), 10);
-      let current = 0;
-      const increment = Math.ceil(target / 40);
-      const timer = setInterval(() => {
-        current += increment;
-        if (current >= target) {
-          counter.textContent = target.toLocaleString() + '+';
-          clearInterval(timer);
-        } else {
-          counter.textContent = current.toLocaleString();
-        }
-      }, 25);
-    });
     window.lucide?.createIcons();
   });
 </script>
@@ -625,30 +619,6 @@ document.querySelectorAll('.feature.card').forEach(function(card,i){
   card.style.transitionDelay=(i*0.1)+'s';
   observer.observe(card);
 });
-var nForm=document.getElementById('newsletterForm');
-if(nForm){
-  nForm.addEventListener('submit',function(e){
-    e.preventDefault();
-    var emailInput=document.getElementById('newsletterEmail');
-    var msgDiv=document.getElementById('newsletterMsg');
-    var subBtn=nForm.querySelector('button[type="submit"]');
-    if(emailInput&&emailInput.value){
-      subBtn.disabled=true;
-      var orig=subBtn.innerHTML;
-      subBtn.innerHTML='<span class="btn-spinner"></span> Subscribing...';
-      setTimeout(function(){
-        subBtn.disabled=false;
-        subBtn.innerHTML=orig;
-        msgDiv.hidden=false;
-        msgDiv.style.color='var(--success, #1f9d69)';
-        msgDiv.textContent='Successfully subscribed to campus-wide updates!';
-        emailInput.value='';
-        setTimeout(function(){msgDiv.hidden=true},4000);
-        window.lucide?.createIcons();
-      }, 700);
-    }
-  });
-}
 var canvas=document.getElementById('heroCanvas');
 if(canvas){
   var ctx=canvas.getContext('2d');

@@ -1,5 +1,5 @@
 import { initBg } from './hk-bg.js';
-import { $, $$, initTheme, fetchApproved, enrich, cachedLocation, publicStats, publicShareUrl, safeUrl, watchUser, shareHackathon, icons } from './hk-core.js';
+import { $, $$, db, FS, initTheme, fetchApproved, enrich, cachedLocation, publicStats, publicShareUrl, safeUrl, watchUser, shareHackathon, icons } from './hk-core.js';
 import { card, empty, bindReveal, countUp } from './hk-ui.js';
 
 const toggleTheme = initTheme();
@@ -20,7 +20,7 @@ function shareRoleFor(h){
   try {
     if(sessionStorage.getItem('hk-role') === 'host') return 'host';
   } catch {}
-  if(currentUser && h?.hostUid && h.hostUid === currentUser.uid) return 'host';
+  if(currentUser && h?.hostUid && (h.hostUid === currentUser.uid || (Array.isArray(h.coHostUids) && h.coHostUids.includes(currentUser.uid)))) return 'host';
   if(currentHk?.activeRole === 'host') return 'host';
   return 'participant';
 }
@@ -56,22 +56,50 @@ function injectEventListLd(list){
   document.head.appendChild(ld);
 }
 
-// Live counters: real numbers from the backend (cached server-side for 10 minutes). No fake fallback values.
+// Live counters: real numbers from backend / Firestore summary + live approved hackathons count. No fake fallback values.
+const statsState = { data: null, hackCount: null, visible: false, animated: {} };
+function applyStats(){
+  if(!statsState.visible) return;
+  $$('[data-n]').forEach(el => {
+    const k = el.dataset.n;
+    let v = statsState.data?.[k];
+    if(k === 'hackathons' && typeof statsState.hackCount === 'number'){
+      v = typeof v === 'number' ? Math.max(v, statsState.hackCount) : statsState.hackCount;
+    }
+    if(typeof v === 'number' && statsState.animated[k] !== v){
+      statsState.animated[k] = v;
+      countUp(el, v);
+    }
+  });
+}
+
 (async () => {
-  let stats = null;
-  try { stats = await publicStats(); } catch(e){ console.warn('stats unavailable', e.message); }
-  const run = () => $$('[data-n]').forEach(el => { const v = stats?.[el.dataset.n]; if(typeof v === 'number') countUp(el, v); });
-  if(!stats) return; // leaves "—" in place rather than showing invented numbers
   const box = $('#stats');
-  if(!('IntersectionObserver' in window)) return run();
-  const io = new IntersectionObserver(es => { if(es.some(x => x.isIntersecting)){ run(); io.disconnect(); } }, { threshold: .25 });
-  io.observe(box);
+  if(!('IntersectionObserver' in window)){
+    statsState.visible = true;
+  } else {
+    const io = new IntersectionObserver(es => {
+      if(es.some(x => x.isIntersecting)){ statsState.visible = true; applyStats(); io.disconnect(); }
+    }, { threshold: .2 });
+    io.observe(box);
+  }
+  let s = null;
+  try {
+    const snap = await FS.getDoc(FS.doc(db, 'publicStats', 'summary'));
+    if(snap.exists()) s = snap.data();
+  } catch {}
+  if(!s){
+    try { s = await publicStats(); } catch(e){ console.warn('stats unavailable', e.message); }
+  }
+  if(s){ statsState.data = s; applyStats(); }
 })();
 
 (async () => {
   const list = $('#featuredList');
   let items = [];
   try { items = await fetchApproved(); } catch(e){ console.warn(e); }
+  statsState.hackCount = items.length;
+  applyStats();
   const now = Date.now();
   const live = items.filter(h => !(h.endMs && now > h.endMs));
   const ranked = enrich(live, { loc: cachedLocation() }).sort((a, b) => b._trend - a._trend);

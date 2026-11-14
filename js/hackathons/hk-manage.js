@@ -9,7 +9,7 @@ const MAIL_FOR_STATUS = { shortlisted: 'shortlisted', selected: 'selected', wait
 export async function manage(cx, id){
   const { S, view } = cx;
   const h = await C.fetchOne(id); if(cx.stale()) return;
-  if(!h || (h.hostUid !== S.user.uid && !C.isStaff(S.site))){ view.innerHTML = `<div class="hk-view">${empty('search-x', 'Hackathon not found', 'You can only manage hackathons you host.', '<a class="hk-btn" href="#/host">Back to dashboard</a>')}</div>`; return; }
+  if(!h || (!C.isHackHost(h, S.user) && !C.isStaff(S.site))){ view.innerHTML = `<div class="hk-view">${empty('search-x', 'Hackathon not found', 'You can only manage hackathons you host.', '<a class="hk-btn" href="#/host">Back to dashboard</a>')}</div>`; return; }
   const hostUid = h.hostUid, rounds = C.roundsOf(h);
   let [regs, subs, atts, meta] = await Promise.all([C.hackathonRegistrations(id, hostUid), C.hackathonSubmissions(id, hostUid).catch(() => []), C.hackathonAttempts(id, hostUid).catch(() => []), C.getTestMeta(id)]); if(cx.stale()) return;
   const org = { name: S.hk.organiserName || S.hk.displayName || 'The organiser', org: S.hk.org || h.hostName || '' };
