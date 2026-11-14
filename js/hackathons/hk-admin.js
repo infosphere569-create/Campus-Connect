@@ -557,7 +557,8 @@ async function viewOne(t, id){
       <div style="display:flex;gap:8px;align-items:center">${s.score != null ? `<span class="hk-chip gold">Score ${esc(s.score)}</span>` : ''}${s.reviewStatus === 'reviewed' ? '<span class="hk-chip">Reviewed</span>' : '<span class="hk-chip warn">Pending review</span>'}</div>
     </div>
     <p class="hk-sm hk-prose" style="margin:10px 0">${esc(s.idea || '')}</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">${linkChip(s.pptUrl, 'PPT')}${linkChip(s.repoUrl, 'Repo')}${linkChip(s.demoUrl, 'Demo')}${linkChip(s.videoUrl, 'Video')}${linkChip(s.extraUrl, 'Other')}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${linkChip(s.pptUrl, 'PPT')}${linkChip(s.repoUrl, 'Repo')}${linkChip(s.demoUrl, 'Demo')}${linkChip(s.videoUrl, 'Prototype Video')}${linkChip(s.introVideoUrl, 'Intro Video')}${linkChip(s.extraUrl, 'Other')}</div>
+    ${(s.customAnswers || []).length ? `<div class="hk-stack" style="gap:4px;margin-top:8px">${s.customAnswers.map(c => `<div class="hk-xs"><b>${esc(c.label)}:</b> ${C.safeUrl(c.value) ? `<a href="${esc(C.safeUrl(c.value))}" target="_blank" rel="noopener noreferrer" style="text-decoration:underline">${esc(c.value)}</a>` : esc(c.value)}</div>`).join('')}</div>` : ''}
     ${s.feedback ? `<div class="hk-msg ok" style="margin-top:10px;padding:8px 12px"><i data-lucide="message-square-text"></i><span><b>Host feedback:</b> ${esc(s.feedback)}</span></div>` : ''}
   </div>`).join('')}</div>` : empty('lightbulb', 'No submissions yet', 'Submitted project ideas, GitHub repos, and PPTs appear here.');
 
@@ -844,7 +845,8 @@ function viewParticipantModal(uid, preferredHackId = ''){
             <div class="hk-xs hk-muted">${r.teamMode === 'solo' ? 'Solo' : 'Team: ' + esc(r.teamName || 'Team')} · Round: ${esc(rName)} · Applied ${C.fmtDate(r.createdAtMs)}</div>
             ${att?.submittedAtMs ? `<div class="hk-xs">Test score: <b>${att.score}/${att.total}</b></div>` : ''}
             ${sub ? `<div class="hk-xs">Project: <b>${esc(sub.title)}</b>${sub.score != null ? ` (Score ${sub.score})` : ''}</div>` : ''}
-            ${(r.members || []).length ? `<div class="hk-xs hk-muted">Members: ${r.members.map(m => esc(m.name)).join(', ')}</div>` : ''}
+            ${(r.members || []).length ? `<div class="hk-xs hk-muted">Members: ${r.members.map(m => `${esc(m.name)}${m.college ? ' (' + esc(m.college) + ')' : ''}`).join(', ')}</div>` : ''}
+            ${(r.customAnswers || []).length ? `<div class="hk-xs hk-muted">${r.customAnswers.map(c => `<b>${esc(c.label)}:</b> ${esc(c.value)}`).join(' · ')}</div>` : ''}
           </div>
           <div style="display:flex;gap:6px;align-items:center;flex:none">
             <span class="hk-chip ${stCls}">${esc(r.status)}</span>
@@ -931,7 +933,7 @@ function toggleBan(uid, roleKind, ban, label){
   const isHost = roleKind === 'host';
   modal(`${ban ? 'Ban' : 'Unban'} ${isHost ? 'Host' : 'Participant'} · ${label}`, `<form class="hk-form" id="banForm">
     <p class="hk-sm hk-muted">${ban
-      ? (isHost ? 'Banning pauses this host from creating or managing hackathons.' : 'Banning pauses this participant from registering or applying to hackathons.')
+      ? (isHost ? 'Banning stops this host from creating new hackathons or publishing drafts, while keeping their existing dashboard visible.' : 'Banning prevents this participant from participating in new hackathons or being added to teams.')
       : 'Restoring removes the ban and lets this account participate normally.'}</p>
     ${ban ? '<div class="hk-field"><label>Reason <small>optional, shown to user</small></label><input class="hk-input" name="reason" maxlength="200" placeholder="e.g. Policy violation / spam"></div>' : ''}
     <button type="submit" class="hk-btn ${ban ? 'danger' : 'primary'} lg block">${ban ? 'Confirm Ban' : 'Confirm Unban'}</button>
@@ -946,6 +948,16 @@ function toggleBan(uid, roleKind, ban, label){
             ? { uid, hostBlocked: ban, banned: ban, banReason: ban ? reason : '', updatedAt: FS.serverTimestamp() }
             : { uid, participantBlocked: ban, banned: ban, banReason: ban ? reason : '', updatedAt: FS.serverTimestamp() };
           await FS.setDoc(FS.doc(C.db, 'hkProfiles', uid), patchData, { merge: true });
+          if(!isHost){
+            const prof = S.hosts.find(x => x.uid === uid) || {};
+            const reg = S.regs.find(x => x.uid === uid) || {};
+            const em = String(prof.email || reg.email || '').trim().toLowerCase();
+            if(em){
+              const banRef = FS.doc(C.db, 'hkBannedEmails', em);
+              if(ban) await FS.setDoc(banRef, { banned: true, reason, uid, updatedAtMs: Date.now() }).catch(() => {});
+              else await FS.deleteDoc(banRef).catch(() => {});
+            }
+          }
           C.notify({
             toUid: uid, fromUid: S.user.uid, type: ban ? 'rejected' : 'approved',
             title: ban ? `${isHost ? 'Hosting' : 'Participant'} access paused` : `${isHost ? 'Hosting' : 'Participant'} access restored`,

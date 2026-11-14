@@ -40,22 +40,52 @@ export async function dash(cx, hid){
   /* project submission card */
   const f = (k) => esc(sub?.[k] || '');
   const reviewed = sub && (sub.score != null || sub.feedback);
+  const hasExplicitFlags = ['askPpt', 'askRepo', 'askVideo', 'askIntroVideo', 'askDemo', 'askExtra', 'reqPpt', 'reqRepo', 'reqVideo', 'reqIntroVideo', 'reqDemo', 'reqExtra'].some(k => k in subCfg);
+  const stdFields = [
+    { key: 'pptUrl', ask: hasExplicitFlags ? !!(subCfg.askPpt || subCfg.reqPpt) : true, req: !!subCfg.reqPpt, label: 'Presentation (PPT / PDF link)', ph: 'https://drive.google.com/…', help: 'drive' },
+    { key: 'repoUrl', ask: hasExplicitFlags ? !!(subCfg.askRepo || subCfg.reqRepo) : true, req: !!subCfg.reqRepo, label: 'Repository link', ph: 'https://github.com/…', help: '' },
+    { key: 'videoUrl', ask: hasExplicitFlags ? !!(subCfg.askVideo || subCfg.reqVideo) : true, req: !!subCfg.reqVideo, label: 'Prototype / Demo video link', ph: 'https://drive.google.com/… or YouTube', help: 'video' },
+    { key: 'introVideoUrl', ask: !!(subCfg.askIntroVideo || subCfg.reqIntroVideo), req: !!subCfg.reqIntroVideo, label: 'Intro / Pitch video link', ph: 'https://drive.google.com/… or YouTube', help: 'video' },
+    { key: 'demoUrl', ask: hasExplicitFlags ? !!(subCfg.askDemo || subCfg.reqDemo) : true, req: !!subCfg.reqDemo, label: 'Live demo link', ph: 'https://…', help: 'web' },
+    { key: 'extraUrl', ask: hasExplicitFlags ? !!(subCfg.askExtra || subCfg.reqExtra) : true, req: !!subCfg.reqExtra, label: 'Other link (design, docs, dataset)', ph: 'https://…', help: 'drive' }
+  ].filter(x => x.ask);
+
+  const customSubFields = (subCfg.customFields || []).filter(cf => (cf.label || '').trim());
+  const getCustomSubVal = (cf, i) => {
+    const arr = Array.isArray(sub?.customAnswers) ? sub.customAnswers : [];
+    const hit = arr.find(a => (cf.id && a.id === cf.id) || a.label === cf.label) || arr[i];
+    return hit?.value || '';
+  };
+
+  const urlFieldHtml = (name, label, ph, val, req, helpKind, attrExtra = '') => `
+    <div class="hk-field"><label>${esc(label)} <small>${req ? 'required' : 'optional'}</small></label>
+      <div class="hk-url-wrap">
+        <input class="hk-input" ${name ? `name="${esc(name)}"` : ''} ${attrExtra} type="url" placeholder="${esc(ph)}" value="${esc(val)}" ${req ? 'required' : ''} ${subOpen ? '' : 'disabled'}>
+        ${helpKind ? `<button type="button" class="hk-help-ic" data-drive-help="${esc(helpKind)}" data-help-label="${esc(label)}" title="How to upload &amp; share link" aria-label="How to upload and share ${esc(label)}"><i data-lucide="info"></i></button>` : ''}
+      </div>
+    </div>`;
+
+  const stdInputsHtml = stdFields.map(x => urlFieldHtml(x.key, x.label, x.ph, sub?.[x.key] || '', x.req, x.help)).join('');
+  const customInputsHtml = customSubFields.map((cf, i) => cf.type === 'url'
+    ? urlFieldHtml('', cf.label, 'https://drive.google.com/…', getCustomSubVal(cf, i), !!cf.required, 'drive', `data-sub-cf="${i}"`)
+    : `<div class="hk-field"><label>${esc(cf.label)} <small>${cf.required ? 'required' : 'optional'}</small></label><input class="hk-input" data-sub-cf="${i}" type="text" placeholder="Enter your answer…" value="${esc(getCustomSubVal(cf, i))}" ${cf.required ? 'required' : ''} ${subOpen ? '' : 'disabled'}></div>`
+  ).join('');
+
   const subCard = subCfg.open === false ? '' : `<section class="hk-card-s hk-dcard" id="subCard"><div class="dh"><i data-lucide="lightbulb"></i><h3>Project submission</h3>${sub ? `<span class="hk-chip">${sub.reviewStatus === 'reviewed' ? 'Reviewed' : 'Submitted'}</span>` : ''}</div>
-    <p class="hk-sm hk-muted">Share your idea and external links (GitHub, demo, PPT on Google Drive / Canva / OneDrive). The organiser evaluates what you submit. ${subCfg.deadlineMs ? `<b>Deadline ${C.fmtDT(subCfg.deadlineMs)}.</b>` : ''}${subCfg.instructions ? ' ' + esc(subCfg.instructions) : ''}</p>
+    <p class="hk-sm hk-muted">Share your idea and links (upload PPT/Video to Google Drive and tap the <i data-lucide="info" style="width:14px;height:14px;color:var(--hk-sky)"></i> icon next to any link field for upload steps). ${subCfg.deadlineMs ? `<b>Deadline ${C.fmtDT(subCfg.deadlineMs)}.</b>` : ''}${subCfg.instructions ? ' ' + esc(subCfg.instructions) : ''}</p>
     ${reviewed ? `<div class="hk-msg ok" style="margin:12px 0"><i data-lucide="message-square-text"></i><span>${sub.score != null ? `Score: <b>${esc(sub.score)}</b>. ` : ''}${sub.feedback ? esc(sub.feedback) : ''}</span></div>` : ''}
     <form id="subForm" class="hk-form" novalidate style="margin-top:12px">
       <div class="hk-field"><label>Project / idea title</label><input class="hk-input" name="title" maxlength="140" required value="${f('title')}" ${subOpen ? '' : 'disabled'}></div>
       <div class="hk-field"><label>Idea &amp; approach <small>what problem, how you solve it, tech used</small></label><textarea class="hk-textarea" name="idea" maxlength="4000" required style="min-height:130px" ${subOpen ? '' : 'disabled'}>${f('idea')}</textarea></div>
-      <div class="hk-grid2"><div class="hk-field"><label>Presentation (PPT / PDF link)</label><input class="hk-input" name="pptUrl" type="url" placeholder="https://…" value="${f('pptUrl')}" ${subOpen ? '' : 'disabled'}></div><div class="hk-field"><label>Repository link</label><input class="hk-input" name="repoUrl" type="url" placeholder="https://github.com/…" value="${f('repoUrl')}" ${subOpen ? '' : 'disabled'}></div></div>
-      <div class="hk-grid2"><div class="hk-field"><label>Live demo link <small>optional</small></label><input class="hk-input" name="demoUrl" type="url" placeholder="https://…" value="${f('demoUrl')}" ${subOpen ? '' : 'disabled'}></div><div class="hk-field"><label>Demo video link <small>optional</small></label><input class="hk-input" name="videoUrl" type="url" placeholder="https://…" value="${f('videoUrl')}" ${subOpen ? '' : 'disabled'}></div></div>
-      <div class="hk-field"><label>Other link <small>optional (design, docs, dataset)</small></label><input class="hk-input" name="extraUrl" type="url" placeholder="https://…" value="${f('extraUrl')}" ${subOpen ? '' : 'disabled'}></div>
+      ${stdInputsHtml ? `<div class="hk-grid2">${stdInputsHtml}</div>` : ''}
+      ${customInputsHtml}
       <div id="subErr" class="hk-msg err hk-hidden"></div>
       ${subOpen ? `<button class="hk-btn primary" type="submit">${sub ? 'Update submission' : 'Submit to organiser'}</button>` : `<div class="hk-msg err"><i data-lucide="lock"></i><span>${reg.status === 'rejected' ? 'Submissions are not available for this registration.' : 'The submission window is closed.'}</span></div>`}
     </form></section>`;
 
   const team = `<section class="hk-card-s hk-dcard"><div class="dh"><i data-lucide="users-round"></i><h3>${reg.teamMode === 'solo' ? 'Solo entry' : esc(reg.teamName || 'Your team')}</h3></div>
     <div class="hk-lrow" style="padding:8px 0"><div class="info"><b>${esc(reg.name)}</b><span class="hk-sm hk-muted">Team leader · ${esc(reg.email)}</span></div></div>
-    ${members.map(m => `<div class="hk-lrow" style="padding:8px 0"><div class="info"><b>${esc(m.name)}</b><span class="hk-sm hk-muted">${esc(m.email || m.phone || 'Member')}</span></div></div>`).join('')}
+    ${members.map(m => `<div class="hk-lrow" style="padding:8px 0"><div class="info"><b>${esc(m.name)}</b><span class="hk-sm hk-muted">${esc([m.email, m.college, m.course, m.year].filter(Boolean).join(' · ') || m.phone || 'Member')}</span></div></div>`).join('')}
     <p class="hk-xs hk-muted" style="margin-top:8px">All updates are emailed to the team leader from team@campusconnectone.online.</p></section>`;
 
   const org = h.organiser || {};
@@ -90,6 +120,27 @@ export async function dash(cx, hid){
     }
   }, () => {});
 
+  const showDriveHelp = (label, kind) => {
+    C.modal(`How to share · ${label}`, `<div class="hk-stack">
+      <div class="hk-msg ok"><i data-lucide="hard-drive-upload"></i><span>Upload your file to <b>Google Drive</b>${kind === 'video' ? ' (or YouTube as <b>Unlisted</b>)' : ''}, set access to <b>Anyone with the link</b>, and paste the URL here.</span></div>
+      <ol style="margin:0;padding-left:20px;display:grid;gap:8px;font-size:.9rem">
+        <li>Open <b>drive.google.com</b> and upload your ${kind === 'video' ? 'video (MP4/MOV)' : 'PPT / PDF / document'}.</li>
+        <li>Click the three dots (<b>⋮</b>) on your uploaded file &rarr; choose <b>Share</b> &rarr; <b>Share</b>.</li>
+        <li>Under <b>General access</b>, change <b>Restricted</b> to <b>Anyone with the link</b> (Viewer role is fine).</li>
+        <li>Click <b>Copy link</b> and paste that <code>https://...</code> URL into the <b>${esc(label)}</b> box.</li>
+      </ol>
+      <div class="hk-hint">Tip: Test your copied link in an incognito/private browser window to verify judges and organisers can open it without requesting permission.</div>
+    </div>`);
+  };
+
+  view.onclick = e => {
+    const hb = e.target.closest('[data-drive-help]');
+    if(hb){
+      e.preventDefault();
+      showDriveHelp(hb.dataset.helpLabel || 'Submission link', hb.dataset.driveHelp);
+    }
+  };
+
   const sf = $('#subForm');
   if(sf && subOpen) sf.onsubmit = async e => {
     e.preventDefault();
@@ -98,14 +149,28 @@ export async function dash(cx, hid){
     for(const k of Object.keys(d)) d[k] = String(d[k]).trim();
     if(d.title.length < 3) return err('Add a project title.');
     if(d.idea.length < 30) return err('Describe your idea in a few sentences (at least 30 characters).');
-    if(!(d.pptUrl || d.repoUrl || d.demoUrl || d.videoUrl || d.extraUrl)) return err('Add at least one link (PPT, repository, demo or video).');
-    for(const k of ['pptUrl', 'repoUrl', 'demoUrl', 'videoUrl', 'extraUrl']) if(d[k] && !C.isUrl(d[k])) return err('Links must start with https://');
+    for(const x of stdFields){
+      const val = d[x.key] || '';
+      if(x.req && !val) return err(`${x.label} is required.`);
+      if(val && !C.isUrl(val)) return err(`${x.label} must start with https://`);
+    }
+    const customAnswers = [];
+    for(let i = 0; i < customSubFields.length; i++){
+      const cf = customSubFields[i];
+      const val = ($(`[data-sub-cf="${i}"]`, sf)?.value || '').trim();
+      if(cf.required && !val) return err(`${cf.label} is required.`);
+      if(val && cf.type === 'url' && !C.isUrl(val)) return err(`${cf.label} must start with https://`);
+      if(val) customAnswers.push({ id: cf.id || ('sf_' + i), label: cf.label, type: cf.type || 'url', value: val });
+    }
+    const hasAnyStd = ['pptUrl', 'repoUrl', 'demoUrl', 'videoUrl', 'introVideoUrl', 'extraUrl'].some(k => !!d[k]);
+    if(!hasAnyStd && !customAnswers.length) return err('Add at least one submission link or answer.');
+    d.customAnswers = customAnswers;
     const btn = $('button[type=submit]', sf); btn.disabled = true; btn.innerHTML = '<span class="hk-spin"></span> Saving…';
     try { await C.saveSubmission(h, S.user, reg, d); toast('Submitted to the organiser'); await dash(cx, hid); icons(); }
     catch(ex){ err(/permission|insufficient/i.test(ex.message) ? 'Submissions are closed or not allowed right now.' : ex.message); btn.disabled = false; btn.textContent = sub ? 'Update submission' : 'Submit to organiser'; }
   };
   const sb = $('[data-start]'); if(sb) sb.onclick = () => runTest(cx, h, meta, () => dash(cx, hid).then(icons));
-  cx.S.cleanup = () => { stopTimer?.(); unsubReg?.(); };
+  cx.S.cleanup = () => { stopTimer?.(); unsubReg?.(); view.onclick = null; };
   icons();
 }
 

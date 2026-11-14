@@ -594,3 +594,20 @@ i[data-lucide]>svg{width:100%;height:100%;display:block}
 .hk-rowlink{background:none;border:0;padding:0;text-align:left;font:inherit;color:inherit;cursor:pointer}
 .hk-rowlink:hover b{color:var(--hk-p);text-decoration:underline;text-underline-offset:2px}
 
+/* ---------- Inline URL help icon button, field errors, custom builders & Organised by strip ---------- */
+.hk-url-wrap{position:relative;display:flex;align-items:center}
+.hk-url-wrap .hk-input{padding-right:44px}
+.hk-help-ic{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:color-mix(in srgb,var(--hk-sky) 14%,var(--hk-surface));color:var(--hk-sky);border:1px solid color-mix(in srgb,var(--hk-sky) 28%,var(--hk-line));transition:.2s}
+.hk-help-ic:hover{background:var(--hk-sky);color:#fff}
+.hk-help-ic i{width:16px;height:16px}
+.hk-field-err{display:flex;align-items:center;gap:6px;margin-top:6px;padding:7px 10px;border-radius:10px;background:color-mix(in srgb,var(--hk-bad) 11%,var(--hk-surface));border:1px solid color-mix(in srgb,var(--hk-bad) 30%,transparent);color:var(--hk-bad);font-size:.78rem;font-weight:700}
+.hk-field-err i{width:14px;height:14px;flex:none}
+.hk-toggle-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 12px;border-radius:12px;background:var(--hk-surface2);border:1px solid var(--hk-line);flex-wrap:wrap}
+.hk-mem-card{padding:12px;border-radius:14px;background:var(--hk-surface2);border:1px solid var(--hk-line);display:grid;gap:8px}
+.hk-mem-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:.78rem;font-weight:800;color:var(--hk-muted);text-transform:uppercase;letter-spacing:.05em}
+.hk-org-strip{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:color-mix(in srgb,var(--hk-surface2) 75%,var(--hk-surface));border:1px solid var(--hk-line)}
+.hk-org-strip img{width:38px;height:38px;border-radius:50%;object-fit:cover;border:1px solid var(--hk-line);flex:none}
+.hk-org-strip small{display:block;font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--hk-muted)}
+.hk-org-strip b{display:block;font-size:.88rem;color:var(--hk-ink);font-weight:700;opacity:.88}
+.hk-org-strip span{display:block;font-size:.78rem;color:var(--hk-muted)}
+

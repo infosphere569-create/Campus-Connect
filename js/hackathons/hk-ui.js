@@ -104,14 +104,24 @@ export function detailBody(h){
   const sched = (h.schedule || []).filter(s => s.title).map(s => `<div class="hk-tl-i"><b>${esc(s.title)}</b><span>${esc(s.when || '')}</span></div>`).join('');
   const prz = (h.prizes || []).filter(p => p.place).map(p => `<div class="hk-prz"><span>${esc(p.place)}</span><b>${p.amount ? money(p.amount) : esc(p.note || '—')}</b>${p.amount && p.note ? `<span>${esc(p.note)}</span>` : ''}</div>`).join('');
   const faqs = (h.faqs || []).filter(f => f.q).map(f => `<details><summary>${esc(f.q)}</summary><p class="hk-prose">${esc(f.a || '')}</p></details>`).join('');
+  const org = h.organiser || {};
+  const orgPhoto = safeUrl(h.hostPhotoURL || org.photoURL) || 'icon.png';
+  const orgName = org.name || h.hostDisplayName || h.contactName || h.brandName || h.hostName || 'Organiser';
+  const orgMail = h.contactEmail || h.hostEmail || org.email || '';
+  const orgPhone = h.showContactPhone ? (h.contactPhone || org.phone || '') : (h.showContactPhone === undefined ? (h.contactPhone || '') : '');
+  const orgSub = [h.brandName && h.brandName !== orgName ? h.brandName : '', orgMail, orgPhone].filter(Boolean).join(' · ');
+  const orgStrip = `<div class="hk-org-strip">
+      <img src="${esc(orgPhoto)}" alt="${esc(orgName)}" onerror="this.src='icon.png'">
+      <div><small>Organised by</small><b>${esc(orgName)}${h.hostVerified ? ' · verified host' : ''}</b>${orgSub ? `<span>${esc(orgSub)}</span>` : ''}</div>
+    </div>`;
   return `<div class="hk-tabs" data-tabs>
       <button class="on" data-tab="about">About</button>${sched ? '<button data-tab="schedule">Schedule</button>' : ''}${(prz || h.perks) ? '<button data-tab="prizes">Prizes</button>' : ''}<button data-tab="rules">Rules</button>${faqs ? '<button data-tab="faq">FAQ</button>' : ''}
     </div>
-    <div data-panel="about" class="hk-stack"><div class="hk-prose">${esc(h.description || '')}</div>${tags ? `<div style="display:flex;gap:7px;flex-wrap:wrap">${tags}</div>` : ''}${tracks ? `<h3 style="margin-top:8px">Tracks & themes</h3><div class="hk-grid2">${tracks}</div>` : ''}${h.announcement ? `<div class="hk-banner"><i data-lucide="megaphone"></i><div class="grow"><b>Latest update</b><div class="hk-sm hk-muted">${esc(h.announcement)}</div></div></div>` : ''}</div>
+    <div data-panel="about" class="hk-stack"><div class="hk-prose">${esc(h.description || '')}</div>${tags ? `<div style="display:flex;gap:7px;flex-wrap:wrap">${tags}</div>` : ''}${tracks ? `<h3 style="margin-top:8px">Tracks & themes</h3><div class="hk-grid2">${tracks}</div>` : ''}${h.announcement ? `<div class="hk-banner"><i data-lucide="megaphone"></i><div class="grow"><b>Latest update</b><div class="hk-sm hk-muted">${esc(h.announcement)}</div></div></div>` : ''}${orgStrip}</div>
     <div data-panel="schedule" class="hk-hidden"><div class="hk-tl">${sched}</div></div>
     <div data-panel="prizes" class="hk-hidden hk-stack">${prz ? `<div class="hk-prizes">${prz}</div>` : ''}${h.perks ? `<div class="hk-card-s"><b>Perks</b><div class="hk-prose hk-sm">${esc(h.perks)}</div></div>` : ''}</div>
     <div data-panel="rules" class="hk-hidden hk-stack">${h.eligibility ? `<div class="hk-card-s"><b>Eligibility</b><div class="hk-prose hk-sm">${esc(h.eligibility)}</div></div>` : ''}<div class="hk-card-s"><b>Rules</b><div class="hk-prose hk-sm">${esc(h.rules || 'Rules will be shared by the organisers.')}</div></div>
-      <div class="hk-card-s"><b>Organiser</b><div class="hk-sm hk-muted">${esc(h.brandName || h.hostName || '')}${h.hostVerified ? ' · verified host' : ''}<br>${esc(h.contactName || '')} ${h.contactEmail ? '· ' + esc(h.contactEmail) : ''} ${h.contactPhone ? '· ' + esc(h.contactPhone) : ''}</div></div></div>
+      ${orgStrip}</div>
     <div data-panel="faq" class="hk-hidden hk-faq" style="max-width:none">${faqs}</div>`;
 }
 

@@ -482,14 +482,16 @@ service cloud.firestore {
         && request.resource.data.regCount == 0
         && request.resource.data.featured == false
         && request.resource.data.hostVerified == hkProfile(request.auth.uid).hostVerified
-        && hkProfile(request.auth.uid).hostBlocked == false;
+        && hkProfile(request.auth.uid).hostBlocked == false
+        && hkProfile(request.auth.uid).get('banned', false) == false;
 
       allow update: if staff()
-        // Owner or invited co-host editing / (re)submitting. Cannot change primary owner, self-approve, feature, or touch regCount.
+        // Owner or invited co-host editing / (re)submitting. Blocked hosts cannot create or publish.
         || (isHkHost(resource.data)
             && request.resource.data.hostUid == resource.data.hostUid
             && resource.data.status != 'closed'
             && hkProfile(request.auth.uid).hostBlocked == false
+            && hkProfile(request.auth.uid).get('banned', false) == false
             && request.resource.data.regCount == resource.data.regCount
             && request.resource.data.featured == resource.data.featured
             && request.resource.data.hostVerified == resource.data.hostVerified
@@ -585,7 +587,7 @@ service cloud.firestore {
         && (
           (resource.data.uid == request.auth.uid
             && request.resource.data.diff(resource.data).affectedKeys()
-                 .hasOnly(['title', 'idea', 'repoUrl', 'demoUrl', 'pptUrl', 'videoUrl', 'extraUrl', 'updatedAtMs'])
+                 .hasOnly(['title', 'idea', 'repoUrl', 'demoUrl', 'pptUrl', 'videoUrl', 'introVideoUrl', 'extraUrl', 'customAnswers', 'updatedAtMs'])
             && hkHack(resource.data.hackathonId).get('submission', {}).get('open', true) == true
             && (hkHack(request.resource.data.hackathonId).get('submission', {}).get('deadlineMs', 0) == 0
                 || request.time.toMillis() <= hkHack(request.resource.data.hackathonId).get('submission', {}).get('deadlineMs', 0))
@@ -638,6 +640,12 @@ service cloud.firestore {
     match /publicStats/{doc} {
       allow read: if true;
       allow write: if false;
+    }
+
+    match /hkBannedEmails/{emailKey} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow write: if admin();
     }
 
     match /hkNotifications/{nid} {

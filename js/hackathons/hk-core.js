@@ -9,6 +9,19 @@ import { isSameInstitution } from '../utils.js';
 
 export { auth, db, FS, isSameInstitution };
 
+export const COURSES = ['B.Tech / B.E.', 'BCA', 'B.Sc', 'B.Com', 'BBA', 'B.A.', 'M.Tech / M.E.', 'MCA', 'M.Sc', 'MBA', 'Diploma', 'Class 11-12', 'Other'];
+export const YEARS = ['1st year', '2nd year', '3rd year', '4th year', '5th year', 'Final year', 'Passed out'];
+
+export async function checkBannedEmail(email){
+  const em = String(email || '').trim().toLowerCase();
+  if(!em) return null;
+  try {
+    const s = await FS.getDoc(FS.doc(db, 'hkBannedEmails', em));
+    if(s.exists() && s.data()?.banned) return { email: em, ...s.data() };
+  } catch {}
+  return null;
+}
+
 /* ---------------- tiny DOM / format helpers ---------------- */
 export const $ = (s, r = document) => r.querySelector(s);
 export const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -356,15 +369,21 @@ export async function saveHackathon(h, user, hk){
   const { id, _shared, _dist, _campus, _phase, _trend, ...rest } = h;
   const rf = FS.doc(db, 'hkHackathons', id);
   const ex = await safeGetDoc(rf);
+  const hostPhoto = hk?.photoURL || user?.photoURL || '';
+  const hostDisplay = hk?.organiserName || hk?.displayName || user.displayName || '';
+  const hostMail = hk?.orgEmail || user.email || '';
   if(!ex.exists()){
     const data = {
       ...rest,
       hostUid: user.uid,
-      hostName: hk?.org || hk?.organiserName || hk?.displayName || user.displayName || 'Host',
+      hostName: hk?.org || hostDisplay || 'Host',
+      hostDisplayName: hostDisplay,
+      hostEmail: hostMail,
+      hostPhotoURL: hostPhoto,
       hostVerified: !!hk?.hostVerified,
       coHostEmails: Array.isArray(rest.coHostEmails) ? rest.coHostEmails : [],
       coHostUids: [],
-      organiser: { name: hk?.organiserName || hk?.displayName || '', designation: hk?.designation || '', org: hk?.org || '', type: hk?.orgType || '', email: hk?.orgEmail || user.email || '', phone: hk?.orgPhone || hk?.phone || '' },
+      organiser: { name: hostDisplay, designation: hk?.designation || '', org: hk?.org || '', type: hk?.orgType || '', email: hostMail, phone: hk?.orgPhone || hk?.phone || '', photoURL: hostPhoto },
       regCount: 0,
       featured: false,
       autoEmail: rest.autoEmail !== false,
@@ -376,12 +395,16 @@ export async function saveHackathon(h, user, hk){
     await FS.setDoc(rf, data);
   } else {
     const existing = ex.data();
+    const isOwner = existing.hostUid === user.uid;
     const data = {
       ...rest,
       hostUid: existing.hostUid,
-      hostName: existing.hostName || hk?.org || hk?.organiserName || hk?.displayName || user.displayName || 'Host',
+      hostName: existing.hostName || hk?.org || hostDisplay || 'Host',
+      hostDisplayName: existing.hostDisplayName || (isOwner ? hostDisplay : '') || existing.organiser?.name || '',
+      hostEmail: existing.hostEmail || (isOwner ? hostMail : '') || existing.organiser?.email || '',
+      hostPhotoURL: (isOwner && hostPhoto ? hostPhoto : existing.hostPhotoURL) || existing.organiser?.photoURL || '',
       hostVerified: !!existing.hostVerified,
-      organiser: existing.organiser || { name: hk?.organiserName || hk?.displayName || '', designation: hk?.designation || '', org: hk?.org || '', type: hk?.orgType || '', email: hk?.orgEmail || user.email || '', phone: hk?.orgPhone || hk?.phone || '' },
+      organiser: existing.organiser || { name: hostDisplay, designation: hk?.designation || '', org: hk?.org || '', type: hk?.orgType || '', email: hostMail, phone: hk?.orgPhone || hk?.phone || '', photoURL: hostPhoto },
       updatedAtMs: Date.now(),
       updatedAt: FS.serverTimestamp()
     };
@@ -411,8 +434,7 @@ export function validateForSubmit(h){
   need(h.startMs && h.endMs && h.endMs > h.startMs, 3, 'Set valid start and end dates');
   need(h.regDeadlineMs && h.startMs && h.regDeadlineMs <= h.startMs, 3, 'Registration deadline must be on/before the start');
   need(h.startMs > Date.now(), 3, 'Start date must be in the future');
-  need(/^\S+@\S+\.\S+$/.test(h.contactEmail || ''), 5, 'Add a valid contact email');
-  need((h.contactName || '').trim().length >= 2, 5, 'Add a contact person');
+  need(/^\S+@\S+\.\S+$/.test(h.contactEmail || h.hostEmail || h.organiser?.email || ''), 5, 'Add a valid contact email');
   need((h.rounds || []).every(r => !r.name || (r.startMs ? r.endMs > r.startMs : true)), 4, 'Each round must end after it starts');
   need(!(h.submission?.open) || (h.submission?.deadlineMs > 0), 4, 'Set a project submission deadline (or switch submissions off)');
   need(!!h.agree, 6, 'Confirm the host declaration');
@@ -501,7 +523,18 @@ export async function getSubmission(hid, uid){
 }
 export async function saveSubmission(h, user, reg, d){
   const id = `${h.id}_${user.uid}`, rf = FS.doc(db, 'hkSubmissions', id), ex = await FS.getDoc(rf);
-  const body = { title: d.title, idea: d.idea, repoUrl: d.repoUrl, demoUrl: d.demoUrl, pptUrl: d.pptUrl, videoUrl: d.videoUrl, extraUrl: d.extraUrl, updatedAtMs: Date.now() };
+  const body = {
+    title: d.title || '',
+    idea: d.idea || '',
+    repoUrl: d.repoUrl || '',
+    demoUrl: d.demoUrl || '',
+    pptUrl: d.pptUrl || '',
+    videoUrl: d.videoUrl || '',
+    introVideoUrl: d.introVideoUrl || '',
+    extraUrl: d.extraUrl || '',
+    customAnswers: Array.isArray(d.customAnswers) ? d.customAnswers : [],
+    updatedAtMs: Date.now()
+  };
   if(ex.exists()) await FS.updateDoc(rf, body);
   else {
     await FS.setDoc(rf, { ...body, hackathonId: h.id, hackathonTitle: h.title, hostUid: h.hostUid, uid: user.uid, teamName: reg.teamName || '', leaderName: reg.name || '', createdAtMs: Date.now(), score: null, feedback: '', reviewStatus: 'submitted' });

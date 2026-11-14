@@ -42,9 +42,10 @@ export async function manage(cx, id){
       <button class="hk-btn sm" data-bulkmail><i data-lucide="mail"></i>Notify selected</button></div>
     ${l.length ? `<div class="hk-tablewrap"><table class="hk-table"><thead><tr><th><input type="checkbox" id="selAll" aria-label="Select all"></th><th>Team leader</th><th>Team</th><th>College</th><th>Round</th><th>Status</th><th>Work</th><th style="text-align:right">Profile &amp; mail</th></tr></thead><tbody id="rb">${l.map(row).join('')}</tbody></table></div>` : empty('users', regs.length ? 'No matches' : 'No registrations yet', regs.length ? 'Try clearing the filters.' : 'Registrations appear here as soon as teams sign up. Share your hackathon link to get started.', regs.length ? '' : '<button class="hk-btn gold" data-share>Copy link</button>')}`; };
 
-  const link = (u, l) => u ? `<a class="hk-chip btn" href="${esc(C.safeUrl(u))}" target="_blank" rel="noopener noreferrer"><i data-lucide="external-link"></i>${l}</a>` : '';
+  const link = (u, l) => C.safeUrl(u) ? `<a class="hk-chip btn" href="${esc(C.safeUrl(u))}" target="_blank" rel="noopener noreferrer"><i data-lucide="external-link"></i>${esc(l)}</a>` : '';
+  const subCustomHtml = s => (s.customAnswers || []).filter(a => a && a.value).map(a => C.isUrl(a.value) ? link(a.value, a.label || 'Link') : `<span class="hk-chip neutral">${esc(a.label)}: ${esc(a.value)}</span>`).join('');
   const subsTab = () => subs.length ? `<div class="hk-stack">${subs.map(s => `<div class="hk-card-s" data-sub="${esc(s.id)}"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><b>${esc(s.title)}</b><div class="hk-sm hk-muted">${esc(s.teamName || s.leaderName)} · ${C.ago(s.updatedAtMs)}</div></div>${s.reviewStatus === 'reviewed' ? '<span class="hk-chip">Reviewed</span>' : '<span class="hk-chip warn">To review</span>'}</div>
-      <p class="hk-sm" style="margin:10px 0;white-space:pre-wrap">${esc(s.idea)}</p><div style="display:flex;gap:8px;flex-wrap:wrap">${link(s.pptUrl, 'PPT')}${link(s.repoUrl, 'Repo')}${link(s.demoUrl, 'Demo')}${link(s.videoUrl, 'Video')}${link(s.extraUrl, 'Other')}</div>
+      <p class="hk-sm" style="margin:10px 0;white-space:pre-wrap">${esc(s.idea)}</p><div style="display:flex;gap:8px;flex-wrap:wrap">${link(s.pptUrl, 'PPT')}${link(s.repoUrl, 'Repo')}${link(s.demoUrl, 'Demo')}${link(s.videoUrl, 'Prototype Video')}${link(s.introVideoUrl, 'Intro Video')}${link(s.extraUrl, 'Other')}${subCustomHtml(s)}</div>
       <div class="hk-grid2" style="margin-top:12px;grid-template-columns:110px 1fr"><input class="hk-input" type="number" min="0" max="100" placeholder="Score" data-score value="${s.score ?? ''}"><input class="hk-input" placeholder="Feedback for the team" data-fb maxlength="500" value="${esc(s.feedback || '')}"></div>
       <button class="hk-btn sm primary" style="margin-top:10px" data-review="${esc(s.id)}">Save review</button></div>`).join('')}</div>` : empty('lightbulb', 'No submissions yet', h.submission?.open === false ? 'Project submissions are switched off for this hackathon.' : 'Teams submit ideas, project links and PPT links from their dashboard.');
 
@@ -166,15 +167,19 @@ export async function manage(cx, id){
             </div>
           </div>
 
+          ${(r.customAnswers || []).filter(a => a && a.value).length ? `<div class="hk-card-s" style="padding:12px 14px"><small class="hk-eyebrow" style="display:block;margin-bottom:6px">Organiser questions</small>
+            <div class="hk-kv-grid">${r.customAnswers.filter(a => a && a.value).map(a => `<div class="hk-kv-item"><small>${esc(a.label)}</small><b>${C.isUrl(a.value) ? `<a href="${esc(C.safeUrl(a.value))}" target="_blank" rel="noopener noreferrer" style="text-decoration:underline;color:var(--hk-p)">${esc(a.value)}</a>` : esc(a.value)}</b></div>`).join('')}</div>
+          </div>` : ''}
+
           ${(r.members || []).length ? `<div class="hk-card-s" style="padding:12px 14px"><small class="hk-eyebrow" style="display:block;margin-bottom:6px">Team members (${r.members.length + 1} total)</small>
-            ${r.members.map(m => `<div class="hk-sm" style="padding:4px 0;border-bottom:1px dashed var(--hk-line)"><b>${esc(m.name)}</b>${m.email ? ' · ' + esc(m.email) : ''}${m.phone ? ' · ' + esc(m.phone) : ''}</div>`).join('')}
+            ${r.members.map(m => `<div class="hk-sm" style="padding:6px 0;border-bottom:1px dashed var(--hk-line)"><b>${esc(m.name)}</b>${m.email ? ' · ' + esc(m.email) : ''}${m.phone ? ' · ' + esc(m.phone) : ''}${(m.college || m.course || m.year) ? `<div class="hk-xs hk-muted">${esc([m.college, m.course, m.year].filter(Boolean).join(' · '))}</div>` : ''}</div>`).join('')}
           </div>` : ''}
 
           ${(sub || att?.submittedAtMs) ? `<div class="hk-card-s" style="padding:12px 14px">
             <small class="hk-eyebrow" style="display:block;margin-bottom:6px">Evaluation</small>
             ${att?.submittedAtMs ? `<div class="hk-sm" style="margin-bottom:6px"><b>Test score:</b> ${att.score} / ${att.total} (${C.ago(att.submittedAtMs)})</div>` : ''}
             ${sub ? `<div class="hk-sm"><b>Project:</b> ${esc(sub.title)}${sub.score != null ? ` · Score <b>${esc(sub.score)}</b>` : ''}</div>
-              <div class="hk-prof-links" style="margin-top:8px">${link(sub.pptUrl, 'PPT')}${link(sub.repoUrl, 'Repo')}${link(sub.demoUrl, 'Demo')}${link(sub.videoUrl, 'Video')}${link(sub.extraUrl, 'Other')}</div>` : ''}
+              <div class="hk-prof-links" style="margin-top:8px">${link(sub.pptUrl, 'PPT')}${link(sub.repoUrl, 'Repo')}${link(sub.demoUrl, 'Demo')}${link(sub.videoUrl, 'Prototype Video')}${link(sub.introVideoUrl, 'Intro Video')}${link(sub.extraUrl, 'Other')}${subCustomHtml(sub)}</div>` : ''}
           </div>` : ''}
 
           <form id="hostNoteForm" class="hk-card-s hk-form" style="padding:12px 14px;gap:8px">
@@ -207,7 +212,7 @@ export async function manage(cx, id){
   }
 
   /* ---------- exports ---------- */
-  const flat = r => [r.name, r.email, r.phone, r.college, r.year || '', r.teamMode === 'solo' ? 'Solo' : 'Team', r.teamName || '', (r.members || []).map(m => `${m.name}${m.email ? ' <' + m.email + '>' : ''}`).join('; '), roundName(r.stage || 0), r.status, subOf(r.uid)?.title || '', subOf(r.uid)?.score ?? '', attOf(r.uid)?.submittedAtMs ? `${attOf(r.uid).score}/${attOf(r.uid).total}` : '', C.fmtDT(r.createdAtMs)];
+  const flat = r => [r.name, r.email, r.phone, r.college, r.year || '', r.teamMode === 'solo' ? 'Solo' : 'Team', r.teamName || '', (r.members || []).map(m => `${m.name}${m.email ? ' <' + m.email + '>' : ''}${m.college ? ' [' + [m.college, m.course, m.year].filter(Boolean).join(', ') + ']' : ''}`).join('; '), roundName(r.stage || 0), r.status, subOf(r.uid)?.title || '', subOf(r.uid)?.score ?? '', attOf(r.uid)?.submittedAtMs ? `${attOf(r.uid).score}/${attOf(r.uid).total}` : '', C.fmtDT(r.createdAtMs)];
   const HEAD = ['Leader', 'Email', 'Phone', 'College', 'Year', 'Mode', 'Team', 'Members', 'Round', 'Status', 'Project', 'Score', 'Test', 'Registered'];
   function pdf(){
     const w = window.open('', '_blank'); if(!w) return toast('Allow pop-ups to export the PDF.', 'error');

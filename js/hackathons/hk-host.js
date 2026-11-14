@@ -9,7 +9,7 @@ const { $, $$, esc, icons, toast, modal, FS } = C;
    ===================================================================== */
 export async function hostDash(cx){
   const { S, view } = cx;
-  if(S.hk.hostBlocked){ view.innerHTML = `<div class="hk-view">${empty('shield-alert', 'Hosting is paused', 'Your host access has been paused by an admin. Contact support@campusconnectone.online.')}</div>`; return; }
+  const blocked = !!(S.hk?.hostBlocked || S.hk?.banned) && !C.isStaff(S.site);
   const mine = await cx.refreshMine(); if(cx.stale()) return;
   const now = Date.now();
   const liveN = mine.filter(h => h.status === 'approved' && !(h.endMs && now > h.endMs)).length;
@@ -21,20 +21,24 @@ export async function hostDash(cx){
     const shared = h.hostUid !== S.user.uid;
     const sharedBadge = shared ? '<span class="hk-chip sky"><i data-lucide="users"></i>Shared</span>' : '';
     const note = ['changes_requested', 'rejected'].includes(h.status) && h.adminNote ? `<div class="hk-msg err" style="margin-top:8px"><i data-lucide="message-square-warning"></i><span><b>Admin note:</b> ${esc(h.adminNote)}</span></div>` : '';
+    const blockedDraftAct = `<button type="button" class="hk-btn sm" disabled title="Hosting paused — drafts cannot be published"><i data-lucide="lock"></i>Publishing paused</button>`;
     const acts = {
-      draft: `<a class="hk-btn sm primary" href="#/host/edit/${h.id}">Continue</a>`,
-      changes_requested: `<a class="hk-btn sm primary" href="#/host/edit/${h.id}">Fix & resubmit</a>`,
-      rejected: `<a class="hk-btn sm" href="#/host/edit/${h.id}">Edit</a>`,
-      pending: `<a class="hk-btn sm" href="#/h/${h.id}">Preview</a><a class="hk-btn sm" href="#/host/edit/${h.id}">Edit</a>`,
-      approved: `<a class="hk-btn sm gold" href="#/host/manage/${h.id}"><i data-lucide="users"></i>Manage</a><a class="hk-btn sm" href="#/h/${h.id}">View</a><a class="hk-btn sm" href="#/host/edit/${h.id}">Edit</a>`,
+      draft: blocked ? blockedDraftAct : `<a class="hk-btn sm primary" href="#/host/edit/${h.id}">Continue</a>`,
+      changes_requested: blocked ? `${blockedDraftAct}<a class="hk-btn sm" href="#/h/${h.id}">Preview</a>` : `<a class="hk-btn sm primary" href="#/host/edit/${h.id}">Fix & resubmit</a>`,
+      rejected: blocked ? `<a class="hk-btn sm" href="#/h/${h.id}">Preview</a>` : `<a class="hk-btn sm" href="#/host/edit/${h.id}">Edit</a>`,
+      pending: `<a class="hk-btn sm" href="#/h/${h.id}">Preview</a>${blocked ? '' : `<a class="hk-btn sm" href="#/host/edit/${h.id}">Edit</a>`}`,
+      approved: `<a class="hk-btn sm gold" href="#/host/manage/${h.id}"><i data-lucide="users"></i>Manage</a><a class="hk-btn sm" href="#/h/${h.id}">View</a>${blocked ? '' : `<a class="hk-btn sm" href="#/host/edit/${h.id}">Edit</a>`}`,
       closed: `<a class="hk-btn sm" href="#/h/${h.id}">View</a>`
     }[h.status] || '';
     const moreBtn = `<button type="button" class="hk-btn icon sm ghost" data-more="${esc(h.id)}" title="Give access &amp; options" aria-label="Give access and options"><i data-lucide="more-vertical"></i></button>`;
     return `<div class="hk-lrow"><div class="th" style="${mediaStyle(h)}"></div><div class="info"><b>${esc(h.title || 'Untitled hackathon')}</b><span class="hk-sm hk-muted">${C.dateRange(h.startMs, h.endMs)} · ${esc(h.mode === 'online' ? 'Online' : h.city || 'No city yet')} · ${h.regCount || 0} registered</span>${note}</div>${sharedBadge}${statusBadge(h.status)}<div class="acts">${acts}${moreBtn}</div></div>`;
   };
 
+  const blockedBanner = blocked ? `<div class="hk-msg err" style="margin-bottom:16px"><i data-lucide="shield-alert"></i><div style="flex:1"><b>Hosting actions paused by admin</b><div class="hk-sm" style="margin-top:2px;color:var(--hk-ink)">You can still view your dashboard and manage live events, but creating new hackathons and publishing drafts are disabled.${S.hk?.banReason ? ' <b>Reason:</b> ' + esc(S.hk.banReason) + '.' : ''} To resolve this, email <a href="mailto:support@campusconnectone.online" style="text-decoration:underline;font-weight:700">support@campusconnectone.online</a> or visit <a href="contact.html" style="text-decoration:underline;font-weight:700">Support</a>.</div></div></div>` : '';
+
   view.innerHTML = `<div class="hk-view">
-    <div class="hk-page-h"><div><span class="hk-eyebrow" style="color:var(--hk-gold)">Host dashboard</span><h1>Your hackathons</h1><p>Create, get approved, go live and manage registrations.</p></div><a class="hk-btn gold lg" href="#/host/new"><i data-lucide="circle-plus"></i>Create hackathon</a></div>
+    <div class="hk-page-h"><div><span class="hk-eyebrow" style="color:var(--hk-gold)">Host dashboard</span><h1>Your hackathons</h1><p>Create, get approved, go live and manage registrations.</p></div>${blocked ? `<button type="button" class="hk-btn" data-blocked-info><i data-lucide="shield-alert"></i>Creation paused</button>` : `<a class="hk-btn gold lg" href="#/host/new"><i data-lucide="circle-plus"></i>Create hackathon</a>`}</div>
+    ${blockedBanner}
     ${needSetup ? `<div class="hk-banner"><i data-lucide="building-2" style="width:28px;height:28px;color:var(--hk-gold)"></i><div class="grow"><b>Finish your host profile</b><div class="hk-sm hk-muted">Add your organisation / club name and a contact number so participants and admins can trust your events.</div></div><button class="hk-btn gold sm" data-setup>Complete now</button></div>` : ''}
     <div class="hk-kpis">
       <div class="hk-kpi g"><div class="ki"><i data-lucide="layers"></i></div><strong>${mine.length}</strong><span>Total hackathons</span></div>
@@ -42,9 +46,17 @@ export async function hostDash(cx){
       <div class="hk-kpi"><div class="ki"><i data-lucide="radio"></i></div><strong>${liveN}</strong><span>Live / upcoming</span></div>
       <div class="hk-kpi s"><div class="ki"><i data-lucide="users"></i></div><strong>${regs}</strong><span>Total registrations</span></div></div>
     <div class="hk-sec"><h2><i data-lucide="list-checks"></i>All hackathons</h2></div>
-    ${mine.length ? `<div class="hk-stack">${mine.map(row).join('')}</div>` : empty('rocket', 'Create your first hackathon', 'Add a banner, the details, schedule and prizes, then publish your event. It takes about 10 minutes.', '<a class="hk-btn gold" href="#/host/new">Start creating</a>')}</div>`;
+    ${mine.length ? `<div class="hk-stack">${mine.map(row).join('')}</div>` : empty('rocket', 'Create your first hackathon', blocked ? 'Creating new hackathons is currently paused for your account.' : 'Add a banner, the details, schedule and prizes, then publish your event. It takes about 10 minutes.', blocked ? '' : '<a class="hk-btn gold" href="#/host/new">Start creating</a>')}</div>`;
 
   view.onclick = async e => {
+    if(e.target.closest('[data-blocked-info]')){
+      modal('Hosting paused', `<div class="hk-stack">
+        <div class="hk-msg err"><i data-lucide="shield-alert"></i><span>Creating new hackathons and publishing drafts have been paused by an admin.${S.hk?.banReason ? ' Reason: ' + esc(S.hk.banReason) : ''}</span></div>
+        <p class="hk-sm hk-muted">You can still view your dashboard and manage any already-live events. To appeal or restore full hosting privileges, contact our support team:</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="hk-btn primary sm" href="mailto:support@campusconnectone.online?subject=${encodeURIComponent('Host account review: ' + (S.user?.email || ''))}"><i data-lucide="mail"></i>Email support@campusconnectone.online</a><a class="hk-btn sm" href="contact.html"><i data-lucide="life-buoy"></i>Contact page</a></div>
+      </div>`);
+      return;
+    }
     if(e.target.closest('[data-setup]')) return setupModal(cx, () => cx.nav('#/host'));
     const m = e.target.closest('[data-more]');
     if(m){
@@ -211,12 +223,21 @@ const SUGGEST = ['AI/ML', 'Web', 'App', 'IoT', 'Web3', 'Open Innovation', 'Cyber
 export async function wizard(cx, id){
   const { S, view } = cx;
   const hk = S.hk || {};
-  if(hk.hostBlocked && !C.isStaff(S.site)){ view.innerHTML = `<div class="hk-view">${empty('shield-alert', 'Hosting is paused', 'Contact support@campusconnectone.online.')}</div>`; return; }
+  const blocked = !!(hk.hostBlocked || hk.banned) && !C.isStaff(S.site);
+  if(blocked && !id){
+    view.innerHTML = `<div class="hk-view">${empty('shield-alert', 'Hosting creation is paused', `Creating new hackathons is disabled for your account.${hk.banReason ? ' Reason: ' + esc(hk.banReason) : ''} Contact support@campusconnectone.online to resolve this.`, '<a class="hk-btn" href="#/host">Back to dashboard</a> <a class="hk-btn primary" href="mailto:support@campusconnectone.online">Email support</a>')}</div>`;
+    return;
+  }
   const blank = () => ({
     id: C.newId(), status: 'draft', title: '', tagline: '', description: '', tags: [], mode: 'offline', bannerURL: '', thumbURL: '', brandName: hk.org || '', website: '',
     college: hk.college || S.site?.college || '', city: hk.city || '', state: '', venue: '', lat: null, lng: null, regDeadlineMs: 0, startMs: 0, endMs: 0,
     teamMin: 1, teamMax: 4, maxParticipants: 0, fee: 0, eligibility: '', rules: '', tracks: [{ title: '', desc: '' }], schedule: [{ when: '', title: '' }],
-    prizePool: 0, prizes: [{ place: '1st Prize', amount: '', note: '' }], perks: '', contactName: hk.organiserName || hk.displayName || '', contactEmail: hk.orgEmail || S.user.email || '', contactPhone: hk.orgPhone || hk.phone || '', rounds: [{ name: 'Idea submission', desc: '', startMs: 0, endMs: 0 }, { name: 'Final round', desc: '', startMs: 0, endMs: 0 }], submission: { open: true, deadlineMs: 0, instructions: '' }, autoEmail: true, community: '', faqs: [{ q: '', a: '' }], agree: false
+    regFields: { askGithub: false, reqGithub: false, askLinkedin: false, reqLinkedin: false, askPortfolio: false, reqPortfolio: false, customFields: [] },
+    prizePool: 0, prizes: [{ place: '1st Prize', amount: '', note: '' }], perks: '',
+    contactName: hk.organiserName || hk.displayName || '', contactEmail: hk.orgEmail || S.user.email || '', contactPhone: '', showContactPhone: false,
+    rounds: [{ name: 'Idea submission', desc: '', startMs: 0, endMs: 0 }, { name: 'Final round', desc: '', startMs: 0, endMs: 0 }],
+    submission: { open: true, deadlineMs: 0, instructions: '', askPpt: true, reqPpt: false, askRepo: true, reqRepo: false, askVideo: false, reqVideo: false, askIntroVideo: false, reqIntroVideo: false, askDemo: false, reqDemo: false, askExtra: false, reqExtra: false, customFields: [] },
+    autoEmail: true, community: '', faqs: [{ q: '', a: '' }], agree: false
   });
   const BK = `hk-draft-new-${S.user.uid}`;
   let D, isNew = !id, restored = false;
@@ -225,10 +246,12 @@ export async function wizard(cx, id){
     if(!h || (!C.isHackHost(h, S.user) && !C.isStaff(S.site))){ view.innerHTML = `<div class="hk-view">${empty('search-x', 'Hackathon not found', 'You can only edit hackathons you host or were invited to co-host.', `<a class="hk-btn" href="${esc(cx.backHash || '#/host')}">Back to dashboard</a>`)}</div>`; return; }
     if(h.status === 'closed' && !C.isStaff(S.site)){ view.innerHTML = `<div class="hk-view">${empty('lock', 'This hackathon is closed', 'Closed hackathons cannot be edited. Contact support if this is a mistake.', '<a class="hk-btn" href="#/host">Back</a>')}</div>`; return; }
     D = { ...blank(), ...h, agree: false };
+    D.regFields = { ...blank().regFields, ...(h.regFields || {}), customFields: Array.isArray(h.regFields?.customFields) ? h.regFields.customFields.map(x => ({ ...x })) : [] };
+    D.submission = { ...blank().submission, ...(h.submission || {}), customFields: Array.isArray(h.submission?.customFields) ? h.submission.customFields.map(x => ({ ...x })) : [] };
     ['tracks', 'schedule', 'prizes', 'faqs', 'rounds'].forEach(k => { if(!D[k]?.length) D[k] = blank()[k]; });
   } else {
     D = blank();
-    try { const b = JSON.parse(localStorage.getItem(BK) || 'null'); if(b?.id){ D = { ...D, ...b }; restored = true; } } catch {}
+    try { const b = JSON.parse(localStorage.getItem(BK) || 'null'); if(b?.id){ D = { ...D, ...b }; D.regFields = { ...blank().regFields, ...(b.regFields || {}), customFields: Array.isArray(b.regFields?.customFields) ? b.regFields.customFields : [] }; D.submission = { ...blank().submission, ...(b.submission || {}), customFields: Array.isArray(b.submission?.customFields) ? b.submission.customFields : [] }; restored = true; } } catch {}
   }
   let step = 1, dirty = false, saving = false, errs = [];
   const live = D.status === 'approved';
@@ -248,6 +271,30 @@ export async function wizard(cx, id){
   const drop = (kind, label, hint) => { const u = C.safeUrl(kind === 'banner' ? D.bannerURL : D.thumbURL); return `<label class="hk-drop ${kind} ${u ? 'has' : ''}" style="${u ? `background-image:url('${u.replace(/'/g, '%27')}')` : ''}"><input type="file" accept="image/*" data-up="${kind}" aria-label="${label}"><span class="dz"><i data-lucide="${u ? 'refresh-cw' : 'image-up'}"></i><span>${u ? 'Change ' : 'Upload '}${label}</span><small>${hint}</small></span></label>`; };
   const tagsHtml = () => D.tags.map((t, i) => `<span class="hk-chip">#${esc(t)} <button type="button" data-tagrm="${i}" aria-label="Remove ${esc(t)}"><i data-lucide="x"></i></button></span>`).join('');
 
+  const customFieldsEd = (scope, list, types, addBtnAttr, addLabel) => `
+    <div class="hk-list-ed" style="margin-top:8px">
+      ${(list || []).map((cf, i) => `<div class="hk-row-ed" style="--cols:3;align-items:center">
+        <input class="hk-input" data-cf="${scope}" data-i="${i}" data-f="label" placeholder="Field title (e.g. Figma link / Portfolio)" value="${esc(cf.label || '')}">
+        <select class="hk-select" data-cf="${scope}" data-i="${i}" data-f="type">${types.map(([v, l]) => `<option value="${v}" ${cf.type === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+        <label class="hk-check" style="font-size:.82rem"><input type="checkbox" data-cf="${scope}" data-i="${i}" data-f="required" ${cf.required ? 'checked' : ''}><span>Required</span></label>
+        <button type="button" class="hk-btn icon ghost" data-cf-del="${scope}:${i}" aria-label="Remove field"><i data-lucide="trash-2"></i></button>
+      </div>`).join('')}
+      <button type="button" class="hk-btn sm" ${addBtnAttr}><i data-lucide="plus"></i>${addLabel}</button>
+    </div>`;
+
+  const toggleRow = (scope, askKey, reqKey, label) => {
+    const obj = D[scope] || {};
+    const ask = !!obj[askKey], req = !!obj[reqKey];
+    return `<div class="hk-toggle-row">
+      <label class="hk-check"><input type="checkbox" data-${scope === 'regFields' ? 'regf' : 'sub'}="${askKey}" ${ask || req ? 'checked' : ''}><span>${label}</span></label>
+      <label class="hk-check hk-xs hk-muted"><input type="checkbox" data-${scope === 'regFields' ? 'regf' : 'sub'}="${reqKey}" ${req ? 'checked' : ''}><span>Required</span></label>
+    </div>`;
+  };
+
+  const hostPhoto = C.safeUrl(hk.photoURL || S.user?.photoURL || '') || 'icon.png';
+  const hostOrgName = D.contactName || hk.organiserName || hk.displayName || S.user?.displayName || 'Organiser';
+  const hostOrgEmail = D.contactEmail || hk.orgEmail || S.user?.email || '';
+
   const body = n => ({
     1: () => `<h2 style="margin-bottom:4px">Media & brand</h2><p class="hk-muted hk-sm" style="margin-bottom:18px">First impressions count. A good banner makes people click.</p><div class="hk-form">
       <div class="hk-field"><label>Banner <small>wide image shown on the hackathon page · 16:6</small></label>${drop('banner', 'banner', 'JPG / PNG / WebP · up to 8 MB')}</div>
@@ -263,7 +310,15 @@ export async function wizard(cx, id){
       ${fArea('Eligibility', 'eligibility', { rows: 3, max: 600, ph: 'Who can join? e.g. Any UG/PG student from a recognised institute.' })}
       ${fArea('Rules', 'rules', { rows: 5, max: 2500, ph: 'Judging criteria, originality, code of conduct, what to bring…' })}
       <div class="hk-grid3">${fNum('Min team size', 'teamMin', { min: 1 })}${fNum('Max team size', 'teamMax', { min: 1, hint: '1 = solo' })}${fNum('Max participants', 'maxParticipants', { hint: '0 = unlimited' })}</div>
-      ${fNum('Entry fee per team (₹)', 'fee', { hint: '0 = free', ph: '0' })}</div>`,
+      ${fNum('Entry fee per team (₹)', 'fee', { hint: '0 = free', ph: '0' })}
+      <div class="hk-card-s" style="padding:16px;display:grid;gap:10px">
+        <div><b>Applicant registration fields <span class="hk-xs hk-muted">(Solo &amp; Team)</span></b><div class="hk-xs hk-muted">Ask participants for GitHub, LinkedIn, Portfolio/Resume, or add any custom question during registration.</div></div>
+        ${toggleRow('regFields', 'askGithub', 'reqGithub', 'GitHub profile URL')}
+        ${toggleRow('regFields', 'askLinkedin', 'reqLinkedin', 'LinkedIn profile URL')}
+        ${toggleRow('regFields', 'askPortfolio', 'reqPortfolio', 'Portfolio / Resume link')}
+        <div class="hk-divider" style="margin:4px 0">Custom applicant fields</div>
+        ${customFieldsEd('regFields', D.regFields?.customFields, [['url', 'Link / URL'], ['text', 'Short text'], ['textarea', 'Long answer']], 'data-add-regfield', 'Add field')}
+      </div></div>`,
     3: () => `<h2 style="margin-bottom:4px">When & where</h2><p class="hk-muted hk-sm" style="margin-bottom:18px">Location is used to show your hackathon to nearby students and to students at your campus.</p><div class="hk-form">
       <div class="hk-grid2">${fText('College / institute', 'college', { ph: 'Hosting campus', max: 100 })}${fText('Venue', 'venue', { ph: D.mode === 'online' ? 'Platform (Zoom, Discord…)' : 'Building / hall', hint: 'optional', max: 100 })}</div>
       <div class="hk-grid2">${fText('City', 'city', { ph: 'e.g. Prayagraj', list: 'hkCityList', max: 60 })}${fText('State', 'state', { ph: 'e.g. Uttar Pradesh', max: 60 })}</div><datalist id="hkCityList">${Object.keys(C.CITIES).map(c => `<option value="${c}">`).join('')}</datalist>
@@ -273,19 +328,36 @@ export async function wizard(cx, id){
     4: () => `<h2 style="margin-bottom:4px">Rounds & submissions</h2><p class="hk-muted hk-sm" style="margin-bottom:18px">Define the stages teams move through and what they must submit for evaluation. You can add a screening test later from Manage.</p><div class="hk-form">
       <div class="hk-field"><label>Rounds <small>in order · teams start in round 1</small></label>${listEd('rounds', [{ f: 'name', ph: 'Round name' }, { f: 'startMs', ph: 'Starts', dt: true }, { f: 'endMs', ph: 'Ends', dt: true }, { f: 'desc', ph: 'What happens in this round' }], 'Add round')}</div>
       <div class="hk-card-s" style="padding:16px;display:grid;gap:12px"><b>Project submission</b>
-        <label class="hk-check"><input type="checkbox" data-sub="open" ${D.submission?.open !== false ? 'checked' : ''}><span>Let teams submit idea, project and PPT links for evaluation</span></label>
+        <label class="hk-check"><input type="checkbox" data-sub="open" ${D.submission?.open !== false ? 'checked' : ''}><span>Let teams submit idea, PPT, prototype video, or project links for evaluation</span></label>
         <div class="hk-field"><label>Submission deadline</label><input class="hk-input" type="datetime-local" data-sub="deadlineMs" data-t="dt" value="${C.toLocalInput(D.submission?.deadlineMs)}"></div>
-        <div class="hk-field"><label>Instructions <small>optional</small></label><textarea class="hk-textarea" data-sub="instructions" maxlength="600" style="min-height:70px" placeholder="e.g. Slides must be a public Google Drive link. Max 10 slides.">${esc(D.submission?.instructions || '')}</textarea></div></div>
+        <div class="hk-field"><label>Instructions <small>optional</small></label><textarea class="hk-textarea" data-sub="instructions" maxlength="600" style="min-height:70px" placeholder="e.g. Upload PPT/Video on Google Drive with Anyone with the link access and paste the URL.">${esc(D.submission?.instructions || '')}</textarea></div>
+        <div class="hk-divider" style="margin:2px 0">What participants submit</div>
+        ${toggleRow('submission', 'askPpt', 'reqPpt', 'PPT / Pitch Deck (Drive / PDF link)')}
+        ${toggleRow('submission', 'askRepo', 'reqRepo', 'GitHub / Code Repository link')}
+        ${toggleRow('submission', 'askVideo', 'reqVideo', 'Prototype / Demo Video link')}
+        ${toggleRow('submission', 'askIntroVideo', 'reqIntroVideo', 'Intro / Team Pitch Video link')}
+        ${toggleRow('submission', 'askDemo', 'reqDemo', 'Live Demo link')}
+        ${toggleRow('submission', 'askExtra', 'reqExtra', 'Other link (Figma, doc, dataset)')}
+        <div class="hk-divider" style="margin:2px 0">Custom submission fields</div>
+        ${customFieldsEd('submission', D.submission?.customFields, [['url', 'Link / Drive URL'], ['text', 'Short text']], 'data-add-subfield', 'Add submission field')}
+      </div>
       <label class="hk-check"><input type="checkbox" ${attr('autoEmail', 'bool')} ${D.autoEmail !== false ? 'checked' : ''}><span>Send automatic emails (confirmation, shortlist, selection) to team leaders from team@campusconnectone.online, signed with your organiser name.</span></label></div>`,
-    5: () => `<h2 style="margin-bottom:4px">Prizes & contact</h2><p class="hk-muted hk-sm" style="margin-bottom:18px">Prizes attract teams. Contact details help participants trust you.</p><div class="hk-form">
+    5: () => `<h2 style="margin-bottom:4px">Prizes & contact</h2><p class="hk-muted hk-sm" style="margin-bottom:18px">Prizes attract teams. Contact details are optional—your Organised by identity is always shown subtly.</p><div class="hk-form">
       ${fNum('Total prize pool (₹)', 'prizePool', { hint: '0 if none', ph: '0' })}
       <div class="hk-field"><label>Prize breakdown</label>${listEd('prizes', [{ f: 'place', ph: 'e.g. Winner' }, { f: 'amount', ph: 'Amount ₹', num: true }, { f: 'note', ph: 'Note (e.g. + goodies)' }], 'Add prize')}</div>
       ${fArea('Perks & swag', 'perks', { rows: 3, max: 800, ph: 'Certificates, internships, mentorship, food, swag…' })}
-      <div class="hk-grid2">${fText('Contact person', 'contactName', { max: 60 })}${fText('Contact email', 'contactEmail', { type: 'email' })}</div>${fText('Contact phone', 'contactPhone', { ph: 'Optional', hint: 'optional' })}
+      <div class="hk-grid2">${fText('Contact person', 'contactName', { ph: 'Optional', hint: 'optional', max: 60 })}${fText('Contact email', 'contactEmail', { type: 'email', hint: 'optional' })}</div>
+      ${fText('Contact phone', 'contactPhone', { ph: 'Optional', hint: 'optional' })}
+      <label class="hk-check"><input type="checkbox" ${attr('showContactPhone', 'bool')} ${D.showContactPhone ? 'checked' : ''}><span>Show contact phone publicly on the hackathon page</span></label>
+      <div class="hk-org-strip">
+        <img src="${esc(hostPhoto)}" alt="" onerror="this.src='icon.png'">
+        <div><small>Organised by · live preview</small><b>${esc(hostOrgName)}</b>${hostOrgEmail ? `<span>${esc(hostOrgEmail)}</span>` : ''}</div>
+      </div>
       <div class="hk-field"><label>FAQs <small>optional</small></label>${listEd('faqs', [{ f: 'q', ph: 'Question' }, { f: 'a', ph: 'Answer', area: true }], 'Add FAQ')}</div></div>`,
     6: () => { errs = C.validateForSubmit({ ...D, agree: true }); const ok = !errs.length;
       return `<h2 style="margin-bottom:4px">Review & submit</h2><p class="hk-muted hk-sm" style="margin-bottom:18px">${live ? 'Saving updated details will re-verify your live listing.' : 'Check your details carefully before submitting your hackathon.'}</p>
-      <div class="hk-form"><div class="hk-card-s" style="padding:16px"><b>Checklist</b><div class="hk-checklist" style="margin-top:10px">${ok ? '<div class="ok"><i data-lucide="circle-check"></i>Everything looks good. Ready to submit.</div>' : errs.map(e => `<div class="no"><i data-lucide="circle-x"></i><span>${esc(e.msg)} · <a href="#" data-jump="${e.step}">fix in step ${e.step}</a></span></div>`).join('')}</div></div>
+      <div class="hk-form">${blocked ? `<div class="hk-msg err"><i data-lucide="shield-alert"></i><span><b>Hosting paused:</b> You cannot publish or submit drafts until admin restores your access. Email support@campusconnectone.online.</span></div>` : ''}
+      <div class="hk-card-s" style="padding:16px"><b>Checklist</b><div class="hk-checklist" style="margin-top:10px">${ok ? '<div class="ok"><i data-lucide="circle-check"></i>Everything looks good. Ready to submit.</div>' : errs.map(e => `<div class="no"><i data-lucide="circle-x"></i><span>${esc(e.msg)} · <a href="#" data-jump="${e.step}">fix in step ${e.step}</a></span></div>`).join('')}</div></div>
       ${live ? '<div class="hk-banner" style="margin:0"><i data-lucide="triangle-alert" style="color:var(--hk-warn)"></i><div class="grow"><b>This hackathon is live</b><div class="hk-sm hk-muted">Updated details are verified before returning to the live feed.</div></div></div>' : ''}
       <label class="hk-check"><input type="checkbox" ${attr('agree', 'bool')} ${D.agree ? 'checked' : ''}><span>I confirm the details are accurate, I'm authorised to host this event and I'll follow the platform's community guidelines.</span></label></div>`; }
   }[n]());
@@ -304,8 +376,8 @@ export async function wizard(cx, id){
   const paintStep = () => {
     $$('#stepper button').forEach((b, i) => { b.classList.toggle('on', i + 1 === step); b.classList.toggle('done', i + 1 < step); });
     const last = step === 6;
-    $('#stepBody').innerHTML = body(step) + `<div class="hk-wiz-nav"><div style="display:flex;gap:8px">${step > 1 ? '<button type="button" class="hk-btn" data-go="-1"><i data-lucide="arrow-left"></i>Back</button>' : ''}${!live ? '<button type="button" class="hk-btn ghost" data-save>Save draft</button>' : ''}</div>
-      ${last ? `<button type="button" class="hk-btn gold lg" data-submit><i data-lucide="send"></i>${live ? 'Save & resubmit' : 'Submit for approval'}</button>` : '<button type="button" class="hk-btn primary" data-go="1">Next<i data-lucide="arrow-right"></i></button>'}</div>`;
+    $('#stepBody').innerHTML = body(step) + `<div class="hk-wiz-nav"><div style="display:flex;gap:8px">${step > 1 ? '<button type="button" class="hk-btn" data-go="-1"><i data-lucide="arrow-left"></i>Back</button>' : ''}${!live && !blocked ? '<button type="button" class="hk-btn ghost" data-save>Save draft</button>' : ''}</div>
+      ${last ? `<button type="button" class="hk-btn gold lg" data-submit ${blocked ? 'disabled title="Hosting paused — publishing disabled"' : ''}><i data-lucide="send"></i>${blocked ? 'Publishing paused' : live ? 'Save & resubmit' : 'Submit for approval'}</button>` : '<button type="button" class="hk-btn primary" data-go="1">Next<i data-lucide="arrow-right"></i></button>'}</div>`;
     preview(); icons();
     $('#stepper button.on')?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
   };
@@ -313,6 +385,10 @@ export async function wizard(cx, id){
   /* --- persistence --- */
   const backup = C.debounce(() => { if(isNew) try { localStorage.setItem(BK, JSON.stringify(D)); } catch {} }, 500);
   async function persist(kind){
+    if(blocked){
+      toast('Hosting is paused by admin. You cannot publish or create new hackathons.', 'error');
+      return false;
+    }
     if(saving) return false; saving = true;
     try {
       const status = kind === 'submit' ? 'pending' : (['approved', 'pending'].includes(D.status) ? D.status : 'draft');
@@ -326,7 +402,7 @@ export async function wizard(cx, id){
     } finally { saving = false; }
   }
   const go = async n => {
-    if(n === step) return; if(dirty && (D.title || '').trim() && !live) await persist('draft');
+    if(n === step) return; if(dirty && (D.title || '').trim() && !live && !blocked) await persist('draft');
     step = Math.max(1, Math.min(6, n)); paintStep(); scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -341,9 +417,22 @@ export async function wizard(cx, id){
       if(['city'].includes(k) && e.type === 'change'){ const f = C.findCity(D.city); if(f && !D.state) { D.state = f.state; const s = $('#f_state'); if(s) s.value = f.state; } }
     } else if(t.matches('[data-l]')){
       const row = D[t.dataset.l][+t.dataset.i]; row[t.dataset.f] = t.dataset.t === 'num' ? (t.value === '' ? '' : Number(t.value)) : t.dataset.t === 'dt' ? C.fromLocalInput(t.value) : t.value;
+    } else if(t.matches('[data-regf]')){
+      const k = t.dataset.regf; D.regFields = { ...(D.regFields || {}) };
+      D.regFields[k] = t.checked;
+      if(k.startsWith('req') && t.checked){ const askKey = 'ask' + k.slice(3); D.regFields[askKey] = true; const askEl = $(`[data-regf="${askKey}"]`, root); if(askEl) askEl.checked = true; }
+      if(k.startsWith('ask') && !t.checked){ const reqKey = 'req' + k.slice(3); D.regFields[reqKey] = false; const reqEl = $(`[data-regf="${reqKey}"]`, root); if(reqEl) reqEl.checked = false; }
     } else if(t.matches('[data-sub]')){
       const k = t.dataset.sub; D.submission = { ...(D.submission || {}) };
       D.submission[k] = t.type === 'checkbox' ? t.checked : t.dataset.t === 'dt' ? C.fromLocalInput(t.value) : t.value;
+      if(k.startsWith('req') && t.checked){ const askKey = 'ask' + k.slice(3); D.submission[askKey] = true; const askEl = $(`[data-sub="${askKey}"]`, root); if(askEl) askEl.checked = true; }
+      if(k.startsWith('ask') && !t.checked){ const reqKey = 'req' + k.slice(3); D.submission[reqKey] = false; const reqEl = $(`[data-sub="${reqKey}"]`, root); if(reqEl) reqEl.checked = false; }
+    } else if(t.matches('[data-cf]')){
+      const scope = t.dataset.cf, idx = +t.dataset.i, field = t.dataset.f;
+      D[scope] = { ...(D[scope] || {}), customFields: [...(D[scope]?.customFields || [])] };
+      const item = { ...(D[scope].customFields[idx] || {}) };
+      item[field] = t.type === 'checkbox' ? t.checked : t.value;
+      D[scope].customFields[idx] = item;
     } else if(t.matches('[data-up]') && e.type === 'change') return upload(t);
     else return;
     dirty = true; backup(); C.debounce(preview, 200)();
@@ -386,14 +475,19 @@ export async function wizard(cx, id){
     const g = t.closest('[data-go]'); if(g) return go(step + +g.dataset.go);
     const j = t.closest('[data-jump]'); if(j){ e.preventDefault(); return go(+j.dataset.jump); }
     const seg = t.closest('[data-seg] [data-v]'); if(seg){ D.mode = seg.dataset.v; $$('[data-seg] button').forEach(b => b.classList.toggle('on', b === seg)); dirty = true; backup(); preview(); return; }
+    if(t.closest('[data-add-regfield]')){ D.regFields = { ...(D.regFields || {}), customFields: [...(D.regFields?.customFields || []), { id: 'rf_' + Date.now().toString(36), label: '', type: 'url', required: false }] }; dirty = true; return paintStepKeep(); }
+    if(t.closest('[data-add-subfield]')){ D.submission = { ...(D.submission || {}), customFields: [...(D.submission?.customFields || []), { id: 'sf_' + Date.now().toString(36), label: '', type: 'url', required: false }] }; dirty = true; return paintStepKeep(); }
+    const cfd = t.closest('[data-cf-del]');
+    if(cfd){ const [scope, i] = cfd.dataset.cfDel.split(':'); if(D[scope]?.customFields){ D[scope].customFields.splice(+i, 1); dirty = true; return paintStepKeep(); } }
     const ad = t.closest('[data-add]'); if(ad){ const n = ad.dataset.add; D[n].push(({ tracks: { title: '', desc: '' }, schedule: { when: '', title: '' }, prizes: { place: '', amount: '', note: '' }, faqs: { q: '', a: '' }, rounds: { name: '', desc: '', startMs: 0, endMs: 0 } })[n]); dirty = true; return paintStepKeep(); }
     const de = t.closest('[data-del]'); if(de && de.dataset.del.includes(':')){ const [n, i] = de.dataset.del.split(':'); D[n].splice(+i, 1); if(!D[n].length) D[n].push(({ tracks: { title: '', desc: '' }, schedule: { when: '', title: '' }, prizes: { place: '', amount: '', note: '' }, faqs: { q: '', a: '' }, rounds: { name: '', desc: '', startMs: 0, endMs: 0 } })[n]); dirty = true; return paintStepKeep(); }
     const tr = t.closest('[data-tagrm]'); if(tr){ D.tags.splice(+tr.dataset.tagrm, 1); $('#tagBox').innerHTML = tagsHtml(); dirty = true; backup(); preview(); icons(); return; }
     const sg = t.closest('[data-sugg]'); if(sg) return addTag(sg.dataset.sugg);
     const ge = t.closest('[data-geo]'); if(ge) return geo(ge.dataset.geo, ge);
-    if(t.closest('[data-save]')){ const b = t.closest('[data-save]'); b.disabled = true; if(await persist('draft')) toast('Draft saved'); b.disabled = false; return; }
+    if(t.closest('[data-save]')){ if(blocked) return toast('Hosting is paused by admin.', 'error'); const b = t.closest('[data-save]'); b.disabled = true; if(await persist('draft')) toast('Draft saved'); b.disabled = false; return; }
     const sb = t.closest('[data-submit]');
     if(sb){
+      if(blocked) return toast('Hosting is paused. You cannot publish or submit drafts.', 'error');
       if(!D.agree){ errs = C.validateForSubmit(D); }
       sb.disabled = true; const o = sb.innerHTML; sb.innerHTML = '<span class="hk-spin"></span> Submitting…';
       try { if(await persist('submit')){ toast(live ? 'Resubmitted for approval' : 'Submitted for approval. We will notify you.'); cx.nav(cx.backHash || '#/host'); } }

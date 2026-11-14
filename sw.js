@@ -1,5 +1,5 @@
-// Campus Connect One Service Worker v23
-const CACHE_VERSION = 'cc-v23';
+// Campus Connect One Service Worker v24
+const CACHE_VERSION = 'cc-v24';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 

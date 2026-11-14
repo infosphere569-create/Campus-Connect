@@ -219,13 +219,13 @@ async function detail(t, id){
   let cta;
   if(own) cta = `<a class="hk-btn gold" href="#/host/manage/${h.id}"><i data-lucide="users"></i>Manage</a><a class="hk-btn" href="#/host/edit/${h.id}"><i data-lucide="pencil"></i>Edit</a>`;
   else if(S.role === 'host') cta = `<button class="hk-btn" disabled>Log in as participant to register</button>`;
-  else if(partBanned) cta = `<button class="hk-btn danger" disabled>Participant access paused</button>`;
+  else if(partBanned) cta = `<button class="hk-btn danger" type="button" data-act="part-banned"><i data-lucide="ban"></i>Participation paused · Resolve</button>`;
   else if(reg) cta = `<a class="hk-btn primary" href="#/my/${h.id}"><i data-lucide="layout-dashboard"></i>Open my dashboard</a><button class="hk-btn danger" data-act="cancel-reg" data-id="${h.id}">Cancel</button>`;
   else if(h.status !== 'approved') cta = `<button class="hk-btn" disabled>Not open for registration</button>`;
   else if(C.canRegister(h)) cta = `<button class="hk-btn primary lg" data-act="register" data-id="${h.id}"><i data-lucide="ticket-check"></i>Register now</button>`;
   else cta = `<button class="hk-btn" disabled>${ph.label}</button>`;
   const notice = h.status !== 'approved' ? `<div class="hk-banner" style="margin:14px 0 0"><i data-lucide="eye"></i><div class="grow"><b>Preview</b><div class="hk-sm hk-muted">Status: ${statusBadge(h.status)} ${h.adminNote ? '· ' + esc(h.adminNote) : ''}</div></div></div>` : '';
-  const banNote = partBanned ? `<div class="hk-msg err" style="margin:14px 0 0"><i data-lucide="ban"></i><span>Your participant access has been paused by an admin.${S.hk?.banReason ? ' Reason: ' + esc(S.hk.banReason) : ''} Contact support@campusconnectone.online.</span></div>` : '';
+  const banNote = partBanned ? `<div class="hk-msg err" style="margin:14px 0 0"><i data-lucide="ban"></i><span>Your participant access has been paused by an admin.${S.hk?.banReason ? ' Reason: ' + esc(S.hk.banReason) : ''} You cannot register for new hackathons. <a href="mailto:support@campusconnectone.online" style="text-decoration:underline;font-weight:700">Contact support</a></span></div>` : '';
   const regNote = reg ? `<div class="hk-banner" style="margin:14px 0 0"><i data-lucide="party-popper" style="color:var(--hk-p)"></i><div class="grow"><b>You're registered</b><div class="hk-sm hk-muted">${reg.teamMode === 'solo' ? 'Solo' : 'Team ' + esc(reg.teamName || '')} · status: ${esc(reg.status)}</div></div></div>` : '';
   const cd = countdownHtml(h, reg, reg?.status === 'selected');
   view.innerHTML = `<div class="hk-view"><button class="hk-btn ghost sm" data-act="back" style="margin-bottom:12px"><i data-lucide="arrow-left"></i>Back</button>
@@ -240,25 +240,116 @@ async function detail(t, id){
 }
 function stopTimersSafe(fn){ try { fn?.(); } catch {} }
 
+function showBannedParticipantModal(){
+  modal('Participation paused', `<div class="hk-stack">
+    <div class="hk-msg err"><i data-lucide="ban"></i><span>Your participant account is blocked from registering for new hackathons.${S.hk?.banReason ? ' <b>Reason:</b> ' + esc(S.hk.banReason) : ''}</span></div>
+    <p class="hk-sm hk-muted">You can still view your existing registered hackathons and submissions under <b>My hackathons</b>, but new registrations are disabled.</p>
+    <div class="hk-card-s" style="padding:14px;display:grid;gap:8px">
+      <b style="font-size:.9rem">How to resolve this</b>
+      <p class="hk-sm hk-muted">Email our support team from your registered Gmail (<b>${esc(S.user?.email || '')}</b>) explaining your issue or appeal. Our team reviews requests within 24–48 hours.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+        <a class="hk-btn primary sm" href="mailto:support@campusconnectone.online?subject=${encodeURIComponent('Participant account review: ' + (S.user?.email || ''))}"><i data-lucide="mail"></i>Email support@campusconnectone.online</a>
+        <button type="button" class="hk-btn sm" id="copySupBtn"><i data-lucide="copy"></i>Copy email</button>
+        <a class="hk-btn sm" href="contact.html"><i data-lucide="life-buoy"></i>Support page</a>
+      </div>
+    </div>
+  </div>`, {
+    onMount(b){
+      $('#copySupBtn', b)?.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText('support@campusconnectone.online'); toast('Support email copied'); }
+        catch { toast('support@campusconnectone.online', 'info'); }
+      });
+    }
+  });
+}
+
 function registerModal(h){
-  if(S.hk?.participantBlocked || S.hk?.banned){ toast('Your participant access has been paused by an admin.', 'error'); return; }
+  if(S.hk?.participantBlocked || S.hk?.banned){ showBannedParticipantModal(); return; }
   const hk = S.hk, max = Math.max(1, +h.teamMax || 1), min = Math.max(1, +h.teamMin || 1), soloOnly = max <= 1, teamOnly = min > 1;
-  const memRow = (i, m = {}) => `<div class="hk-mem" data-i="${i}"><div class="hk-grid3"><input class="hk-input" name="mn" placeholder="Member name" value="${esc(m.name || '')}" maxlength="80"><input class="hk-input" name="me" type="email" placeholder="Email" value="${esc(m.email || '')}"><input class="hk-input" name="mp" inputmode="tel" placeholder="Phone (optional)" value="${esc(m.phone || '')}"></div><button type="button" class="hk-btn sm ghost" data-rm aria-label="Remove member"><i data-lucide="x"></i></button></div>`;
+  const rf = h.regFields || {};
+  const courseOpts = C.COURSES.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  const yearOpts = C.YEARS.map(y => `<option value="${esc(y)}">${esc(y)}</option>`).join('');
+  const memRow = (i, m = {}) => `<div class="hk-mem-card hk-mem" data-i="${i}">
+    <div class="hk-mem-head"><span>Member #${i + 2}</span><button type="button" class="hk-btn icon sm ghost" data-rm aria-label="Remove member"><i data-lucide="x"></i></button></div>
+    <div class="hk-grid3">
+      <input class="hk-input" name="mn" placeholder="Full name *" required value="${esc(m.name || '')}" maxlength="80">
+      <input class="hk-input" name="me" type="email" placeholder="Gmail / Email *" required value="${esc(m.email || '')}">
+      <input class="hk-input" name="mp" inputmode="tel" placeholder="Contact no. (optional)" value="${esc(m.phone || '')}">
+    </div>
+    <div class="hk-grid3">
+      <input class="hk-input" name="mcol" placeholder="College / University *" required value="${esc(m.college || '')}" maxlength="120">
+      <select class="hk-select" name="mc" required aria-label="Course"><option value="">Select course *</option>${courseOpts}</select>
+      <select class="hk-select" name="my" required aria-label="Year"><option value="">Select year *</option>${yearOpts}</select>
+    </div>
+    <div class="hk-field-err hk-hidden" data-mem-err></div>
+  </div>`;
+
+  const extraProfileFields = [
+    (rf.askGithub || rf.reqGithub) ? `<div class="hk-field"><label>GitHub profile URL <small>${rf.reqGithub ? 'required' : 'optional'}</small></label><input class="hk-input" name="github" type="url" ${rf.reqGithub ? 'required' : ''} placeholder="https://github.com/username" value="${esc(hk.github || S.site?.githubURL || '')}"></div>` : '',
+    (rf.askLinkedin || rf.reqLinkedin) ? `<div class="hk-field"><label>LinkedIn profile URL <small>${rf.reqLinkedin ? 'required' : 'optional'}</small></label><input class="hk-input" name="linkedin" type="url" ${rf.reqLinkedin ? 'required' : ''} placeholder="https://linkedin.com/in/username" value="${esc(hk.linkedin || S.site?.linkedinURL || '')}"></div>` : '',
+    (rf.askPortfolio || rf.reqPortfolio) ? `<div class="hk-field"><label>Portfolio / Resume link <small>${rf.reqPortfolio ? 'required' : 'optional'}</small></label><input class="hk-input" name="portfolio" type="url" ${rf.reqPortfolio ? 'required' : ''} placeholder="https://…" value="${esc(hk.portfolio || S.site?.websiteURL || '')}"></div>` : ''
+  ].filter(Boolean).join('');
+
+  const customRegFields = (rf.customFields || []).filter(cf => (cf.label || '').trim()).map((cf, i) => `
+    <div class="hk-field"><label>${esc(cf.label)} <small>${cf.required ? 'required' : 'optional'}</small></label>
+      ${cf.type === 'textarea'
+        ? `<textarea class="hk-textarea" data-cf-ans="${i}" style="min-height:80px" ${cf.required ? 'required' : ''} placeholder="Enter your answer…"></textarea>`
+        : `<input class="hk-input" data-cf-ans="${i}" type="${cf.type === 'url' ? 'url' : 'text'}" ${cf.required ? 'required' : ''} placeholder="${cf.type === 'url' ? 'https://…' : 'Enter your answer…'}">`
+      }
+    </div>`).join('');
+
   modal(`Register · ${h.title}`, `<form class="hk-form" id="regForm" novalidate>
     <div class="hk-msg ok"><i data-lucide="mail-check"></i><span>A confirmation email goes to <b>${esc(S.user.email || '')}</b> from team@campusconnectone.online. The team leader receives all updates.</span></div>
     ${soloOnly ? '<input type="hidden" name="teamMode" value="solo"><div class="hk-chip">Solo hackathon</div>' : `<div class="hk-field"><label>How are you joining?</label><div class="hk-seg" id="tm">${teamOnly ? '' : '<button type="button" class="on" data-m="solo">Solo</button>'}<button type="button" class="${teamOnly ? 'on' : ''}" data-m="team">Team</button></div><input type="hidden" name="teamMode" value="${teamOnly ? 'team' : 'solo'}"></div>
     <div id="teamBox" class="${teamOnly ? '' : 'hk-hidden'} hk-form"><div class="hk-field"><label>Team name</label><input class="hk-input" name="teamName" maxlength="60" placeholder="e.g. Null Pointers"></div>
-      <div class="hk-field"><label>Team members <small>you are the team leader · ${min > 1 ? `${min - 1} to ` : 'up to '}${max - 1} more</small></label><div id="mems" class="hk-stack"></div><button type="button" class="hk-btn sm" id="addMem"><i data-lucide="user-plus"></i>Add member</button></div></div>`}
+      <div class="hk-field"><label>Team members <small>you are the team leader · ${min > 1 ? `${min - 1} to ` : 'up to '}${max - 1} more · Name, Gmail, College, Course &amp; Year required</small></label><div id="mems" class="hk-stack"></div><button type="button" class="hk-btn sm" id="addMem"><i data-lucide="user-plus"></i>Add member</button></div></div>`}
     <fieldset class="hk-fs"><legend>Team leader (you)</legend><div class="hk-grid2"><div class="hk-field"><label>Full name</label><input class="hk-input" name="name" required value="${esc(hk.displayName || '')}"></div><div class="hk-field"><label>Phone</label><input class="hk-input" name="phone" inputmode="tel" required value="${esc(hk.phone || '')}"></div></div>
-    <div class="hk-grid2"><div class="hk-field"><label>College</label><input class="hk-input" name="college" required value="${esc(myCollege())}"></div><div class="hk-field"><label>Year / course</label><input class="hk-input" name="year" value="${esc([hk.course, hk.year].filter(Boolean).join(' · '))}"></div></div></fieldset>
+    <div class="hk-grid2"><div class="hk-field"><label>College</label><input class="hk-input" name="college" required value="${esc(myCollege())}"></div><div class="hk-field"><label>Course &amp; Year</label><input class="hk-input" name="year" value="${esc([hk.course, hk.year].filter(Boolean).join(' · '))}"></div></div></fieldset>
+    ${(extraProfileFields || customRegFields) ? `<fieldset class="hk-fs"><legend>Additional organiser questions</legend>${extraProfileFields}${customRegFields}</fieldset>` : ''}
     ${+h.fee > 0 ? `<div class="hk-msg ok"><i data-lucide="ticket"></i><span>Entry fee ${C.money(h.fee)} per team. The organiser will contact you to collect it.</span></div>` : ''}
     <label class="hk-check"><input type="checkbox" name="agree"><span>I have read the rules and agree to share these details with the organisers.</span></label>
     <div id="regErr" class="hk-msg err hk-hidden"></div>
-    <button class="hk-btn primary lg block" type="submit">Confirm registration</button></form>`, { onMount(b, close){
+    <button class="hk-btn primary lg block" type="submit">Confirm registration</button></form>`, { wide: !soloOnly, onMount(b, close){
     const f = $('#regForm', b), err = m => { const e = $('#regErr', b); e.classList.toggle('hk-hidden', !m); e.innerHTML = m ? `<i data-lucide="circle-alert"></i><span>${esc(m)}</span>` : ''; icons(); };
     const mems = $('#mems', b), count = () => mems ? mems.children.length : 0;
+    const bannedCache = new Map();
+    const checkMemberBan = async (cardEl) => {
+      const emailEl = $('[name="me"]', cardEl), errEl = $('[data-mem-err]', cardEl);
+      if(!emailEl || !errEl) return false;
+      const em = emailEl.value.trim().toLowerCase();
+      if(!em || !/^\S+@\S+\.\S+$/.test(em)){
+        emailEl.classList.remove('err'); errEl.classList.add('hk-hidden'); errEl.innerHTML = '';
+        return false;
+      }
+      let res = bannedCache.has(em) ? bannedCache.get(em) : await C.checkBannedEmail(em);
+      bannedCache.set(em, res);
+      if(res){
+        emailEl.classList.add('err');
+        errEl.classList.remove('hk-hidden');
+        errEl.innerHTML = `<i data-lucide="ban"></i><span><b>Banned:</b> ${esc(em)} is blocked from participating.${res.reason ? ' (' + esc(res.reason) + ')' : ''}</span>`;
+        icons();
+        return true;
+      }
+      emailEl.classList.remove('err');
+      errEl.classList.add('hk-hidden');
+      errEl.innerHTML = '';
+      return false;
+    };
     const add = () => { if(count() >= max - 1) return toast(`Maximum team size is ${max}.`, 'error'); mems.insertAdjacentHTML('beforeend', memRow(count())); icons(); };
-    if(mems){ for(let i = 0; i < Math.max(0, min - 1); i++) mems.insertAdjacentHTML('beforeend', memRow(i)); $('#addMem', b).onclick = add; mems.onclick = e => { const r = e.target.closest('[data-rm]'); if(r) r.closest('.hk-mem').remove(); }; }
+    if(mems){
+      for(let i = 0; i < Math.max(0, min - 1); i++) mems.insertAdjacentHTML('beforeend', memRow(i));
+      $('#addMem', b).onclick = add;
+      mems.onclick = e => { const r = e.target.closest('[data-rm]'); if(r) r.closest('.hk-mem').remove(); };
+      mems.addEventListener('change', e => { if(e.target.name === 'me') checkMemberBan(e.target.closest('.hk-mem')); });
+      mems.addEventListener('focusout', e => { if(e.target.name === 'me') checkMemberBan(e.target.closest('.hk-mem')); });
+      mems.addEventListener('input', e => {
+        if(e.target.name === 'me'){
+          const cardEl = e.target.closest('.hk-mem');
+          $('[data-mem-err]', cardEl)?.classList.add('hk-hidden');
+          e.target.classList.remove('err');
+        }
+      });
+    }
     $('#tm', b)?.addEventListener('click', e => { const bt = e.target.closest('[data-m]'); if(!bt) return; $$('#tm button', b).forEach(x => x.classList.toggle('on', x === bt)); f.teamMode.value = bt.dataset.m; $('#teamBox', b).classList.toggle('hk-hidden', bt.dataset.m !== 'team'); });
     icons();
     f.onsubmit = async ev => {
@@ -270,12 +361,55 @@ function registerModal(h){
       let members = [];
       if(d.teamMode === 'team'){
         if(!(d.teamName || '').trim()) return err('Give your team a name.');
-        members = $$('.hk-mem', b).map(r => { const [n, e, p] = $$('input', r).map(x => x.value.trim()); return { name: n, email: e, phone: p }; });
-        if(members.some(m => m.name.length < 2)) return err('Enter a name for every team member (or remove the empty row).');
-        if(members.some(m => m.email && !/^\S+@\S+\.\S+$/.test(m.email))) return err('A member email is not valid.');
+        const memCards = $$('.hk-mem', b);
+        members = memCards.map(r => ({
+          el: r,
+          name: ($('[name="mn"]', r)?.value || '').trim(),
+          email: ($('[name="me"]', r)?.value || '').trim().toLowerCase(),
+          phone: ($('[name="mp"]', r)?.value || '').trim(),
+          college: ($('[name="mcol"]', r)?.value || '').trim(),
+          course: ($('[name="mc"]', r)?.value || '').trim(),
+          year: ($('[name="my"]', r)?.value || '').trim()
+        }));
         if(members.length + 1 < min) return err(`This hackathon needs at least ${min} members including you.`);
         if(members.length + 1 > max) return err(`Maximum team size is ${max}.`);
+        for(let idx = 0; idx < members.length; idx++){
+          const m = members[idx], n = idx + 2;
+          if(m.name.length < 2) return err(`Enter full name for Member #${n}.`);
+          if(!/^\S+@\S+\.\S+$/.test(m.email)) return err(`Enter a valid Gmail / email for Member #${n}.`);
+          if(m.phone && m.phone.replace(/\D/g, '').length < 10) return err(`Member #${n} phone must be 10 digits or left blank.`);
+          if(m.college.length < 2) return err(`Enter college / university for Member #${n}.`);
+          if(!m.course) return err(`Select course for Member #${n}.`);
+          if(!m.year) return err(`Select year for Member #${n}.`);
+        }
+        const leaderEmail = (S.user.email || '').trim().toLowerCase();
+        if(members.some(m => m.email === leaderEmail)) return err('You are already listed as Team Leader; do not repeat your own email in members.');
+        const seenEmails = new Set();
+        for(const m of members){
+          if(seenEmails.has(m.email)) return err(`Duplicate team member email: ${m.email}`);
+          seenEmails.add(m.email);
+        }
+        const banFlags = await Promise.all(members.map(m => checkMemberBan(m.el)));
+        if(banFlags.some(Boolean)) return err('One or more team member emails are banned from hackathons.');
+        members = members.map(({ el, ...clean }) => clean);
       }
+      if(rf.reqGithub && !(d.github || '').trim()) return err('GitHub profile URL is required.');
+      if((d.github || '').trim() && !C.isUrl(d.github)) return err('GitHub URL must start with https://');
+      if(rf.reqLinkedin && !(d.linkedin || '').trim()) return err('LinkedIn profile URL is required.');
+      if((d.linkedin || '').trim() && !C.isUrl(d.linkedin)) return err('LinkedIn URL must start with https://');
+      if(rf.reqPortfolio && !(d.portfolio || '').trim()) return err('Portfolio / Resume link is required.');
+      if((d.portfolio || '').trim() && !C.isUrl(d.portfolio)) return err('Portfolio / Resume link must start with https://');
+
+      const customAnswers = [];
+      const activeCustom = (rf.customFields || []).filter(cf => (cf.label || '').trim());
+      for(let i = 0; i < activeCustom.length; i++){
+        const cf = activeCustom[i];
+        const val = ($(`[data-cf-ans="${i}"]`, b)?.value || '').trim();
+        if(cf.required && !val) return err(`${cf.label} is required.`);
+        if(val && cf.type === 'url' && !C.isUrl(val)) return err(`${cf.label} must be a valid link starting with https://`);
+        if(val) customAnswers.push({ id: cf.id || ('q' + i), label: cf.label, type: cf.type || 'text', value: val });
+      }
+
       if(!d.agree) return err('Please accept the rules to continue.');
       const btn = $('button[type=submit]', b); btn.disabled = true; btn.innerHTML = '<span class="hk-spin"></span> Registering…';
       try {
@@ -283,7 +417,10 @@ function registerModal(h){
           name: d.name.trim(), phone: d.phone.replace(/\D/g, '').slice(-10), email: S.user.email || '',
           college: d.college.trim(), year: (d.year || '').trim(), course: hk.course || S.site?.course || '', branch: hk.branch || S.site?.branch || '',
           city: hk.city || '', level: hk.level || '', gender: hk.gender || '', skills: hk.skills || '', bio: hk.bio || S.site?.bio || '',
-          github: hk.github || S.site?.githubURL || '', linkedin: hk.linkedin || S.site?.linkedinURL || '', portfolio: hk.portfolio || S.site?.websiteURL || '',
+          github: (d.github || '').trim() || hk.github || S.site?.githubURL || '',
+          linkedin: (d.linkedin || '').trim() || hk.linkedin || S.site?.linkedinURL || '',
+          portfolio: (d.portfolio || '').trim() || hk.portfolio || S.site?.websiteURL || '',
+          customAnswers,
           photoURL: hk.photoURL || S.site?.photoURL || S.user?.photoURL || '',
           teamMode: d.teamMode, teamName: d.teamMode === 'team' ? d.teamName.trim() : '', members, teamSize: members.length + 1
         });
@@ -546,7 +683,11 @@ document.addEventListener('click', async e => {
   else if(act === 'logout'){ await signOut(C.auth); sessionStorage.removeItem('hk-role'); location.replace('hackthons.html'); }
   else if(act === 'back') history.length > 1 ? history.back() : nav('#/home');
   else if(act === 'clear-filters'){ S.f = { q: '', mode: '', fee: '', when: '', sort: 'trending', tag: '' }; route(); }
-  else if(act === 'register'){ const h = S.cur?.id === a.dataset.id ? S.cur : await getH(a.dataset.id); if(h) registerModal(h); }
+  else if(act === 'part-banned'){ showBannedParticipantModal(); }
+  else if(act === 'register'){
+    if(S.hk?.participantBlocked || S.hk?.banned){ showBannedParticipantModal(); return; }
+    const h = S.cur?.id === a.dataset.id ? S.cur : await getH(a.dataset.id); if(h) registerModal(h);
+  }
   else if(act === 'cancel-reg'){
     if(!confirm('Cancel your registration for this hackathon?')) return;
     try { await C.cancelRegistration(S.cur, S.user); S.regs = null; S.all = null; toast('Registration cancelled', 'info'); route(); } catch(err){ toast(err.message, 'error'); }
