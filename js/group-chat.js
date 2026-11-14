@@ -1,0 +1,168 @@
+// Real-time WhatsApp-style chat for a group: live message stream, pin (leader
+// only), and a leader-only "announce to all" broadcast that also notifies
+// every member (via the broadcastGroupMessage Cloud Function, since creating
+// notifications for other people is staff-gated at the rules level -- a group
+// leader isn't necessarily platform staff, so this has to go through a
+// function that verifies leadership server-side).
+import './theme.js';
+import {db} from './firebase.js';
+import {subscribeAuth,requireAuth,currentUser,currentProfile} from './auth.js';
+import {collection,addDoc,doc,getDoc,updateDoc,deleteDoc,onSnapshot,query,orderBy,limit,serverTimestamp} from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js';
+import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-functions.js';
+import { getQuery, escapeHtml, linkifyHtml, initials, timeAgo, toast } from './utils.js';
+
+let groupId=null, isLeader=false, unsub=null;
+
+function bubble(m){
+ const mine=m.authorId===currentUser?.uid;
+ const pinned=m.pinned?'<div class="chat-pinned-tag"><i data-lucide="pin"></i>Pinned</div>':'';
+ const broadcastTag=m.broadcast?'<div class="chat-broadcast-tag"><i data-lucide="megaphone"></i>Announcement</div>':'';
+ return `<div class="chat-row ${mine?'mine':''}" data-msg-id="${escapeHtml(m.id)}" data-raw="${escapeHtml(m.text||'')}">
+  ${mine?'':`<div class="avatar sm">${initials(m.authorName)}</div>`}
+  <div class="chat-bubble ${m.broadcast?'chat-bubble-broadcast':''}">
+   ${broadcastTag}${pinned}
+   ${mine?'':`<div class="chat-author">${escapeHtml(m.authorName||'Student')}</div>`}
+   <div class="chat-text">${linkifyHtml(m.text||'')}</div>
+   <div class="chat-time">${timeAgo(m.createdAt)}${m.edited?' · edited':''}</div>
+   <div class="chat-bubble-actions">
+   ${isLeader&&!mine?`<button class="chat-pin-btn" data-toggle-pin="${escapeHtml(m.id)}" title="${m.pinned?'Unpin':'Pin'}"><i data-lucide="pin"></i></button>`:''}
+   ${mine?`<button class="chat-pin-btn" data-edit-msg="${escapeHtml(m.id)}" title="Edit"><i data-lucide="pencil"></i></button><button class="chat-pin-btn" data-delete-msg="${escapeHtml(m.id)}" title="Delete"><i data-lucide="trash-2"></i></button>${isLeader?`<button class="chat-pin-btn" data-toggle-pin="${escapeHtml(m.id)}" title="${m.pinned?'Unpin':'Pin'}"><i data-lucide="pin"></i></button>`:''}`:''}
+   </div>
+  </div>
+ </div>`;
+}
+
+function renderMessages(msgs){
+ const win=document.getElementById('chatWindow');
+ if(!win)return;
+ const wasAtBottom=win.scrollTop+win.clientHeight>=win.scrollHeight-40;
+ if(!msgs.length){
+  win.innerHTML='<div class="empty"><i data-lucide="message-circle"></i><h3>No messages yet</h3><p class="muted">Say hello to the group.</p></div>';
+ }else{
+  win.innerHTML=msgs.map(bubble).join('');
+ }
+ window.lucide?.createIcons();
+ const pinned=msgs.find(m=>m.pinned);
+ const pinBar=document.getElementById('pinnedMessageBar');
+ if(pinBar){
+  if(pinned){pinBar.hidden=false;pinBar.className='chat-pinned-bar';pinBar.innerHTML=`<i data-lucide="pin"></i><span>${escapeHtml((pinned.text||'').slice(0,80))}</span>`;window.lucide?.createIcons()}
+  else{pinBar.hidden=true}
+ }
+ if(wasAtBottom)win.scrollTop=win.scrollHeight;
+}
+
+const DEMO_CHAT_MESSAGES = [
+  { id: 'm-1', authorName: 'Rohan Mehta', text: 'Hey everyone! Welcome to the group chat. What are you all working on this term?', createdAt: new Date(Date.now() - 3600000 * 4), pinned: false },
+  { id: 'm-2', authorName: 'Ananya Sen', text: 'Preparing for the algorithmic hackathon this weekend! Anyone need code reviews?', createdAt: new Date(Date.now() - 3600000 * 2), pinned: false },
+  { id: 'm-3', authorName: 'Ayush Kumar', text: 'Important: Next meetup is scheduled for Thursday 5 PM in Room 204.', createdAt: new Date(Date.now() - 3600000), pinned: true, broadcast: true }
+];
+
+let localMsgs = [...DEMO_CHAT_MESSAGES];
+
+async function start(){
+ if(unsub){unsub();unsub=null;}
+ groupId=getQuery('id')||'demo-grp-coders';
+ if(groupId.startsWith('demo')||!db){
+  renderMessages(localMsgs);
+  return;
+ }
+ try{
+  const gsnap=await getDoc(doc(db,'groups',groupId));
+  if(gsnap.exists()){
+   isLeader=gsnap.data().createdBy===currentUser?.uid;
+   const bcOption=document.getElementById('broadcastOption');if(bcOption)bcOption.hidden=!isLeader;
+  }
+ }catch(e){}
+ const q=query(collection(db,'groups',groupId,'messages'),orderBy('createdAt','asc'),limit(100));
+ unsub=onSnapshot(q,snap=>{
+  const msgs=snap.docs.map(d=>({id:d.id,...d.data()}));
+  renderMessages(msgs.length?msgs:localMsgs);
+ },err=>{
+  renderMessages(localMsgs);
+ });
+}
+
+document.getElementById('chatForm')?.addEventListener('submit',async e=>{
+ e.preventDefault();
+ const input=document.getElementById('chatInput');
+ const text=input.value.trim();if(!text)return;
+ const broadcastCheck=document.getElementById('broadcastCheck');
+ const wantsBroadcast=isLeader&&broadcastCheck?.checked;
+ input.value='';
+ const btn=e.currentTarget.querySelector('button[type="submit"]');if(btn)btn.disabled=true;
+ try{
+  if(groupId?.startsWith('demo')||!db){
+   const newMsg = {
+    id: `local-m-${Date.now()}`,
+    text,
+    authorId: currentUser?.uid || 'demo-user',
+    authorName: currentProfile?.displayName || 'Student',
+    pinned: false,
+    broadcast: Boolean(wantsBroadcast),
+    createdAt: new Date()
+   };
+   localMsgs.push(newMsg);
+   renderMessages(localMsgs);
+   return;
+  }
+  if(wantsBroadcast){
+   await httpsCallable(getFunctions(),'broadcastGroupMessage')({groupId,text});
+   if(broadcastCheck)broadcastCheck.checked=false;
+   toast('Announcement sent to all members');
+  }else{
+   await addDoc(collection(db,'groups',groupId,'messages'),{text,authorId:currentUser.uid,authorName:currentProfile?.displayName||'Student',pinned:false,broadcast:false,createdAt:serverTimestamp()});
+  }
+ }catch(err){
+  // fallback local message
+  localMsgs.push({
+    id: `local-m-${Date.now()}`,
+    text,
+    authorId: currentUser?.uid || 'demo-user',
+    authorName: currentProfile?.displayName || 'Student',
+    pinned: false,
+    broadcast: false,
+    createdAt: new Date()
+  });
+  renderMessages(localMsgs);
+ }
+ finally{if(btn)btn.disabled=false}
+});
+
+document.addEventListener('click',async e=>{
+ const pinBtn=e.target.closest('[data-toggle-pin]');
+ if(pinBtn&&groupId){
+  const id=pinBtn.dataset.togglePin;
+  const row=pinBtn.closest('[data-msg-id]');
+  const currentlyPinned=row?.querySelector('.chat-pinned-tag');
+  try{await updateDoc(doc(db,'groups',groupId,'messages',id),{pinned:!currentlyPinned})}
+  catch(err){toast(err.message||'Could not update pin.','error')}
+  return;
+ }
+
+ const editBtn=e.target.closest('[data-edit-msg]');
+ if(editBtn&&groupId){
+  const row=editBtn.closest('[data-msg-id]');
+  const id=row.dataset.msgId;
+  const raw=row.dataset.raw||'';
+  const textEl=row.querySelector('.chat-text');
+  textEl.innerHTML=`<form data-inline-edit style="display:flex;gap:6px;align-items:center"><input value="${escapeHtml(raw)}" maxlength="2000" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 10px;color:var(--text)"><button type="submit" class="btn sm primary" style="padding:6px 10px">Save</button><button type="button" data-cancel-msg-edit class="btn sm" style="padding:6px 10px">Cancel</button></form>`;
+  textEl.querySelector('[data-cancel-msg-edit]').addEventListener('click',()=>{textEl.innerHTML=linkifyHtml(raw)});
+  textEl.querySelector('[data-inline-edit]').addEventListener('submit',async ev=>{
+   ev.preventDefault();
+   const newText=ev.currentTarget.querySelector('input').value.trim();if(!newText)return;
+   try{await updateDoc(doc(db,'groups',groupId,'messages',id),{text:newText,edited:true});row.dataset.raw=newText}
+   catch(err){toast(err.message||'Could not edit message.','error');textEl.innerHTML=linkifyHtml(raw)}
+  });
+  return;
+ }
+
+ const delBtn=e.target.closest('[data-delete-msg]');
+ if(delBtn&&groupId){
+  if(!confirm('Delete this message?'))return;
+  const id=delBtn.closest('[data-msg-id]').dataset.msgId;
+  try{await deleteDoc(doc(db,'groups',groupId,'messages',id))}
+  catch(err){toast(err.message||'Could not delete message.','error')}
+ }
+});
+
+subscribeAuth((u,p)=>{if(!requireAuth())return;start()});

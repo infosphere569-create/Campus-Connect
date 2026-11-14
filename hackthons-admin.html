@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>(function(){try{var v=localStorage.getItem("cc-theme")||"system";document.documentElement.dataset.theme=v==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):v;}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Hackathons Admin — Campus Connect One</title>
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#178a54">
+<link rel="icon" type="image/png" href="icon.png"><link rel="apple-touch-icon" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/hackathons.css">
+</head>
+<body class="hk-body" data-page="hk-admin">
+<canvas class="hk-bg" id="hkBg" aria-hidden="true"></canvas>
+<div class="hk-layer hk-app" id="app">
+  <header class="hk-top">
+    <button class="hk-btn icon ghost" id="menuBtn" aria-label="Toggle sidebar" aria-expanded="false"><i data-lucide="panel-left"></i></button>
+    <div class="who"><img class="hk-avatar" id="avatar" src="icon.png" alt="" width="40" height="40"><span style="min-width:0"><b id="uName">Campus Connect One</b><small id="uRole">Admin</small></span></div>
+    <button class="hk-btn icon ghost hk-bell" id="bellBtn" aria-label="Pending approvals"><i data-lucide="shield-check"></i><span class="dot hk-hidden" id="bellDot">0</span></button>
+  </header>
+  <div class="hk-shell">
+    <aside class="hk-side" id="side"></aside>
+    <main class="hk-main" id="view" tabindex="-1"><div class="hk-skel" style="height:260px;border-radius:26px"></div></main>
+  </div>
+  <div class="hk-scrim" id="scrim"></div>
+  <nav class="hk-bottom" id="bottom" aria-label="Primary"></nav>
+</div>
+<script src="js/hackathons/hk-icons.js"></script>
+<script type="module" src="js/hackathons/hk-admin.js"></script>
+</body>
+</html>

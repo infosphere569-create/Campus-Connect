@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>(function(){try{var v=localStorage.getItem("cc-theme")||"system";document.documentElement.dataset.theme=v==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):v;}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Hackathons — Campus Connect One</title>
+<meta name="description" content="Find, host and run campus hackathons end to end: registration, solo or team entries, rounds, tests, project submissions and results. Part of Campus Connect One.">
+<meta name="theme-color" content="#178a54">
+<meta property="og:type" content="website"><meta property="og:site_name" content="Campus Connect One"><meta property="og:title" content="Hackathons — Campus Connect One"><meta property="og:description" content="Find, host and run campus hackathons end to end."><meta property="og:image" content="https://campusconnectone.online/icon.png">
+<link rel="icon" type="image/png" href="icon.png"><link rel="apple-touch-icon" href="icon.png"><link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/hackathons.css">
+</head>
+<body class="hk-body" data-page="hk-landing">
+<canvas class="hk-bg" id="hkBg" aria-hidden="true"></canvas>
+<div class="hk-layer">
+
+  <header class="hk-nav" id="nav">
+    <div class="hk-wrap hk-nav-in">
+      <a class="hk-brand" href="hackthons.html" aria-label="Campus Connect One Hackathons"><img src="icon.png" alt="" width="38" height="38"><span>Campus Connect<small>Hackathons</small></span></a>
+      <nav class="hk-links" aria-label="Sections"><a href="#featured">Hackathons</a><a href="#how">How it works</a><a href="#features">Features</a><a href="#faq">FAQ</a></nav>
+      <button class="hk-btn icon ghost" id="themeBtn" aria-label="Toggle theme"><i data-lucide="sun-moon"></i></button>
+      <a class="hk-btn ghost" href="login-hackthons.html">Log in</a>
+      <a class="hk-btn primary" href="login-hackthons.html">Get started <i data-lucide="arrow-right"></i></a>
+    </div>
+  </header>
+
+  <main>
+    <section class="hk-hero"><div class="hk-wrap">
+      <div class="hk-hero-grid">
+        <div>
+          <span class="hk-chip"><i data-lucide="code"></i>for campus builders</span>
+          <h1>Run and join hackathons, <span class="hk-grad-text">end to end.</span></h1>
+          <p class="lead">Discover hackathons at your campus and nearest to you. Register solo or as a team, take the screening test, submit your idea, project link and presentation, and track every round. Organisers get one place to approve, evaluate and announce results.</p>
+          <div class="hk-cta-row">
+            <a class="hk-btn primary lg" href="login-hackthons.html?role=participant"><i data-lucide="rocket"></i>I'm a participant</a>
+            <a class="hk-btn gold lg" href="login-hackthons.html?role=host"><i data-lucide="megaphone"></i>I'm an organiser</a>
+          </div>
+          <div class="hk-trust"><span><i data-lucide="map-pin"></i>Nearest first</span><span><i data-lucide="shield-check"></i>Admin-approved events</span><span><i data-lucide="mail-check"></i>Email updates</span></div>
+        </div>
+        <div class="hk-flow" aria-label="How a hackathon runs on the platform">
+          <span class="tag">// the pipeline</span>
+          <div class="row"><div class="n g"><i data-lucide="pencil"></i></div><div><b>Create</b><span class="d">Organiser sets rounds, test and submission rules.</span></div></div>
+          <div class="row"><div class="n"><i data-lucide="shield-check"></i></div><div><b>Approve</b><span class="d">Admins review it before students can see it.</span></div></div>
+          <div class="row"><div class="n"><i data-lucide="users-round"></i></div><div><b>Register</b><span class="d">Solo or team entries with a confirmation email.</span></div></div>
+          <div class="row"><div class="n"><i data-lucide="clipboard-check"></i></div><div><b>Test &amp; submit</b><span class="d">Screening test, idea, project link and slides.</span></div></div>
+          <div class="row"><div class="n g"><i data-lucide="trophy"></i></div><div><b>Select</b><span class="d">Shortlist round by round and notify every team.</span></div></div>
+        </div>
+      </div>
+
+      <!-- live counters (real numbers from the platform; no placeholders) -->
+      <div class="hk-stats3 hk-reveal" id="stats" aria-label="Campus Connect One in numbers">
+        <div class="s"><strong data-n="students">—</strong><span class="live">Active students</span></div>
+        <div class="s"><strong data-n="clubs">—</strong><span class="live">Clubs &amp; groups</span></div>
+        <div class="s"><strong data-n="resolvedIssues">—</strong><span class="live">Campus issues resolved</span></div>
+      </div>
+    </div></section>
+
+    <section class="hk-section" id="featured"><div class="hk-wrap">
+      <div class="hk-sec-head hk-reveal"><span class="hk-eyebrow">Live now</span><h2>Hackathons open for you</h2><p>Only admin-approved hackathons appear here. Log in to see the ones at your own campus and nearest to you.</p></div>
+      <div id="featuredList" class="hk-cards"><div class="hk-skel" style="height:320px"></div><div class="hk-skel" style="height:320px"></div><div class="hk-skel" style="height:320px"></div></div>
+    </div></section>
+
+    <section class="hk-section" id="how"><div class="hk-wrap">
+      <div class="hk-sec-head hk-reveal"><span class="hk-eyebrow">How it works</span><h2>Two sides, one flow</h2><p>You pick your side when you log in. To use the other side, log out and log in again with that role.</p></div>
+      <div class="hk-tracks">
+        <div class="hk-track p hk-reveal"><span class="hk-chip"><i data-lucide="rocket"></i>participant</span><h3 style="font-size:1.45rem;margin-top:12px">Find it. Join it. Ship it.</h3>
+          <ol class="hk-steps-l"><li><div><b>Complete your profile once</b><span>College, course, year and skills power your dashboard.</span></div></li><li><div><b>Register solo or with a team</b><span>The team leader registers and adds members. Confirmation arrives by email.</span></div></li><li><div><b>Test, submit, track</b><span>Take screening tests, submit idea, project links and PPT link, and watch your round status.</span></div></li></ol>
+          <a class="hk-btn primary" style="margin-top:20px" href="login-hackthons.html?role=participant">Continue as participant <i data-lucide="arrow-right"></i></a></div>
+        <div class="hk-track h hk-reveal"><span class="hk-chip gold"><i data-lucide="megaphone"></i>organiser</span><h3 style="font-size:1.45rem;margin-top:12px">Create. Evaluate. Announce.</h3>
+          <ol class="hk-steps-l"><li><div><b>Create &amp; submit for approval</b><span>Banner, brand, rounds, test, prizes and submission rules in one guided form.</span></div></li><li><div><b>Manage registrations</b><span>Filter, shortlist by round, export CSV or PDF and review submissions.</span></div></li><li><div><b>Notify teams in one click</b><span>Branded status emails to team leaders from team@campusconnectone.online.</span></div></li></ol>
+          <a class="hk-btn gold" style="margin-top:20px" href="login-hackthons.html?role=host">Continue as organiser <i data-lucide="arrow-right"></i></a></div>
+      </div>
+    </div></section>
+
+    <section class="hk-section" id="features"><div class="hk-wrap">
+      <div class="hk-sec-head hk-reveal"><span class="hk-eyebrow">Features</span><h2>Everything a live hackathon needs</h2></div>
+      <div class="hk-feats">
+        <div class="hk-glass hk-feat hk-reveal"><div class="fi"><i data-lucide="map-pinned"></i></div><h3>Campus &amp; nearby</h3><p>Your campus first, then trending and nearest events using your location.</p></div>
+        <div class="hk-glass hk-feat hk-reveal"><div class="fi"><i data-lucide="users-round"></i></div><h3>Solo or team</h3><p>Team size limits, member details and a single team leader per entry.</p></div>
+        <div class="hk-glass hk-feat hk-reveal"><div class="fi"><i data-lucide="list-ordered"></i></div><h3>Rounds</h3><p>Define rounds, move teams forward, waitlist or reject with one action.</p></div>
+        <div class="hk-glass hk-feat hk-reveal"><div class="fi"><i data-lucide="clipboard-check"></i></div><h3>Screening tests</h3><p>Timed MCQ tests graded on the server, so answer keys stay private.</p></div>
+        <div class="hk-glass hk-feat hk-reveal"><div class="fi"><i data-lucide="lightbulb"></i></div><h3>Project submission</h3><p>Idea, repository, demo, video and PPT links go straight to the organiser.</p></div>
+        <div class="hk-glass hk-feat hk-reveal"><div class="fi"><i data-lucide="mail-check"></i></div><h3>Email updates</h3><p>Confirmations and status updates from team@campusconnectone.online, signed by the organiser.</p></div>
+        <div class="hk-glass hk-feat hk-reveal"><div class="fi"><i data-lucide="download"></i></div><h3>Exports</h3><p>Download registrations as CSV or a print-ready PDF report.</p></div>
+        <div class="hk-glass hk-feat hk-reveal"><div class="fi"><i data-lucide="shield-check"></i></div><h3>Approval &amp; audit</h3><p>Every hackathon is reviewed by an admin, and every decision is logged.</p></div>
+        <div class="hk-glass hk-feat hk-reveal"><div class="fi"><i data-lucide="smartphone"></i></div><h3>Made for phones</h3><p>Docked bottom navigation on mobile, a roomy sidebar on laptops.</p></div>
+      </div>
+    </div></section>
+
+    <section class="hk-section" id="faq"><div class="hk-wrap">
+      <div class="hk-sec-head hk-reveal"><span class="hk-eyebrow">FAQ</span><h2>Good to know</h2></div>
+      <div class="hk-faq hk-reveal">
+        <details><summary>Do I need a new account?</summary><p>No. Your Campus Connect One login works here. New to the platform? Create an account on the login page.</p></details>
+        <details><summary>Can I be a participant and an organiser?</summary><p>Yes, but you choose one side each time you log in. To switch, log out and log in again with the other role.</p></details>
+        <details><summary>Why does a hackathon need approval?</summary><p>To keep the platform trustworthy. Admins check dates, details and contact info before a hackathon becomes visible to students.</p></details>
+        <details><summary>Which emails will I get?</summary><p>A confirmation when you register and updates when the organiser changes your status or moves you to the next round. They come from team@campusconnectone.online and are signed by the organiser.</p></details>
+        <details><summary>How does "nearest" work?</summary><p>With your permission we use your device location. You can also choose your city. Your location is never shown to others.</p></details>
+      </div>
+    </div></section>
+
+    <section class="hk-section"><div class="hk-wrap"><div class="hk-cta hk-reveal"><h2>Your next build starts here</h2><p>Join a hackathon near you, or bring your campus community together by hosting one.</p>
+      <div class="hk-cta-row" style="justify-content:center;margin:0"><a class="hk-btn lg" style="background:#fff;color:#0c5535;border:0" href="login-hackthons.html">Get started</a><a class="hk-btn lg ghost" style="color:#fff;border:1.5px solid rgba(255,255,255,.5)" href="home.html">Back to Campus Connect</a></div></div></div></section>
+  </main>
+
+  <footer class="hk-foot"><div class="hk-wrap hk-foot-in"><span>© <span id="yr"></span> Campus Connect One · Hackathons</span><nav><a href="home.html">Campus Connect</a><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="contact.html">Contact</a></nav></div></footer>
+</div>
+
+<script src="js/hackathons/hk-icons.js"></script>
+<script type="module" src="js/hackathons/hk-landing.js"></script>
+</body>
+</html>

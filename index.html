@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script>(function(){try{var v=localStorage.getItem("cc-theme")||"system";var r=v==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):v;document.documentElement.dataset.theme=r;document.documentElement.dataset.themePreference=v;}catch(e){}})();</script>
+  <title>Campus Connect One · Unified Student Community & Campus Network</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#5b5cf0">
+  <meta name="description" content="Campus Connect One is the premier student community platform for discovering university clubs, sharing ideas, finding campus events, and anonymous issue reporting.">
+  <meta name="keywords" content="CampusConnectOne, Campus Connect One, college community, student network, campus feed, university clubs, student discussions, college events, campus issues, anonymous reporting">
+  <meta name="author" content="Campus Connect One">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="https://campusconnectone.online/">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Campus Connect One">
+  <meta property="og:title" content="Campus Connect One · Unified Student Community & Campus Network">
+  <meta property="og:description" content="Campus Connect One is the premier student community platform for discovering university clubs, sharing ideas, finding campus events, and anonymous issue reporting.">
+  <meta property="og:url" content="https://campusconnectone.online/">
+  <meta property="og:image" content="https://campusconnectone.online/icon.png">
+  <meta property="og:image:width" content="512">
+  <meta property="og:image:height" content="512">
+  <meta property="og:locale" content="en_US">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:site" content="@campusconnect">
+  <meta name="twitter:title" content="Campus Connect One · Unified Student Community & Campus Network">
+  <meta name="twitter:description" content="Campus Connect One is the premier student community platform for discovering university clubs, sharing ideas, finding campus events, and anonymous issue reporting.">
+  <meta name="twitter:image" content="https://campusconnectone.online/icon.png">
+
+  <!-- PWA & Favicon -->
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="apple-touch-icon" href="icon.png">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Campus Connect One">
+
+  <!-- Schema.org JSON-LD Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "EducationalOrganization",
+        "@id": "https://campusconnectone.online/#organization",
+        "name": "Campus Connect One",
+        "url": "https://campusconnectone.online/",
+        "logo": "https://campusconnectone.online/icon.png",
+        "description": "Campus Connect One is the premier unified student network and campus community platform for university clubs, events, peer discussions, and anonymous campus issue reporting.",
+        "sameAs": [
+          "https://instagram.com/campusconnect",
+          "https://x.com/campusconnect",
+          "https://linkedin.com/company/campusconnect",
+          "https://youtube.com/@campusconnect"
+        ]
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://campusconnectone.online/#website",
+        "name": "Campus Connect One",
+        "url": "https://campusconnectone.online/",
+        "publisher": {
+          "@id": "https://campusconnectone.online/#organization"
+        },
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://campusconnectone.online/search?q={search_term_string}",
+          "query-input": "required name=search_term_string"
+        }
+      }
+    ]
+  }
+  </script>
+
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/pages.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <style id="cc-premium">
+:root{--cc-accent:#5b5cf0;--cc-accent-2:#8b7cf6;--cc-accent-soft:rgba(91,92,240,.14);--cc-ease:cubic-bezier(.22,1,.36,1)}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+
+/* ---------- Global texture ---------- */
+body{position:relative}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:2;opacity:.035;mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+/* ---------- Header ---------- */
+.landing-header{position:sticky;top:0;z-index:50;backdrop-filter:saturate(180%) blur(14px);-webkit-backdrop-filter:saturate(180%) blur(14px);background:color-mix(in srgb, var(--surface, #0d0d14) 72%, transparent);border-bottom:1px solid transparent;transition:border-color .4s var(--cc-ease), box-shadow .4s var(--cc-ease), background .4s var(--cc-ease)}
+.landing-header.is-scrolled{border-bottom-color:color-mix(in srgb, var(--cc-accent) 18%, transparent);box-shadow:0 8px 30px -18px rgba(91,92,240,.55)}
+.landing-nav{padding-block:14px}
+.landing-header .brand{display:inline-flex;align-items:center;gap:10px}
+.landing-header .brand-mark,.footer .brand-mark{position:relative;display:inline-grid;place-items:center;width:34px;height:34px;border-radius:10px;overflow:hidden;background:linear-gradient(145deg,var(--cc-accent),var(--cc-accent-2));box-shadow:0 6px 18px -6px rgba(91,92,240,.65);transition:transform .45s var(--cc-ease), box-shadow .45s var(--cc-ease)}
+.landing-header .brand-mark img,.footer .brand-mark img{width:100%;height:100%;object-fit:cover;display:block}
+.landing-header .brand:hover .brand-mark,.footer .brand:hover .brand-mark{transform:scale(1.08) rotate(-4deg);box-shadow:0 10px 26px -6px rgba(91,92,240,.85)}
+.landing-header .brand-name{font-weight:700;letter-spacing:-.01em;position:relative}
+.landing-header .brand-name::after{content:"";position:absolute;left:0;bottom:-3px;width:0;height:2px;background:linear-gradient(90deg,var(--cc-accent),var(--cc-accent-2));transition:width .35s var(--cc-ease)}
+.landing-header .brand:hover .brand-name::after{width:100%}
+
+.landing-header .muted-link{position:relative;padding-bottom:2px;transition:color .3s var(--cc-ease)}
+.landing-header .muted-link::after{content:"";position:absolute;left:0;right:100%;bottom:-2px;height:2px;border-radius:2px;background:linear-gradient(90deg,var(--cc-accent),var(--cc-accent-2));transition:right .35s var(--cc-ease)}
+.landing-header .muted-link:hover{color:var(--cc-accent)}
+.landing-header .muted-link:hover::after{right:0}
+
+/* ---------- Buttons ---------- */
+.btn{position:relative;overflow:hidden;transition:transform .3s var(--cc-ease), box-shadow .3s var(--cc-ease), filter .3s var(--cc-ease)}
+.btn.primary{background:linear-gradient(135deg,var(--cc-accent),var(--cc-accent-2));box-shadow:0 8px 24px -10px rgba(91,92,240,.7)}
+.btn::before{content:"";position:absolute;inset:0;background:linear-gradient(120deg,transparent 20%,rgba(255,255,255,.35) 45%,transparent 70%);transform:translateX(-120%);transition:transform .7s var(--cc-ease)}
+.btn:hover::before{transform:translateX(120%)}
+.btn:hover{transform:translateY(-2px);filter:brightness(1.04)}
+.btn.primary:hover{box-shadow:0 14px 32px -10px rgba(91,92,240,.85)}
+.btn:active{transform:translateY(0) scale(.98)}
+.btn i{transition:transform .3s var(--cc-ease)}
+.btn:hover i{transform:translateX(3px)}
+.hero-actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:20px}
+.hero-actions .btn{min-height:46px;display:inline-flex;align-items:center;gap:8px}
+
+/* ---------- Premium PWA Install Button ---------- */
+.pwa-hero-btn{
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+  padding:10px 20px;
+  border-radius:999px;
+  font-weight:700;
+  font-size:.94rem;
+  background:color-mix(in srgb,var(--surface) 82%,transparent);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+  border:1.5px solid color-mix(in srgb,var(--cc-accent) 36%,var(--border));
+  color:var(--text);
+  cursor:pointer;
+  box-shadow:0 6px 20px -6px rgba(0,0,0,.28);
+  transition:all .35s var(--cc-ease);
+  overflow:hidden;
+}
+.pwa-hero-btn .pwa-btn-content{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  position:relative;
+  z-index:1;
+}
+.pwa-hero-btn svg{
+  flex:0 0 auto;
+  transition:transform .3s var(--cc-ease);
+}
+.pwa-hero-btn:hover svg{
+  transform:translateY(2px);
+}
+.pwa-hero-btn .pwa-tag{
+  font-size:.68rem;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+  padding:2px 7px;
+  border-radius:6px;
+  background:color-mix(in srgb,var(--cc-accent) 20%,transparent);
+  color:var(--cc-accent-2);
+  border:1px solid color-mix(in srgb,var(--cc-accent) 30%,transparent);
+  transition:all .3s var(--cc-ease);
+}
+.pwa-hero-btn::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(120deg,transparent 20%,rgba(255,255,255,.28) 50%,transparent 80%);
+  transform:translateX(-130%);
+  transition:transform .7s var(--cc-ease);
+}
+.pwa-hero-btn:hover{
+  transform:translateY(-2px);
+  border-color:var(--cc-accent);
+  color:var(--text);
+  box-shadow:0 12px 30px -8px rgba(91,92,240,.5);
+}
+.pwa-hero-btn:hover::before{
+  transform:translateX(130%);
+}
+.pwa-hero-btn:hover .pwa-tag{
+  background:var(--cc-accent);
+  color:#fff;
+}
+
+/* Green card fill when installed */
+.pwa-hero-btn.is-installed{
+  background:color-mix(in srgb,#10b981 18%,var(--surface))!important;
+  border-color:#10b981!important;
+  color:#10b981!important;
+  box-shadow:0 8px 26px -6px rgba(16,185,129,.5)!important;
+}
+.pwa-hero-btn.is-installed .pwa-tag{
+  background:color-mix(in srgb,#10b981 24%,transparent)!important;
+  color:#10b981!important;
+  border-color:color-mix(in srgb,#10b981 45%,transparent)!important;
+}
+.pwa-hero-btn.is-installed:hover{
+  background:color-mix(in srgb,#10b981 26%,var(--surface))!important;
+  box-shadow:0 14px 34px -6px rgba(16,185,129,.65)!important;
+  transform:translateY(-2px);
+}
+.pwa-hero-btn.is-installed:hover svg{
+  transform:scale(1.12);
+}
+.pwa-installed-dot{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background:#10b981;
+  box-shadow:0 0 10px #10b981;
+  animation:pwaPulse 2s infinite ease-in-out;
+}
+@keyframes pwaPulse{
+  0%,100%{opacity:1;transform:scale(1)}
+  50%{opacity:.4;transform:scale(1.35)}
+}
+
+/* ---------- Hero ---------- */
+.landing-hero{position:relative;overflow:hidden}
+.landing-hero::before{content:"";position:absolute;inset:-30% -15% auto -15%;height:640px;background:radial-gradient(circle at 22% 24%,rgba(91,92,240,.35),transparent 55%),radial-gradient(circle at 78% 18%,rgba(192,132,252,.28),transparent 50%),radial-gradient(circle at 55% 60%,rgba(139,124,246,.22),transparent 55%);filter:blur(2px);pointer-events:none;z-index:0;animation:cc-drift 12s ease-in-out infinite alternate}
+.landing-hero .hero-grid{position:relative;z-index:1}
+@keyframes cc-drift{from{transform:translate3d(0,0,0) scale(1) rotate(0deg)}to{transform:translate3d(0,22px,0) scale(1.06) rotate(3deg)}}
+.landing-hero h1{background:linear-gradient(100deg,currentColor 35%,var(--cc-accent) 60%,var(--cc-accent-2) 75%,currentColor 90%);background-size:220% auto;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:cc-sheen 6s linear infinite}
+@keyframes cc-sheen{to{background-position:-220% center}}
+.hero-preview{animation:cc-float 6s ease-in-out infinite;perspective:1200px}
+@keyframes cc-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.preview-window{transition:box-shadow .4s var(--cc-ease), transform .15s var(--cc-ease);transform-style:preserve-3d;will-change:transform}
+.preview-window:hover{box-shadow:0 34px 70px -24px rgba(91,92,240,.55)}
+.badge.primary{position:relative}
+.badge.primary::after{content:"";position:absolute;inset:-4px;border-radius:inherit;border:1px solid var(--cc-accent);opacity:.6;animation:cc-pulse 2.2s var(--cc-ease) infinite}
+@keyframes cc-pulse{0%{transform:scale(.96);opacity:.6}70%{transform:scale(1.18);opacity:0}100%{opacity:0}}
+.eyebrow{position:relative;display:inline-block}
+.hero-stat strong{background:linear-gradient(90deg,var(--cc-accent),var(--cc-accent-2));-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* ---------- Feature & showcase cards ---------- */
+.feature-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px}
+@media (max-width:1024px){.feature-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.feature-grid{grid-template-columns:1fr}}
+.feature.card,.showcase-card.card,.preview-post{transition:transform .35s var(--cc-ease), box-shadow .35s var(--cc-ease), border-color .35s var(--cc-ease);position:relative}
+.feature.card{
+  background:var(--surface);
+  border:1.5px solid var(--border);
+  border-radius:22px;
+  padding:26px 22px;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  opacity:0;
+  transform:translateY(28px);
+  transition:opacity .6s var(--cc-ease), transform .6s var(--cc-ease), box-shadow .35s var(--cc-ease), border-color .35s var(--cc-ease);
+}
+.feature.card.is-revealed{
+  opacity:1;
+  transform:translateY(0);
+}
+.feature.card::before{content:"";position:absolute;inset:0;border-radius:inherit;background:radial-gradient(280px circle at var(--mx,50%) var(--my,50%),rgba(91,92,240,.18),transparent 70%);opacity:0;transition:opacity .3s var(--cc-ease);pointer-events:none}
+.feature.card:hover::before{opacity:1}
+.feature.card:hover{transform:translateY(-8px);box-shadow:0 24px 50px -18px rgba(91,92,240,.38);border-color:color-mix(in srgb, var(--cc-accent) 45%, var(--border))}
+
+.feature-emblem{
+  width:56px;
+  height:56px;
+  border-radius:18px;
+  background:linear-gradient(135deg,color-mix(in srgb,var(--cc-accent) 14%,var(--surface)),var(--surface-2));
+  border:1.5px solid color-mix(in srgb,var(--cc-accent) 26%,var(--border));
+  color:var(--cc-accent);
+  display:grid;
+  place-items:center;
+  margin-bottom:18px;
+  transition:transform .4s var(--cc-ease), background .4s var(--cc-ease), color .4s var(--cc-ease), box-shadow .4s var(--cc-ease);
+}
+.feature.card:hover .feature-emblem{
+  transform:scale(1.1) translateY(-2px);
+  background:linear-gradient(135deg,var(--cc-accent),var(--cc-accent-2));
+  color:#fff;
+  border-color:transparent;
+  box-shadow:0 12px 26px -8px rgba(91,92,240,.75);
+}
+.feature-emblem svg{width:28px;height:28px}
+
+.feature.card h3{
+  margin:0 0 8px;
+  font-size:1.24rem;
+  letter-spacing:-.025em;
+  font-weight:800;
+  color:var(--text);
+}
+.feature.card p{
+  margin:0 0 16px;
+  color:var(--muted);
+  font-size:.92rem;
+  line-height:1.55;
+  flex:1;
+}
+.feature-meta{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  font-size:.76rem;
+  font-weight:600;
+  color:var(--muted);
+  margin-bottom:16px;
+  padding-top:12px;
+  border-top:1px solid color-mix(in srgb,var(--border) 60%,transparent);
+}
+.feature-meta span{color:var(--text);font-weight:700}
+.feature-link-btn{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  font-size:.84rem;
+  font-weight:800;
+  color:var(--cc-accent);
+  transition:gap .2s var(--cc-ease), color .2s var(--cc-ease);
+  text-decoration:none;
+}
+.feature-link-btn i{width:16px;height:16px;transition:transform .25s var(--cc-ease)}
+.feature.card:hover .feature-link-btn i{transform:translateX(4px)}
+
+.showcase-card.card:hover{transform:translateY(-5px);box-shadow:0 22px 48px -22px rgba(91,92,240,.42)}
+.preview-post:hover{transform:translateY(-3px);box-shadow:0 14px 28px -18px rgba(91,92,240,.4)}
+.privacy-card{transition:transform .4s var(--cc-ease)}
+.privacy-card:hover{transform:translateY(-4px) scale(1.01)}
+
+/* ---------- Footer ---------- */
+.footer{
+  position:relative;
+  overflow:hidden;
+  background:color-mix(in srgb,var(--surface) 40%,var(--bg));
+  border-top:1px solid var(--border);
+  padding:48px 0 36px;
+  margin-top:40px;
+}
+.footer::before{content:"";position:absolute;top:0;left:6%;right:6%;height:1px;background:linear-gradient(90deg,transparent,var(--cc-accent),var(--cc-accent-2),transparent)}
+.footer .muted-link{transition:color .3s var(--cc-ease), transform .3s var(--cc-ease);display:inline-block}
+.footer .muted-link:hover{color:var(--cc-accent);transform:translateX(2px)}
+.footer-cols{display:grid;grid-template-columns:1.4fr repeat(4,1fr);gap:28px}
+.footer-cols h4{font-size:.8rem;letter-spacing:.02em;margin:0 0 12px;opacity:.85}
+.footer-cols ul{list-style:none;margin:0;padding:0;display:grid;gap:9px}
+
+
+
+.footer-social{display:flex;gap:10px;margin-top:16px}
+.footer-social-btn{
+  display:inline-grid;
+  place-items:center;
+  width:38px;
+  height:38px;
+  border-radius:12px;
+  background:var(--surface);
+  border:1.5px solid var(--border);
+  color:var(--muted);
+  transition:transform .3s var(--cc-ease), background .3s var(--cc-ease), border-color .3s var(--cc-ease), color .3s var(--cc-ease), box-shadow .3s var(--cc-ease);
+}
+.footer-social-btn:hover{
+  transform:translateY(-3px) scale(1.06);
+  background:linear-gradient(135deg,var(--cc-accent),var(--cc-accent-2));
+  border-color:transparent;
+  color:#fff;
+  box-shadow:0 8px 20px -6px rgba(91,92,240,.6);
+}
+.footer-social-btn svg{width:18px;height:18px;display:block}
+
+.footer-bottom{margin-top:28px;padding-top:20px;border-top:1px solid color-mix(in srgb, currentColor 10%, transparent);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px}
+@media (max-width:760px){.footer-cols{grid-template-columns:1fr 1fr}}
+
+/* ---------- Header Search & Dropdown ---------- */
+.header-search-wrap{position:relative;flex:1;max-width:380px;margin:0 20px}
+.header-search-input-wrap{position:relative;display:flex;align-items:center}
+.header-search-input-wrap i{position:absolute;left:12px;color:var(--muted);pointer-events:none;width:16px;height:16px}
+.landing-search-input{width:100%;height:40px;padding:0 12px 0 38px;border-radius:12px;background:color-mix(in srgb, var(--surface) 60%, transparent);border:1.5px solid var(--border);color:var(--text);font-size:.9rem;transition:all .3s var(--cc-ease);outline:none}
+.landing-search-input:focus{background:var(--surface);border-color:var(--cc-accent);box-shadow:0 0 0 4px var(--cc-accent-soft)}
+
+.search-results-dropdown{position:absolute;top:calc(100% + 8px);left:0;right:0;background:var(--surface);border:1.5px solid var(--border);border-radius:16px;box-shadow:0 20px 50px -12px rgba(0,0,0,.4);z-index:100;overflow:hidden;animation:cc-dropdown .3s var(--cc-ease)}
+@keyframes cc-dropdown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+
+.search-dropdown-header{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:color-mix(in srgb, var(--surface-2, #1a1a24) 40%, transparent)}
+.search-dropdown-count{font-size:.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.search-dropdown-tabs{display:flex;gap:4px}
+.search-cat-tab{padding:4px 10px;border-radius:8px;font-size:.72rem;font-weight:700;color:var(--muted);background:transparent;border:1px solid transparent;transition:all .2s var(--cc-ease)}
+.search-cat-tab:hover{color:var(--text);background:var(--cc-accent-soft)}
+.search-cat-tab.active{color:var(--cc-accent);background:var(--cc-accent-soft);border-color:rgba(91,92,240,.3)}
+
+.search-dropdown-list{max-height:420px;overflow-y:auto;padding:8px}
+.search-dropdown-item{display:flex;align-items:center;gap:12px;padding:10px;border-radius:12px;transition:all .2s var(--cc-ease);cursor:pointer;text-decoration:none}
+.search-dropdown-item:hover, .search-dropdown-item.is-selected{background:var(--cc-accent-soft);transform:translateX(4px)}
+.search-item-icon{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;flex-shrink:0}
+.search-item-content{flex:1;min-width:0}
+.search-item-title-row{display:flex;align-items:center;gap:8px;margin-bottom:2px}
+.search-item-title{font-weight:700;font-size:.92rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.search-item-badge{font-size:.65rem;font-weight:800;text-transform:uppercase;padding:2px 6px;border-radius:5px}
+.search-item-desc{font-size:.78rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.search-item-arrow{color:var(--cc-accent);opacity:0;transition:all .2s var(--cc-ease);font-weight:bold}
+.search-dropdown-item:hover .search-item-arrow, .search-dropdown-item.is-selected .search-item-arrow{opacity:1;transform:translateX(2px)}
+
+/* Category Colors */
+.cat-badge-club{background:rgba(56,189,248,.15);color:#38bdf8}
+.cat-badge-event{background:rgba(168,85,247,.15);color:#a855f7}
+.cat-badge-issue{background:rgba(244,63,94,.15);color:#f43f5e}
+.search-item-icon.cat-badge-club{background:rgba(56,189,248,.1);color:#38bdf8}
+.search-item-icon.cat-badge-event{background:rgba(168,85,247,.1);color:#a855f7}
+.search-item-icon.cat-badge-issue{background:rgba(244,63,94,.1);color:#f43f5e}
+
+.search-match{background:rgba(91,92,240,.25);color:var(--cc-accent);padding:0 2px;border-radius:3px;font-weight:800}
+.search-dropdown-empty{padding:40px 20px;text-align:center;color:var(--muted)}
+.search-dropdown-empty svg{margin-bottom:12px;opacity:.5}
+.search-empty-title{font-weight:700;color:var(--text);margin-bottom:6px}
+.search-empty-desc{font-size:.85rem}
+.search-dropdown-footer{padding:10px 14px;background:color-mix(in srgb, var(--surface-2) 30%, transparent);border-top:1px solid var(--border);display:flex;gap:12px}
+.search-footer-hint{font-size:.68rem;color:var(--muted);display:flex;align-items:center;gap:4px}
+.search-footer-hint kbd{background:var(--surface);border:1px solid var(--border);padding:1px 4px;border-radius:4px;font-family:inherit;font-weight:700;color:var(--text)}
+
+@media (max-width: 900px) {
+  .header-search-wrap{max-width:none;order:10;width:100%;margin:10px 0 0}
+  .landing-nav{flex-wrap:wrap;padding-bottom:18px}
+}
+
+/* ---------- Section reveal (single orchestrated pass) ---------- */
+.section,.landing-hero{opacity:0;transform:translateY(16px);animation:cc-rise .8s var(--cc-ease) forwards}
+.landing-hero{animation-delay:.05s}
+.section:nth-of-type(1){animation-delay:.1s}
+.section:nth-of-type(2){animation-delay:.18s}
+.section:nth-of-type(3){animation-delay:.26s}
+@keyframes cc-rise{to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body data-landing>
+<header class="landing-header">
+  <div class="container landing-nav">
+    <a class="brand" href="index.html">
+      <span class="brand-mark"><img src="icon.png" alt="Campus Connect One logo" width="34" height="34"></span>
+      <span class="brand-name">Campus Connect One</span>
+    </a>
+    
+    <div class="header-search-wrap" id="headerSearchWrap">
+      <div class="header-search-input-wrap">
+        <i data-lucide="search"></i>
+        <input type="text" id="landingSearchInput" class="landing-search-input" placeholder="Search clubs, events, issues..." autocomplete="off" aria-label="Search platform">
+      </div>
+      <div id="landingSearchResults" class="search-results-dropdown" hidden></div>
+    </div>
+
+    <div class="toolbar">
+      <a class="muted-link hide-mobile" href="#features">Features</a>
+      <a class="muted-link hide-mobile" href="hackthons.html" style="color:#10b981;font-weight:700;display:inline-flex;align-items:center;gap:4px"><i data-lucide="terminal" style="width:14px;height:14px"></i><span>Hackathons</span></a>
+      <a class="muted-link hide-mobile" href="#privacy">Privacy</a>
+      <a class="btn ghost" href="login.html?mode=login">Login</a>
+      <a class="btn primary" href="login.html?mode=register">Get started</a>
+    </div>
+  </div>
+</header>
+<main>
+<section class="hero landing-hero">
+  <canvas id="heroCanvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;mix-blend-mode:screen;opacity:0.35"></canvas>
+  <div class="container hero-grid">
+    <div>
+      <div class="eyebrow">BUILT FOR CAMPUS LIFE</div>
+      <h1>Your campus has a community. Now it has a place to connect.</h1>
+      <p>Campus Connect One brings conversations, groups, events and campus issues into one thoughtful student-first platform.</p>
+      <div class="hero-actions">
+        <a class="btn primary" href="login.html?mode=register"><i data-lucide="arrow-right"></i>Join Campus Connect One</a>
+        <a class="btn" href="#features"><i data-lucide="play-circle"></i>Explore the platform</a>
+        <button id="heroInstallBtn" class="btn pwa-hero-btn" type="button" aria-label="Install Campus Connect One App">
+          <span class="pwa-btn-content">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            <span class="pwa-btn-text">Install App</span>
+            <span class="pwa-tag">PWA</span>
+          </span>
+        </button>
+      </div><div class="hero-stat"><div><strong>Community-first</strong><span class="small muted">Designed around student life</span></div><div><strong>Privacy-conscious</strong><span class="small muted">Anonymous issue reporting</span></div></div></div><div class="hero-preview"><div class="preview-window"><div class="preview-bar"><strong>Campus Feed</strong><span class="badge primary">Live community</span></div><div class="preview-body"><div class="preview-post"><div class="row"><div class="avatar">AK</div><div><strong>Student Community</strong><div class="small muted">CSE · 18m</div></div></div><p>Anyone up for a weekend hackathon team?</p><div class="toolbar small muted"><span>♡ 42</span><span>◌ 12 comments</span><span>↗ Share</span></div></div><div class="grid grid-2"><div class="preview-post"><span class="badge success">Open</span><h3>Wi-Fi in Block A</h3><span class="small muted">Anonymous Student · 84 support</span></div><div class="preview-post"><span class="badge primary">SEP 18</span><h3>Campus Hacknight</h3><span class="small muted">Main Lab · 5:30 PM</span></div></div></div></div></div></div></section>
+
+<!-- Live Statistics Bar Section -->
+<section class="section" style="padding: 10px 0 32px">
+  <div class="container">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; background: var(--surface); border: 1.5px solid var(--border); border-radius: 20px; padding: 26px; box-shadow: 0 16px 40px -16px rgba(0,0,0,0.3)">
+      <div style="display: flex; align-items: center; gap: 16px">
+        <div style="width: 48px; height: 48px; border-radius: 14px; background: var(--cc-accent-soft); color: var(--cc-accent); display: grid; place-items: center">
+          <i data-lucide="users" style="width: 24px; height: 24px"></i>
+        </div>
+        <div>
+          <div data-counter="14250" style="font-size: 1.8rem; font-weight: 800; color: var(--text); letter-spacing: -0.02em">0</div>
+          <div style="font-size: 0.85rem; color: var(--muted); font-weight: 600">Active Students</div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 16px">
+        <div style="width: 48px; height: 48px; border-radius: 14px; background: rgba(16, 185, 129, 0.12); color: #10b981; display: grid; place-items: center">
+          <i data-lucide="building-2" style="width: 24px; height: 24px"></i>
+        </div>
+        <div>
+          <div data-counter="85" style="font-size: 1.8rem; font-weight: 800; color: var(--text); letter-spacing: -0.02em">0</div>
+          <div style="font-size: 0.85rem; color: var(--muted); font-weight: 600">University Clubs</div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 16px">
+        <div style="width: 48px; height: 48px; border-radius: 14px; background: rgba(168, 85, 247, 0.12); color: #a855f7; display: grid; place-items: center">
+          <i data-lucide="check-circle-2" style="width: 24px; height: 24px"></i>
+        </div>
+        <div>
+          <div data-counter="1240" style="font-size: 1.8rem; font-weight: 800; color: var(--text); letter-spacing: -0.02em">0</div>
+          <div style="font-size: 0.85rem; color: var(--muted); font-weight: 600">Resolved Campus Issues</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const counters = document.querySelectorAll('[data-counter]');
+    counters.forEach(counter => {
+      const target = parseInt(counter.getAttribute('data-counter'), 10);
+      let current = 0;
+      const increment = Math.ceil(target / 40);
+      const timer = setInterval(() => {
+        current += increment;
+        if (current >= target) {
+          counter.textContent = target.toLocaleString() + '+';
+          clearInterval(timer);
+        } else {
+          counter.textContent = current.toLocaleString();
+        }
+      }, 25);
+    });
+    window.lucide?.createIcons();
+  });
+</script>
+
+<section class="section" id="features"><div class="container"><div class="section-title"><div><div class="eyebrow">ONE PLATFORM</div><h2 class="landing-section-title">Everything campus conversations need.</h2><p class="landing-copy">A focused set of tools that help students connect without turning the experience into a noisy generic social network.</p></div></div><div class="feature-grid">
+  <article class="feature card">
+    <span class="feature-emblem" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 11a9 9 0 0 1 9 9"></path>
+        <path d="M4 4a16 16 0 0 1 16 16"></path>
+        <circle cx="5" cy="19" r="1.5" fill="currentColor"></circle>
+      </svg>
+    </span>
+    <h3>Campus Feed</h3>
+    <p>Share updates, questions, opportunities and useful conversations.</p>
+    <div class="feature-meta"><span>Live threads</span> · <span>College first</span> · <span>Zero spam</span></div>
+    <a class="feature-link-btn" href="feed.html">Explore feed <i data-lucide="arrow-right"></i></a>
+  </article>
+
+  <article class="feature card">
+    <span class="feature-emblem" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+        <circle cx="9" cy="7" r="4"></circle>
+        <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+      </svg>
+    </span>
+    <h3>Communities</h3>
+    <p>Join focused groups for study, placements, clubs, coding and campus life.</p>
+    <div class="feature-meta"><span>Club hubs</span> · <span>Placement circles</span> · <span>Realtime chat</span></div>
+    <a class="feature-link-btn" href="grouplist.html">Browse groups <i data-lucide="arrow-right"></i></a>
+  </article>
+
+  <article class="feature card">
+    <span class="feature-emblem" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="4"></rect>
+        <line x1="16" y1="2" x2="16" y2="6"></line>
+        <line x1="8" y1="2" x2="8" y2="6"></line>
+        <line x1="3" y1="10" x2="21" y2="10"></line>
+        <circle cx="8" cy="15" r="1" fill="currentColor"></circle>
+        <circle cx="12" cy="15" r="1" fill="currentColor"></circle>
+        <circle cx="16" cy="15" r="1" fill="currentColor"></circle>
+      </svg>
+    </span>
+    <h3>Events</h3>
+    <p>Discover workshops, competitions, club activities and campus moments.</p>
+    <div class="feature-meta"><span>Workshops</span> · <span>Hackathons</span> · <span>Instant RSVP</span></div>
+    <a class="feature-link-btn" href="events.html">View events <i data-lucide="arrow-right"></i></a>
+  </article>
+
+  <article class="feature card">
+    <span class="feature-emblem" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+        <path d="m9 12 2 2 4-4"></path>
+      </svg>
+    </span>
+    <h3>Campus Issues</h3>
+    <p>Raise concerns publicly without revealing your student identity.</p>
+    <div class="feature-meta"><span>100% Anonymous</span> · <span>Status tracking</span> · <span>Student votes</span></div>
+    <a class="feature-link-btn" href="issues.html">Track issues <i data-lucide="arrow-right"></i></a>
+  </article>
+</div></div></section><section class="section" id="privacy"><div class="container showcase"><article class="showcase-card card"><div class="eyebrow">PRIVACY</div><h2 class="landing-section-title">Publicly anonymous. Privately accountable.</h2><p class="landing-copy">Issue reports are designed so the public community sees only "Anonymous Student". Moderation metadata stays separated and access-controlled.</p><div class="notice"><strong>Identity boundary</strong><br><span class="small muted">The public issue interface never needs a student profile to render an issue.</span></div></article><article class="showcase-card card"><div class="eyebrow">DISCOVERY</div><h2 class="landing-section-title">Less noise. More relevance.</h2><p class="landing-copy">The feed uses freshness, engagement, relevance and trend signals with diversity controls rather than simply sorting everything by newest.</p><div class="toolbar"><span class="badge">Recency</span><span class="badge">Relevance</span><span class="badge">Trend</span><span class="badge">Diversity</span></div></article></div></section><section class="section"><div class="container"><div class="issue-hero"><div class="issue-hero-layout"><div><div class="eyebrow">READY TO CONNECT?</div><h2>Make campus more connected.</h2><p class="muted">Start with a group, a post, an event or a problem that needs attention.</p><div class="hero-actions"><a class="btn primary" href="login.html?mode=register">Get started</a><a class="btn" href="login.html?mode=login">Login</a></div></div><div class="privacy-card"><i data-lucide="sparkles"></i><strong>Your Campus. Your Community.</strong><span>Built to make student life easier to navigate.</span></div></div></div></div></section></main><footer class="footer"><div class="container"><div class="footer-cols"><div><a class="brand" href="index.html"><span class="brand-mark"><img src="icon.png" alt="Campus Connect One logo" width="34" height="34"></span><span class="brand-name">Campus Connect One</span></a><p class="small muted" style="margin-top:10px;line-height:1.5">Your Campus. Your Community. A modern student platform for discovering groups, attending events, having meaningful discussions, and anonymous issue resolution.</p><div class="campus-status-pill"><span class="live-dot"></span><span>Platform active · Academic Year 2026–2027</span></div><div class="footer-social"><a class="footer-social-btn" href="https://instagram.com/campusconnect" target="_blank" rel="noopener noreferrer" aria-label="Campus Connect One on Instagram"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg></a><a class="footer-social-btn" href="https://x.com/campusconnect" target="_blank" rel="noopener noreferrer" aria-label="Campus Connect One on X"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></a><a class="footer-social-btn" href="https://linkedin.com/company/campusconnect" target="_blank" rel="noopener noreferrer" aria-label="Campus Connect One on LinkedIn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect width="4" height="12" x="2" y="9"/><circle cx="4" cy="4" r="2"/></svg></a><a class="footer-social-btn" href="https://youtube.com/@campusconnect" target="_blank" rel="noopener noreferrer" aria-label="Campus Connect One on YouTube"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17"/><polygon points="10 15 15 12 10 9 10 15"/></svg></a><a class="footer-social-btn" href="https://github.com/infosphere569-create/Campus-Connect" target="_blank" rel="noopener noreferrer" aria-label="Campus Connect One on GitHub"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg></a></div><div style="margin-top:16px"><div style="font-size:.8rem;font-weight:800;letter-spacing:.03em;margin-bottom:6px">Campus Newsletter</div><form id="newsletterForm" style="display:flex;gap:6px"><input type="email" id="newsletterEmail" placeholder="your.email@college.edu" required style="flex:1;min-height:38px;padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:.85rem;outline:none"><button type="submit" class="btn primary sm" style="min-height:38px;padding-inline:14px">Subscribe</button></form><div id="newsletterMsg" class="small muted" style="margin-top:6px" hidden></div></div></div><div><h4>Platform</h4><ul><li><a class="muted-link small" href="feed.html">Campus Feed</a></li><li><a class="muted-link small" href="grouplist.html">Student Groups</a></li><li><a class="muted-link small" href="events.html">Campus Events</a></li><li><a class="muted-link small" href="issues.html">Campus Issues</a></li></ul></div><div><h4>Student Life</h4><ul><li><a class="muted-link small" href="student-life.html">Student Life Hub</a></li><li><a class="muted-link small" href="issues.html">Anonymous Issues</a></li><li><a class="muted-link small" href="grouplist.html">Club Communities</a></li><li><a class="muted-link small" href="safety.html">Safety & Guidelines</a></li></ul></div><div><h4>Account</h4><ul><li><a class="muted-link small" href="login.html?mode=register">Join Campus Connect One</a></li><li><a class="muted-link small" href="login.html?mode=login">Sign In</a></li><li><a class="muted-link small" href="home.html">Dashboard</a></li><li><a class="muted-link small" href="settings.html">Preferences</a></li></ul></div><div><h4>Institutional</h4><ul><li><a class="muted-link small" href="privacy.html">Student Privacy Model</a></li><li><a class="muted-link small" href="moderation.html">Campus Moderation</a></li><li><a class="muted-link small" href="institutional.html">Administration Portal</a></li><li><a class="muted-link small" href="roadmap.html">Feature Roadmap</a></li><li><a class="muted-link small" href="contact.html">Contact Us</a></li></ul></div></div><div class="footer-bottom"><span class="small muted">© <span id="cc-year"></span> Campus Connect One. Built for student life. All rights reserved.</span><span class="toolbar"><a class="muted-link small" href="privacy.html">Privacy Policy</a><a class="muted-link small" href="terms.html">Terms of Service</a><a class="muted-link small" href="contact.html">Contact Us</a></span></div></div></footer><script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script><script type="module" src="js/index.js"></script><script type="module" src="js/performance.js"></script><script type="module" src="js/pwa-install.js"></script><script>(function(){
+var h=document.querySelector(".landing-header");
+if(h){var onScroll=function(){h.classList.toggle("is-scrolled",window.scrollY>8)};onScroll();window.addEventListener("scroll",onScroll,{passive:true})}
+var pv=document.querySelector(".preview-window");
+if(pv&&matchMedia("(pointer:fine)").matches){
+  var wrap=pv.parentElement;
+  wrap.addEventListener("mousemove",function(e){
+    var r=wrap.getBoundingClientRect();
+    var px=(e.clientX-r.left)/r.width-.5, py=(e.clientY-r.top)/r.height-.5;
+    pv.style.transform="rotateY("+(px*10)+"deg) rotateX("+(py*-10)+"deg)";
+  });
+  wrap.addEventListener("mouseleave",function(){pv.style.transform="rotateY(0deg) rotateX(0deg)"});
+}
+var yr=document.getElementById("cc-year");if(yr)yr.textContent=new Date().getFullYear();
+document.querySelectorAll(".feature.card").forEach(function(card,i){
+  card.addEventListener("mousemove",function(e){
+    var r=card.getBoundingClientRect();
+    card.style.setProperty("--mx",(e.clientX-r.left)+"px");
+    card.style.setProperty("--my",(e.clientY-r.top)+"px");
+  });
+});
+var observerOptions={root:null,rootMargin:'0px 0px -40px 0px',threshold:0.1};
+var observer=new IntersectionObserver(function(entries,obs){
+  entries.forEach(function(entry){
+    if(entry.isIntersecting){
+      entry.target.classList.add('is-revealed');
+      obs.unobserve(entry.target);
+    }
+  });
+},observerOptions);
+document.querySelectorAll('.feature.card').forEach(function(card,i){
+  card.style.transitionDelay=(i*0.1)+'s';
+  observer.observe(card);
+});
+var nForm=document.getElementById('newsletterForm');
+if(nForm){
+  nForm.addEventListener('submit',function(e){
+    e.preventDefault();
+    var emailInput=document.getElementById('newsletterEmail');
+    var msgDiv=document.getElementById('newsletterMsg');
+    var subBtn=nForm.querySelector('button[type="submit"]');
+    if(emailInput&&emailInput.value){
+      subBtn.disabled=true;
+      var orig=subBtn.innerHTML;
+      subBtn.innerHTML='<span class="btn-spinner"></span> Subscribing...';
+      setTimeout(function(){
+        subBtn.disabled=false;
+        subBtn.innerHTML=orig;
+        msgDiv.hidden=false;
+        msgDiv.style.color='var(--success, #1f9d69)';
+        msgDiv.textContent='Successfully subscribed to campus-wide updates!';
+        emailInput.value='';
+        setTimeout(function(){msgDiv.hidden=true},4000);
+        window.lucide?.createIcons();
+      }, 700);
+    }
+  });
+}
+var canvas=document.getElementById('heroCanvas');
+if(canvas){
+  var ctx=canvas.getContext('2d');
+  var canvasW=canvas.width=canvas.offsetWidth, canvasH=canvas.height=canvas.offsetHeight;
+  window.addEventListener('resize',function(){
+    if(!canvas)return;
+    canvasW=canvas.width=canvas.offsetWidth;
+    canvasH=canvas.height=canvas.offsetHeight;
+  });
+  var particles=[];
+  for(var i=0;i<32;i++){
+    particles.push({
+      x:Math.random()*canvasW,
+      y:Math.random()*canvasH,
+      vx:(Math.random()-.5)*0.5,
+      vy:(Math.random()-.5)*0.5,
+      r:Math.random()*2+1
+    });
+  }
+  function draw(){
+    ctx.clearRect(0,0,canvasW,canvasH);
+    ctx.fillStyle='rgba(91,92,240,0.65)';
+    ctx.strokeStyle='rgba(139,124,246,0.2)';
+    ctx.lineWidth=1;
+    for(var i=0;i<particles.length;i++){
+      var p=particles[i];
+      p.x+=p.vx; p.y+=p.vy;
+      if(p.x<0)p.x=canvasW; if(p.x>canvasW)p.x=0;
+      if(p.y<0)p.y=canvasH; if(p.y>canvasH)p.y=0;
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fill();
+      for(var j=i+1;j<particles.length;j++){
+        var p2=particles[j];
+        var dx=p.x-p2.x, dy=p.y-p2.y;
+        var dist=Math.sqrt(dx*dx+dy*dy);
+        if(dist<120){
+          ctx.beginPath();
+          ctx.moveTo(p.x,p.y);
+          ctx.lineTo(p2.x,p2.y);
+          ctx.stroke();
+        }
+      }
+    }
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+}
+})();</script><script type="module">
+  import { initHeaderSearch } from './search.js';
+  initHeaderSearch({
+    inputId: 'landingSearchInput',
+    dropdownId: 'landingSearchResults',
+    wrapperId: 'headerSearchWrap'
+  });
+</script>
+</body></html>

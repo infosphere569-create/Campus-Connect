@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script>(function(){try{var v=localStorage.getItem("cc-theme")||"system";var r=v==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):v;document.documentElement.dataset.theme=r;document.documentElement.dataset.themePreference=v;}catch(e){}})();</script>
+  <title>Saved Posts & Bookmarks · Campus Connect One</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#5b5cf0">
+  <meta name="description" content="Access your bookmarked campus discussions, saved resources, and important student announcements on Campus Connect One.">
+  <meta name="keywords" content="CampusConnectOne, Campus Connect One, college community, student network, campus feed, university clubs, student discussions, college events, campus issues, anonymous reporting">
+  <meta name="author" content="Campus Connect One">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <link rel="canonical" href="https://campusconnectone.online/saved.html">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Campus Connect One">
+  <meta property="og:title" content="Saved Posts & Bookmarks · Campus Connect One">
+  <meta property="og:description" content="Access your bookmarked campus discussions, saved resources, and important student announcements on Campus Connect One.">
+  <meta property="og:url" content="https://campusconnectone.online/saved.html">
+  <meta property="og:image" content="https://campusconnectone.online/icon.png">
+  <meta property="og:image:width" content="512">
+  <meta property="og:image:height" content="512">
+  <meta property="og:locale" content="en_US">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Saved Posts & Bookmarks · Campus Connect One">
+  <meta name="twitter:description" content="Access your bookmarked campus discussions, saved resources, and important student announcements on Campus Connect One.">
+  <meta name="twitter:image" content="https://campusconnectone.online/icon.png">
+
+  <!-- Favicon & PWA -->
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="apple-touch-icon" href="icon.png">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Campus Connect One">
+
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/pages.css">
+</head>
+<body data-page="saved">
+  <div data-app-root></div>
+  <div data-app-main>
+    <div class="content-grid no-aside">
+      <section>
+        <div class="page-head">
+          <div>
+            <div class="kicker">Bookmarks</div>
+            <h1>Saved Posts</h1>
+            <p class="muted">Access and review all discussions and updates you've bookmarked.</p>
+          </div>
+        </div>
+
+        <div class="stack" id="savedPostsList">
+          <div class="skeleton" style="height:100px"></div>
+          <div class="skeleton" style="height:100px"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+  <script type="module">
+    import './js/theme.js';
+    import { subscribeAuth, requireAuth } from './js/auth.js';
+    import { getSavedPosts } from './js/data-layer.js';
+    import { linkifyHtml, timeAgo, escapeHtml, toast } from './js/utils.js';
+
+    async function loadSaved() {
+      const box = document.getElementById('savedPostsList');
+      if (!box) return;
+      try {
+        const posts = await getSavedPosts();
+        if (!posts || !posts.length) {
+          box.innerHTML = `<div class="card empty" style="text-align:center;padding:40px 16px">
+            <i data-lucide="bookmark"></i>
+            <h3>No saved posts</h3>
+            <p class="muted">When you see something helpful in your feed, tap "Save" to keep it here.</p>
+            <a class="btn primary sm" href="feed.html" style="margin-top:12px">Explore feed</a>
+          </div>`;
+        } else {
+          box.innerHTML = posts.map(p => `
+            <article class="card post-card" data-post-id="${escapeHtml(p.id)}">
+              <div class="split" style="margin-bottom:8px">
+                <span class="badge primary">${escapeHtml(p.branch || p.college || 'Campus')}</span>
+                <span class="small muted">${timeAgo(p.createdAt)}</span>
+              </div>
+              <div class="post-text">${linkifyHtml(p.text || '')}</div>
+              ${p.imageURL ? `<img class="post-media" src="${escapeHtml(p.imageURL)}" alt="Post image" style="border-radius:12px;margin-top:8px;max-height:260px;object-fit:cover">` : ''}
+              <div class="toolbar" style="margin-top:12px;justify-content:space-between">
+                <span class="small muted">${p.likes || 0} likes · ${p.comments || 0} comments</span>
+                <a class="btn sm" href="feed.html?post=${encodeURIComponent(p.id)}">Open discussion →</a>
+              </div>
+            </article>
+          `).join('');
+        }
+        window.lucide?.createIcons();
+      } catch (err) {
+        box.innerHTML = `<div class="card empty"><h3>Could not load saved posts</h3><p class="muted">${err.message}</p></div>`;
+      }
+    }
+
+    subscribeAuth((u) => {
+      if (!requireAuth()) return;
+      loadSaved();
+    });
+  </script>
+</body>
+</html>

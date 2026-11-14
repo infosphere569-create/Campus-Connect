@@ -1,0 +1,254 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><script>(function(){try{var v=localStorage.getItem("cc-theme")||"system";var r=v==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):v;document.documentElement.dataset.theme=r;document.documentElement.dataset.themePreference=v;}catch(e){}})();(function(){try{var isPWA=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone||Boolean(navigator.userAgent.match(/wv|PWA/i));var isMobileOrTablet=/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)||(window.innerWidth<=1024&&('ontouchstart'in window||navigator.maxTouchPoints>0));if(isPWA||isMobileOrTablet){document.documentElement.classList.add('is-mobile-or-pwa')}else{document.documentElement.classList.add('is-laptop-device')}}catch(e){}})();</script><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#5b5cf0"><meta name="robots" content="noindex,nofollow"><title>Sign in — Campus Connect One</title><link rel="stylesheet" href="css/global.css?v=3"><link rel="stylesheet" href="css/components.css?v=3"><link rel="stylesheet" href="css/pages.css?v=3"><link rel="icon" type="image/png" href="icon.png"><link rel="apple-touch-icon" href="icon.png"><meta property="og:type" content="website"><meta property="og:site_name" content="Campus Connect One"><meta property="og:title" content="Sign in — Campus Connect One"><meta property="og:description" content="Sign in to Campus Connect One — your campus community."><meta property="og:image" content="https://campusconnectone.online/icon.png"><meta name="twitter:card" content="summary"><meta name="twitter:title" content="Sign in — Campus Connect One"><meta name="twitter:description" content="Sign in to Campus Connect One — your campus community."><meta name="twitter:image" content="https://campusconnectone.online/icon.png"><link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icons/icon-180.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Campus Connect One"></head><body>
+<div id="globalProgressBar"></div>
+<div class="auth-page">
+  <section class="auth-side" style="position:relative;overflow:hidden">
+    <canvas id="heroCanvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;mix-blend-mode:screen;opacity:0.35"></canvas>
+    <div style="position:relative;z-index:1">
+      <a class="brand" href="index.html">
+        <span class="brand-mark"><img src="icon.png" alt="Logo" width="22" height="22" style="border-radius:6px"></span>
+        <span class="brand-name">Campus Connect One</span>
+      </a>
+      <div class="eyebrow" style="margin-top:50px">YOUR CAMPUS. YOUR COMMUNITY.</div>
+      <h1>One place for campus conversations that matter.</h1>
+      <p>Join groups, discover events, share ideas and raise issues with privacy built into the experience.</p>
+      <div class="auth-perks">
+        <div><i data-lucide="users-round"></i><span>Student communities</span></div>
+        <div><i data-lucide="calendar-days"></i><span>Campus events</span></div>
+        <div><i data-lucide="shield-check"></i><span>Anonymous issues</span></div>
+      </div>
+    </div>
+  </section>
+  <section class="auth-panel">
+    <!-- Mobile Background Canvas Particle Animation (Left Card Mirror) -->
+    <canvas id="mobileHeroCanvas" class="mobile-hero-canvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;mix-blend-mode:screen;opacity:0.35"></canvas>
+
+    <div class="auth-card" style="position:relative;z-index:2">
+      <a href="index.html" id="webCloseBtn" class="btn icon ghost" style="position:absolute;top:14px;right:14px;border-radius:50%;border:1px solid var(--border);z-index:10" aria-label="Close and return to home">
+        <i data-lucide="x"></i>
+      </a>
+      <div class="split">
+        <div>
+          <div class="kicker">Welcome</div>
+          <h1 style="margin:.25rem 0">Campus Connect One</h1>
+        </div>
+      </div>
+      <div class="auth-toggle">
+        <button class="active" data-auth-tab="login">Login</button>
+        <button data-auth-tab="register">Create account</button>
+      </div>
+      <div id="authMessage"></div>
+      <form id="authForm" class="form">
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" type="email" autocomplete="email" required placeholder="you@gmail.com">
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <div class="password-field">
+            <input id="password" type="password" autocomplete="current-password" required minlength="6">
+            <button type="button" class="btn icon ghost" id="togglePass" aria-label="Show password"><i data-lucide="eye"></i></button>
+          </div>
+        </div>
+        <div id="registerOnly" class="hidden stack">
+          <div class="field">
+            <label for="name">Full name</label>
+            <input id="name" autocomplete="name" placeholder="Your name">
+          </div>
+          <div class="field">
+            <label for="branch">Branch</label>
+            <input id="branch" placeholder="CSE / IT / ECE...">
+          </div>
+          <div class="grid grid-2">
+            <div class="field">
+              <label for="year">Year</label>
+              <select id="year">
+                <option>1st Year</option>
+                <option>2nd Year</option>
+                <option>3rd Year</option>
+                <option>4th Year</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="gender">Gender</label>
+              <select id="gender">
+                <option>Prefer not to say</option>
+                <option>Male</option>
+                <option>Female</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <button class="btn primary" type="submit" id="submitAuth">Login <i data-lucide="arrow-right"></i></button>
+        <button class="btn" type="button" id="googleAuth" style="display:inline-flex;align-items:center;justify-content:center;gap:8px">
+          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" style="flex-shrink:0">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+          </svg>
+          <span>Continue with Google</span>
+        </button>
+        <button class="btn ghost" type="button" id="forgotAuth">Forgot password?</button>
+      </form>
+      <div class="auth-footnote small muted" style="margin-top:14px">By continuing you agree to keep your campus community respectful and safe for everyone.</div>
+    </div>
+  </section>
+</div>
+<script>
+if(window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone){
+  var wb = document.getElementById('webCloseBtn');
+  if(wb) wb.style.display = 'none';
+}
+</script>
+<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+<script type="module">
+import {login,register,googleLogin,resetPassword, subscribeAuth} from './js/auth.js';
+import {toast} from './js/utils.js';
+
+// Auto-redirect if already logged in
+subscribeAuth((user) => {
+  if (user) location.replace('home.html');
+});
+
+const tabs=[...document.querySelectorAll('[data-auth-tab]')],form=document.querySelector('#authForm'),submit=document.querySelector('#submitAuth'),registerOnly=document.querySelector('#registerOnly');
+let mode=new URLSearchParams(location.search).get('mode')==='register'?'register':'login';
+function setMode(m){
+  mode=m;
+  tabs.forEach(t=>t.classList.toggle('active',t.dataset.authTab===m));
+  submit.innerHTML=m==='login'?'Login <i data-lucide="arrow-right"></i>':'Create account <i data-lucide="arrow-right"></i>';
+  registerOnly.classList.toggle('hidden',m!=='register');
+  document.querySelector('#name').required=m==='register';
+  window.lucide?.createIcons();
+}
+tabs.forEach(t=>t.addEventListener('click',()=>setMode(t.dataset.authTab)));
+setMode(mode);
+document.querySelector('#togglePass').onclick=()=>{const i=document.querySelector('#password');i.type=i.type==='password'?'text':'password'};
+document.querySelector('#forgotAuth').onclick=async()=>{
+  const email=document.querySelector('#email').value.trim();
+  if(!email)return toast('Enter your email first.','error');
+  try{await resetPassword(email);toast('Password reset email sent.')}catch(e){toast(e.message,'error')}
+};
+const gBtn=document.querySelector('#googleAuth');
+const origGBtnHtml=gBtn.innerHTML;
+gBtn.onclick=async()=>{
+  gBtn.disabled=true;
+  gBtn.innerHTML='<span class="btn-spinner"></span> Connecting…';
+  try{
+    await googleLogin();
+    location.href='home.html';
+  }catch(e){
+    toast(e.message||'Google sign in failed.','error');
+    gBtn.disabled=false;
+    gBtn.innerHTML=origGBtnHtml;
+  }
+};
+form.onsubmit=async e=>{
+  e.preventDefault();
+  const email=document.querySelector('#email').value.trim(),password=document.querySelector('#password').value;
+  if(password.length<6)return toast('Use at least 6 characters for the password.','error');
+  submit.disabled=true;
+  submit.innerHTML='<span class="btn-spinner"></span> Please wait…';
+  try{
+    if(mode==='login'){await login(email,password)}
+    else{
+      const name=document.querySelector('#name').value.trim();
+      await register({email,password,displayName:name,profile:{branch:document.querySelector('#branch').value.trim(),year:document.querySelector('#year').value,gender:document.querySelector('#gender').value}});
+    }
+    location.href='home.html';
+  }catch(e){
+    toast(e.message||'Authentication failed.','error');
+    submit.disabled=false;
+    setMode(mode);
+  }
+};
+window.lucide?.createIcons();
+
+// Screen detection: mobile layout = same breakpoint as global.css (<=720px)
+function isMobileOrPWA() {
+  return window.matchMedia('(max-width:720px)').matches;
+}
+
+// Particle network canvas animation initializer
+function initParticleCanvas(canvasId, particleColor, lineColor, isMobileOnly) {
+  var cvs = document.getElementById(canvasId);
+  if(!cvs) return;
+  var ctx = cvs.getContext('2d');
+
+  function getWidth() { return cvs.offsetWidth || cvs.parentElement?.offsetWidth || window.innerWidth || 300; }
+  function getHeight() { return cvs.offsetHeight || cvs.parentElement?.offsetHeight || window.innerHeight || 400; }
+
+  var cW = cvs.width = getWidth();
+  var cH = cvs.height = getHeight();
+
+  function updateSize() {
+    if(!cvs) return;
+    var w = getWidth();
+    var h = getHeight();
+    if(w > 0 && h > 0 && (w !== cW || h !== cH)) {
+      cW = cvs.width = w;
+      cH = cvs.height = h;
+    }
+  }
+
+  window.addEventListener('resize', updateSize);
+
+  var pts = [];
+  for(var i = 0; i < 35; i++){
+    pts.push({
+      x: Math.random() * (cW || 300),
+      y: Math.random() * (cH || 400),
+      vx: (Math.random() - 0.5) * 0.55,
+      vy: (Math.random() - 0.5) * 0.55,
+      r: Math.random() * 2 + 1
+    });
+  }
+
+  function animate(){
+    // If this is the mobile canvas and we are on desktop/laptop/tablet (>720px), keep it completely clear & inactive
+    if (isMobileOnly && !isMobileOrPWA()) {
+      if (cW > 0 && cH > 0) ctx.clearRect(0, 0, cW, cH);
+      requestAnimationFrame(animate);
+      return;
+    }
+    updateSize();
+    if(cW > 0 && cH > 0) {
+      ctx.clearRect(0, 0, cW, cH);
+      ctx.fillStyle = particleColor || 'rgba(91,92,240,0.65)';
+      ctx.strokeStyle = lineColor || 'rgba(139,124,246,0.2)';
+      ctx.lineWidth = 1;
+      for(var i = 0; i < pts.length; i++){
+        var p = pts[i];
+        p.x += p.vx; p.y += p.vy;
+        if(p.x < 0) p.x = cW; if(p.x > cW) p.x = 0;
+        if(p.y < 0) p.y = cH; if(p.y > cH) p.y = 0;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fill();
+        for(var j = i + 1; j < pts.length; j++){
+          var p2 = pts[j];
+          var dx = p.x - p2.x, dy = p.y - p2.y;
+          var dist = Math.sqrt(dx * dx + dy * dy);
+          if(dist < 115){
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.stroke();
+          }
+        }
+      }
+    }
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+}
+
+// Left side canvas (Laptop/Desktop)
+initParticleCanvas('heroCanvas', 'rgba(91,92,240,0.65)', 'rgba(139,124,246,0.2)', false);
+
+// Mobile background canvas (<=720px only, browser + PWA)
+initParticleCanvas('mobileHeroCanvas', 'rgba(91,92,240,0.65)', 'rgba(139,124,246,0.2)', true);
+</script>
+<script type="module" src="js/pwa.js"></script>
+<script type="module" src="js/performance.js"></script>
+<script type="module" src="js/pwa-install.js"></script>
+</body></html>

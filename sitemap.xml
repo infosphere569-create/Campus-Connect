@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://campusconnectone.online/</loc><priority>1.0</priority><changefreq>daily</changefreq></url>
+  <url><loc>https://campusconnectone.online/about.html</loc><priority>0.8</priority></url>
+  <url><loc>https://campusconnectone.online/contact.html</loc><priority>0.8</priority></url>
+  <url><loc>https://campusconnectone.online/student-life.html</loc><priority>0.8</priority></url>
+  <url><loc>https://campusconnectone.online/privacy.html</loc><priority>0.6</priority></url>
+  <url><loc>https://campusconnectone.online/terms.html</loc><priority>0.6</priority></url>
+  <url><loc>https://campusconnectone.online/safety.html</loc><priority>0.6</priority></url>
+  <url><loc>https://campusconnectone.online/roadmap.html</loc><priority>0.6</priority></url>
+  <url><loc>https://campusconnectone.online/institutional.html</loc><priority>0.6</priority></url>
+</urlset>

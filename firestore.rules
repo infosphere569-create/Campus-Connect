@@ -1,0 +1,624 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================
+    // HELPERS
+    // =========================================================
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function self(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function currentUser() {
+      return get(
+        /databases/$(database)/documents/users/$(request.auth.uid)
+      ).data;
+    }
+
+    function roleIs(role) {
+      return signedIn() && currentUser().role == role;
+    }
+
+    function staff() {
+      return signedIn()
+        && currentUser().role in ['moderator', 'platformAdmin'];
+    }
+
+    function admin() {
+      return signedIn()
+        && currentUser().role == 'platformAdmin';
+    }
+
+    function isGroupLeader(groupId) {
+      return signedIn() &&
+        get(/databases/$(database)/documents/groups/$(groupId)).data.createdBy == request.auth.uid;
+    }
+
+
+    // =========================================================
+    // USERS
+    // =========================================================
+
+    match /users/{uid} {
+      allow read: if self(uid) || staff();
+      allow create: if self(uid);
+      allow update: if self(uid) || admin();
+      allow delete: if admin();
+    }
+
+
+    // =========================================================
+    // POSTS
+    // =========================================================
+
+    match /posts/{postId} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.resource.data.authorId == request.auth.uid;
+
+      allow update: if signedIn()
+        && (
+          resource.data.authorId == request.auth.uid
+          || staff()
+          || request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['likes','comments','shares','saves','reportCount','reposts'])
+        );
+
+      allow delete: if signedIn()
+        && (
+          resource.data.authorId == request.auth.uid
+          || staff()
+        );
+
+      // COMMENTS
+      match /comments/{commentId} {
+        allow read: if signedIn();
+        allow create: if signedIn()
+          && request.resource.data.authorId == request.auth.uid;
+        allow update: if signedIn()
+          && resource.data.authorId == request.auth.uid;
+        allow delete: if signedIn()
+          && (
+            resource.data.authorId == request.auth.uid
+            || staff()
+          );
+      }
+    }
+
+
+    // =========================================================
+    // GROUPS
+    // =========================================================
+
+    match /groups/{groupId} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid;
+
+      allow update: if signedIn()
+        && (
+          resource.data.createdBy == request.auth.uid
+          || staff()
+          || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount'])
+        );
+
+      allow delete: if signedIn()
+        && (
+          resource.data.createdBy == request.auth.uid
+          || staff()
+        );
+
+      // GROUP MESSAGES
+      match /messages/{messageId} {
+        allow read: if signedIn();
+
+        allow create: if signedIn()
+          && request.resource.data.authorId == request.auth.uid;
+
+        allow update: if signedIn()
+          && (
+            (resource.data.authorId == request.auth.uid)
+            || staff()
+            || (isGroupLeader(groupId) &&
+                request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pinned']))
+          );
+
+        allow delete: if signedIn()
+          && (
+            resource.data.authorId == request.auth.uid
+            || staff()
+            || isGroupLeader(groupId)
+          );
+      }
+    }
+
+
+    // =========================================================
+    // GROUP MEMBERS
+    // =========================================================
+
+    match /groupMembers/{memberId} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && (
+          request.resource.data.uid == request.auth.uid
+          || staff()
+        );
+
+      allow update: if signedIn()
+        && (
+          resource.data.uid == request.auth.uid
+          || staff()
+          || isGroupLeader(resource.data.groupId)
+        );
+
+      allow delete: if signedIn()
+        && (
+          resource.data.uid == request.auth.uid
+          || staff()
+          || isGroupLeader(resource.data.groupId)
+        );
+    }
+
+
+    // =========================================================
+    // GROUP REQUESTS
+    // =========================================================
+
+    match /groupRequests/{requestId} {
+      allow read: if signedIn()
+        && (
+          resource.data.uid == request.auth.uid
+          || staff()
+          || isGroupLeader(resource.data.groupId)
+        );
+
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid;
+
+      allow update: if signedIn()
+        && (
+          resource.data.uid == request.auth.uid
+          || staff()
+          || isGroupLeader(resource.data.groupId)
+        );
+
+      allow delete: if signedIn()
+        && (
+          resource.data.uid == request.auth.uid
+          || staff()
+          || isGroupLeader(resource.data.groupId)
+        );
+    }
+
+
+    // =========================================================
+    // ISSUES
+    // =========================================================
+
+    match /issues/{issueId} {
+      // Students can read public issues.
+      allow read: if signedIn();
+
+      // Allow signed-in students / users to submit issues
+      allow create: if signedIn();
+
+      // Staff can update everything.
+      // Students can only update supportCount + updatedAt.
+      allow update: if signedIn()
+        && (
+          staff()
+          ||
+          request.resource.data
+            .diff(resource.data)
+            .affectedKeys()
+            .hasOnly([
+              'supportCount',
+              'updatedAt'
+            ])
+        );
+
+      allow delete: if staff();
+    }
+
+
+    // =========================================================
+    // PRIVATE ISSUE DATA
+    // =========================================================
+
+    match /issuePrivate/{issueId} {
+      // Reporter identity/private data only for staff.
+      allow read: if staff();
+
+      // Allow signed-in users to attach private metadata to their own issue
+      allow create: if signedIn() && request.resource.data.authorUid == request.auth.uid;
+      allow update, delete: if staff();
+    }
+
+
+    // =========================================================
+    // ISSUE VOTES / SUPPORT
+    // =========================================================
+
+    match /issueVotes/{voteId} {
+      allow read: if signedIn();
+
+      // User can support only as themselves.
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid;
+
+      allow delete: if signedIn()
+        && resource.data.uid == request.auth.uid;
+
+      allow update: if false;
+    }
+
+
+    // =========================================================
+    // EVENTS
+    // =========================================================
+
+    match /events/{eventId} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid;
+
+      allow update: if staff()
+        || (signedIn() && resource.data.createdBy == request.auth.uid)
+        || (signedIn() &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['interestedCount']));
+
+      allow delete: if staff()
+        || (signedIn() && resource.data.createdBy == request.auth.uid);
+    }
+
+
+    // =========================================================
+    // EVENT INTEREST
+    // =========================================================
+
+    match /eventInterest/{interestId} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid;
+
+      allow delete: if signedIn()
+        && resource.data.uid == request.auth.uid;
+
+      allow update: if false;
+    }
+
+
+    // =========================================================
+    // NOTIFICATIONS
+    // =========================================================
+
+    match /notifications/{notificationId} {
+      allow read: if signedIn()
+        && resource.data.uid == request.auth.uid;
+
+      allow create: if staff();
+
+      allow update: if signedIn()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data
+          .diff(resource.data)
+          .affectedKeys()
+          .hasOnly(['read']);
+
+      allow delete: if signedIn()
+        && resource.data.uid == request.auth.uid;
+    }
+
+
+    // =========================================================
+    // SAVED POSTS
+    // =========================================================
+
+    match /savedPosts/{uid} {
+      allow read: if self(uid);
+      allow create, update, delete: if false;
+
+      match /items/{postId} {
+        allow read: if self(uid);
+        allow create: if self(uid);
+        allow update: if self(uid);
+        allow delete: if self(uid);
+      }
+    }
+
+
+    // =========================================================
+    // POST LIKES
+    // =========================================================
+
+    match /postLikes/{postId} {
+      allow read: if signedIn();
+      allow create, update, delete: if false;
+
+      match /users/{uid} {
+        allow read: if signedIn();
+        allow create: if self(uid);
+        allow delete: if self(uid);
+        allow update: if false;
+      }
+    }
+
+
+    // =========================================================
+    // REPOSTS & REPORTS
+    // =========================================================
+
+    match /reposts/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow update: if false;
+    }
+
+    match /reports/{reportId} {
+      allow create: if signedIn()
+        && request.resource.data.reporterId == request.auth.uid;
+
+      allow read: if staff();
+      allow update: if staff();
+      allow delete: if admin();
+    }
+
+
+    // =========================================================
+    // AUDIT LOGS
+    // =========================================================
+
+    match /auditLogs/{logId} {
+      allow read: if staff();
+      allow create: if staff();
+      allow update, delete: if admin();
+    }
+
+
+    // =========================================================
+    // GROUP INVITES
+    // =========================================================
+
+    match /groupInvites/{inviteCode} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.createdBy == request.auth.uid;
+      allow delete: if signedIn()
+        && (resource.data.createdBy == request.auth.uid || staff());
+      allow update: if false;
+    }
+
+
+    // =========================================================
+    // ANNOUNCEMENTS
+    // =========================================================
+
+    match /announcements/{announcementId} {
+      allow read: if signedIn();
+      allow create: if staff();
+      allow update: if staff();
+      allow delete: if staff();
+    }
+
+
+    // =========================================================
+    // NEWSLETTER SUBSCRIBERS
+    // =========================================================
+
+    match /subscribers/{subId} {
+      allow create, update: if true;
+      allow read, delete: if staff();
+    }
+
+
+    // =========================================================
+    // HACKATHONS MODULE  (hkProfiles / hkHackathons / hkRegistrations / hkNotifications)
+    // =========================================================
+
+    function hkProfile(uid) {
+      return get(/databases/$(database)/documents/hkProfiles/$(uid)).data;
+    }
+    function hkHack(id) {
+      return get(/databases/$(database)/documents/hkHackathons/$(id)).data;
+    }
+
+    match /hkProfiles/{uid} {
+      allow read: if self(uid) || staff();
+
+      // A user can only create their own profile and cannot self-verify or self-unblock.
+      allow create: if self(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.hostVerified == false
+        && request.resource.data.hostBlocked == false;
+
+      // Owner may edit their profile but never the trust flags; only a platform admin changes those.
+      allow update: if (self(uid)
+          && request.resource.data.hostVerified == resource.data.hostVerified
+          && request.resource.data.hostBlocked == resource.data.hostBlocked)
+        || admin();
+
+      allow delete: if admin();
+    }
+
+    match /hkHackathons/{hid} {
+      // Public once approved. Owners see their own, staff see everything.
+      allow read: if resource.data.status == 'approved'
+        || (signedIn() && resource.data.hostUid == request.auth.uid)
+        || staff();
+
+      allow create: if signedIn()
+        && request.resource.data.hostUid == request.auth.uid
+        && request.resource.data.status in ['draft', 'pending']
+        && request.resource.data.regCount == 0
+        && request.resource.data.featured == false
+        && request.resource.data.hostVerified == hkProfile(request.auth.uid).hostVerified
+        && hkProfile(request.auth.uid).hostBlocked == false;
+
+      allow update: if staff()
+        // Owner editing / (re)submitting. Cannot self-approve, feature, or touch the counter.
+        || (signedIn()
+            && resource.data.hostUid == request.auth.uid
+            && request.resource.data.hostUid == resource.data.hostUid
+            && resource.data.status != 'closed'
+            && hkProfile(request.auth.uid).hostBlocked == false
+            && request.resource.data.regCount == resource.data.regCount
+            && request.resource.data.featured == resource.data.featured
+            && request.resource.data.hostVerified == hkProfile(request.auth.uid).hostVerified
+            && (
+              request.resource.data.status in ['draft', 'pending']
+              || (resource.data.status == 'approved'
+                  && request.resource.data.status == 'approved'
+                  && request.resource.data.diff(resource.data).affectedKeys()
+                       .hasOnly(['registrationClosed', 'announcement', 'announcementAtMs', 'autoEmail', 'rounds', 'submission', 'updatedAtMs', 'updatedAt'])))
+          )
+        // Participants only bump the registration counter by exactly one, together with their registration doc.
+        || (signedIn()
+            && resource.data.status == 'approved'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['regCount'])
+            && (
+              (request.resource.data.regCount == resource.data.regCount + 1
+                 && existsAfter(/databases/$(database)/documents/hkRegistrations/$(hid + '_' + request.auth.uid)))
+              ||
+              (request.resource.data.regCount == resource.data.regCount - 1
+                 && !existsAfter(/databases/$(database)/documents/hkRegistrations/$(hid + '_' + request.auth.uid)))
+            ));
+
+      allow delete: if admin()
+        || (signedIn()
+            && resource.data.hostUid == request.auth.uid
+            && resource.data.status in ['draft', 'rejected', 'changes_requested']);
+    }
+
+    match /hkRegistrations/{rid} {
+      allow read: if signedIn()
+        && (resource.data.uid == request.auth.uid
+            || resource.data.hostUid == request.auth.uid
+            || staff());
+
+      allow create: if signedIn()
+        && rid == request.resource.data.hackathonId + '_' + request.auth.uid
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'registered'
+        && request.resource.data.stage == 0
+        && hkHack(request.resource.data.hackathonId).status == 'approved'
+        && request.resource.data.hostUid == hkHack(request.resource.data.hackathonId).hostUid;
+
+      // Host (or staff) may change only review fields.
+      allow update: if signedIn()
+        && (resource.data.hostUid == request.auth.uid || staff())
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'stage', 'hostNote', 'score', 'updatedAtMs']);
+
+      // Participant cancels their own registration.
+      allow delete: if signedIn() && (resource.data.uid == request.auth.uid || staff());
+    }
+
+    // Project submissions: one per registration (team leader). Participant writes content, host writes review.
+    match /hkSubmissions/{sid} {
+      allow read: if signedIn()
+        && (resource.data.uid == request.auth.uid || resource.data.hostUid == request.auth.uid || staff());
+
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && sid == request.resource.data.hackathonId + '_' + request.auth.uid
+        && exists(/databases/$(database)/documents/hkRegistrations/$(sid))
+        && get(/databases/$(database)/documents/hkRegistrations/$(sid)).data.status != 'rejected'
+        && request.resource.data.hostUid == hkHack(request.resource.data.hackathonId).hostUid
+        && hkHack(request.resource.data.hackathonId).get('submission', {}).get('open', true) == true
+        && (hkHack(request.resource.data.hackathonId).get('submission', {}).get('deadlineMs', 0) == 0
+            || request.time.toMillis() <= hkHack(request.resource.data.hackathonId).get('submission', {}).get('deadlineMs', 0))
+        && request.resource.data.title.size() <= 140
+        && request.resource.data.idea.size() <= 4000;
+
+      allow update: if signedIn()
+        && (
+          (resource.data.uid == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['title', 'idea', 'repoUrl', 'demoUrl', 'pptUrl', 'videoUrl', 'extraUrl', 'updatedAtMs'])
+            && hkHack(resource.data.hackathonId).get('submission', {}).get('open', true) == true
+            && (hkHack(resource.data.hackathonId).get('submission', {}).get('deadlineMs', 0) == 0
+                || request.time.toMillis() <= hkHack(resource.data.hackathonId).get('submission', {}).get('deadlineMs', 0))
+            && request.resource.data.title.size() <= 140
+            && request.resource.data.idea.size() <= 4000)
+          ||
+          ((resource.data.hostUid == request.auth.uid || staff())
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['score', 'feedback', 'reviewStatus', 'reviewedAtMs']))
+        );
+
+      allow delete: if false;
+    }
+
+    // Screening test: meta is visible to registrants, questions and answer key live in hkTestKeys (host only).
+    // Starting / submitting / grading happens in Cloud Functions (hkStartTest / hkSubmitTest).
+    match /hkTests/{hid} {
+      allow read: if signedIn()
+        && (hkHack(hid).hostUid == request.auth.uid
+            || staff()
+            || exists(/databases/$(database)/documents/hkRegistrations/$(hid + '_' + request.auth.uid)));
+      allow create, update: if signedIn()
+        && hkHack(hid).hostUid == request.auth.uid
+        && request.resource.data.hostUid == request.auth.uid;
+      allow delete: if signedIn() && hkHack(hid).hostUid == request.auth.uid;
+    }
+    match /hkTestKeys/{hid} {
+      allow read: if signedIn() && (hkHack(hid).hostUid == request.auth.uid || staff());
+      allow create, update, delete: if signedIn() && hkHack(hid).hostUid == request.auth.uid;
+    }
+    match /hkAttempts/{aid} {
+      allow read: if signedIn()
+        && (resource.data.uid == request.auth.uid || resource.data.hostUid == request.auth.uid || staff());
+      allow write: if false;
+    }
+
+    // Written only by Cloud Functions (admin SDK).
+    match /hkMailLog/{lid} {
+      allow read: if signedIn() && (resource.data.hostUid == request.auth.uid || staff());
+      allow write: if false;
+    }
+    match /publicStats/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /hkNotifications/{nid} {
+      allow read: if signedIn() && resource.data.toUid == request.auth.uid;
+
+      // Sender must be the host of the hackathon, the host's registrant, or staff.
+      allow create: if signedIn()
+        && request.resource.data.fromUid == request.auth.uid
+        && request.resource.data.read == false
+        && (staff()
+            || (request.resource.data.hackathonId != ''
+                && (hkHack(request.resource.data.hackathonId).hostUid == request.auth.uid
+                    || hkHack(request.resource.data.hackathonId).hostUid == request.resource.data.toUid)));
+
+      allow update: if signedIn()
+        && resource.data.toUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+
+      allow delete: if signedIn() && resource.data.toUid == request.auth.uid;
+    }
+
+
+    // =========================================================
+    // DEFAULT DENY
+    // =========================================================
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
