@@ -507,6 +507,9 @@ i[data-lucide],.hk-ic{width:18px;height:18px;flex:none;stroke-width:2.1}
 
 /* Hackathons PWA Splash Screen */
 #hkSplash{
+  display:none;
+}
+.is-standalone-pwa #hkSplash{
   position:fixed;
   inset:0;
   background:#0b1410;

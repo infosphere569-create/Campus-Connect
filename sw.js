@@ -1,5 +1,5 @@
-// Campus Connect One Service Worker v37
-const CACHE_VERSION = 'cc-v37';
+// Campus Connect One Service Worker v38
+const CACHE_VERSION = 'cc-v38';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -84,6 +84,13 @@ self.addEventListener('fetch', (event) => {
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req).then((res) => {
+        if (res.redirected) {
+          return new Response(res.body, {
+            status: res.status,
+            statusText: res.statusText,
+            headers: res.headers
+          });
+        }
         if (res && res.status === 200) {
           const copy = res.clone();
           caches.open(RUNTIME_CACHE).then((c) => c.put(req, copy));

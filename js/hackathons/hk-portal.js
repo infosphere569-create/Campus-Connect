@@ -692,7 +692,7 @@ document.addEventListener('click', async e => {
   const a = e.target.closest('[data-act]'); if(!a) return; const act = a.dataset.act;
   if(act === 'loc') locModal();
   else if(act === 'theme') toggleTheme();
-  else if(act === 'logout'){ await signOut(C.auth); sessionStorage.removeItem('hk-role'); location.replace('login-hackthons.html'); }
+  else if(act === 'logout'){ await signOut(C.auth); sessionStorage.removeItem('hk-role'); const target = location.pathname.endsWith('.html') ? 'login-hackthons.html' : 'login-hackthons'; location.replace(target); }
   else if(act === 'back') history.length > 1 ? history.back() : nav('#/home');
   else if(act === 'clear-filters'){ S.f = { q: '', mode: '', fee: '', when: '', sort: 'trending', tag: '' }; route(); }
   else if(act === 'part-banned'){ showBannedParticipantModal(); }
@@ -728,7 +728,8 @@ C.watchUser(async (user, { site, hk }) => {
   if(isPwa){
     params.push('pwa=1');
   }
-  const back = 'login-hackthons.html' + (params.length ? '?' + params.join('&') : '');
+  const targetBase = location.pathname.endsWith('.html') ? 'login-hackthons.html' : 'login-hackthons';
+  const back = targetBase + (params.length ? '?' + params.join('&') : '');
   if(!user || !hk){ location.replace(back); return; }
   // The role is fixed at login (sessionStorage). An explicit invite targets the Host space.
   const chosen = sessionStorage.getItem('hk-role');

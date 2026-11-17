@@ -12,7 +12,6 @@
       document.documentElement.classList.add('is-standalone-pwa');
       if(!sessionStorage.getItem('hk-login-splash')){
         sessionStorage.setItem('hk-login-splash', '1');
-        document.write('<style>#hkSplash{display:grid!important}</style>');
         window.addEventListener('DOMContentLoaded', function(){
           setTimeout(function(){
             var sp = document.getElementById('hkSplash');

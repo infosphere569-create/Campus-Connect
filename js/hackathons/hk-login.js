@@ -60,7 +60,8 @@ async function finish(user, extra = {}){
   const qStr = [invParam, pwaParam].filter(Boolean).join('&');
   const invQ = qStr ? '?' + qStr : '';
   const targetHash = inviteId ? '#/host' : next;
-  location.replace('hackthons-portal.html' + invQ + targetHash);
+  const targetPage = location.pathname.endsWith('.html') ? 'hackthons-portal.html' : 'hackthons-portal';
+  location.replace(targetPage + invQ + targetHash);
 }
 
 $$('.hk-role').forEach(b => b.onclick = async () => {
