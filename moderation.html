@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script>(function(){try{var v=localStorage.getItem("cc-theme")||"system";var r=v==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):v;document.documentElement.dataset.theme=r;document.documentElement.dataset.themePreference=v;}catch(e){}})();</script>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#5b5cf0">
+  <title>Campus Moderation Model — Campus Connect One</title>
+  <meta name="description" content="Campus Connect Moderation — automated filters, peer report queues, transparent audit logging, and community safety protocols.">
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/pages.css">
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="manifest" href="manifest.json">
+</head>
+<body data-page="moderation">
+  <div id="globalProgressBar"></div>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="index.html">
+        <span class="brand-mark"><img src="icon.png" alt="Logo" width="22" height="22" style="border-radius:6px"></span>
+        <span class="brand-name">Campus Connect One</span>
+      </a>
+      <div class="top-actions" style="margin-left:auto">
+        <a class="btn ghost sm" href="index.html">Home</a>
+        <a class="btn primary sm" href="admin.html">Admin Console</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="main container" style="max-width:960px;padding-block:36px">
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">GOVERNANCE & TRUST</div>
+        <h1>Campus Moderation Framework</h1>
+        <p class="landing-copy">A balanced multi-tiered moderation approach combining automated sentiment filters, peer reporting, and student council oversight.</p>
+      </div>
+      <span class="badge primary" style="padding:8px 14px;font-weight:800"><i data-lucide="shield-check"></i> Active Moderation Protocol</span>
+    </div>
+
+    <div class="grid grid-3" style="margin-bottom:28px">
+      <div class="card stat">
+        <i data-lucide="filter" style="color:var(--primary);width:28px;height:28px"></i>
+        <strong style="margin-top:8px">Automated Scanning</strong>
+        <span class="small muted">Blocks profanity, hate speech keywords, and duplicate spam before publication.</span>
+      </div>
+      <div class="card stat">
+        <i data-lucide="users-round" style="color:var(--success);width:28px;height:28px"></i>
+        <strong style="margin-top:8px">Peer Review Queue</strong>
+        <span class="small muted">Student council members and elected club leaders review reported posts in real time.</span>
+      </div>
+      <div class="card stat">
+        <i data-lucide="scrollText" style="color:var(--warning);width:28px;height:28px"></i>
+        <strong style="margin-top:8px">Immutable Audit Log</strong>
+        <span class="small muted">Every warning, post removal, or suspension is recorded in the admin audit log for transparency.</span>
+      </div>
+    </div>
+
+    <section class="card stack" style="gap:22px;padding:28px">
+      <h2>How Moderation Works</h2>
+      
+      <div class="notice">
+        <strong>1. Reporting an Item</strong>
+        <p class="small muted" style="margin-top:4px">Any student can report content using the flag button. Items receiving multiple reports are automatically placed in the moderation queue.</p>
+      </div>
+
+      <div class="notice">
+        <strong>2. Moderator Review & Action</strong>
+        <p class="small muted" style="margin-top:4px">Moderators evaluate the context against our Safety Guidelines. Actions include approving, issuing a user warning, hiding the post, or temporary suspension.</p>
+      </div>
+
+      <div class="notice">
+        <strong>3. Appeals Process</strong>
+        <p class="small muted" style="margin-top:4px">If your post was removed or flagged by mistake, you can submit an appeal through the Account Settings or Report Status tab.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer" style="margin-top:40px">
+    <div class="container" style="text-align:center">
+      <span class="small muted">© 2026 Campus Connect One. Built for student life. All rights reserved.</span>
+      <div class="toolbar" style="justify-content:center;margin-top:10px">
+        <a class="muted-link small" href="privacy.html">Privacy Policy</a>
+        <a class="muted-link small" href="terms.html">Terms of Service</a>
+        <a class="muted-link small" href="moderation.html">Moderation Framework</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => window.lucide?.createIcons());
+  </script>
+</body>
+</html>

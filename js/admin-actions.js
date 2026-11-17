@@ -1,0 +1,7 @@
+import { db,auth } from "./firebase.js";
+import { doc,updateDoc,setDoc,serverTimestamp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+import { dispatchAutomatedEmailNotification } from "./email-templates.js";
+const uid=()=>auth.currentUser?.uid||(()=>{throw Error("Authentication required.")})();
+export async function reviewReport(id,status,note=""){const u=uid();await updateDoc(doc(db,"reports",id),{status,moderatorNote:note.trim(),reviewedBy:u,reviewedAt:serverTimestamp()});await setDoc(doc(db,"auditLogs",`${Date.now()}_${u}`),{action:"review_report",targetId:id,status,actorUid:u,createdAt:serverTimestamp()});}
+export async function updateIssueStatus(id,status,response=""){const u=uid();await updateDoc(doc(db,"issues",id),{status,adminResponse:response.trim(),updatedAt:serverTimestamp()});await setDoc(doc(db,"auditLogs",`${Date.now()}_${u}`),{action:"update_issue",targetId:id,status,actorUid:u,createdAt:serverTimestamp()});dispatchAutomatedEmailNotification({payload:{collection:"issues",action:"update",issueId:id,status,adminResponse:response.trim()},sendNow:true,source:"admin_actions"}).catch(()=>{});}
+export async function moderateGroup(id,approved,note=""){const u=uid();await updateDoc(doc(db,"groups",id),{approvalStatus:approved?"approved":"rejected",moderationNote:note.trim(),moderatedBy:u,moderatedAt:serverTimestamp()});await setDoc(doc(db,"auditLogs",`${Date.now()}_${u}`),{action:"moderate_group",targetId:id,approved,actorUid:u,createdAt:serverTimestamp()});}

@@ -1,0 +1,18 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><script>(function(){try{var v=localStorage.getItem("cc-theme")||"system";var r=v==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):v;document.documentElement.dataset.theme=r;document.documentElement.dataset.themePreference=v;}catch(e){}})();</script><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<title>Settings · Campus Connect One</title><link rel="stylesheet" href="css/global.css"><link rel="stylesheet" href="css/components.css">
+<link rel="icon" type="image/png" href="icon.png"><link rel="apple-touch-icon" href="icon.png"><meta property="og:type" content="website"><meta property="og:site_name" content="Campus Connect One"><meta property="og:title" content="Settings · Campus Connect One"><meta property="og:description" content="Manage your Campus Connect One account and preferences."><meta property="og:image" content="https://campusconnectone.online/icon.png"><meta name="twitter:card" content="summary"><meta name="twitter:title" content="Settings · Campus Connect One"><meta name="twitter:description" content="Manage your Campus Connect One account and preferences."><meta name="twitter:image" content="https://campusconnectone.online/icon.png"><link rel="manifest" href="manifest.json"><link rel="apple-touch-icon" href="icons/icon-180.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Campus Connect One"></head><body><main class="page-shell"><section class="card settings-card"><div class="eyebrow">Campus Connect One</div><h1>Settings</h1>
+<form id="settingsForm" class="stack">
+<h3>Privacy</h3><label>Profile visibility<select id="profileVisibility"><option value="campus">Campus</option><option value="private">Private</option></select></label>
+<label class="check-row"><input type="checkbox" id="showEmail"> Show email on profile</label>
+<h3>Notifications</h3>
+<label class="check-row"><input type="checkbox" id="likes"> Likes</label><label class="check-row"><input type="checkbox" id="comments"> Comments</label>
+<label class="check-row"><input type="checkbox" id="groups"> Groups</label><label class="check-row"><input type="checkbox" id="events"> Events</label>
+<h3>Developer</h3>
+<div class="stack" style="gap:8px">
+  <p class="small muted">Troubleshoot app installation and notifications.</p>
+  <button type="button" class="btn sm" id="resetPWA">Reset Install Banner</button>
+</div>
+<br>
+<button class="btn primary">Save settings</button><p id="status" class="muted"></p>
+</form></section></main><script type="module" src="js/settings-page.js"></script><script type="module" src="js/performance.js"></script><script type="module" src="js/pwa-install.js"></script></body></html>

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script>(function(){try{var v=localStorage.getItem("cc-theme")||"system";var r=v==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):v;document.documentElement.dataset.theme=r;document.documentElement.dataset.themePreference=v;}catch(e){}})();</script>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#5b5cf0">
+  <title>Student Life & Campus Survival Guide — Campus Connect One</title>
+  <meta name="description" content="Discover student life at Campus Connect — study tips, club activities, event calendars, campus hacks, and student communities.">
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/pages.css">
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="manifest" href="manifest.json">
+</head>
+<body data-page="student-life">
+  <div id="globalProgressBar"></div>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="index.html">
+        <span class="brand-mark"><img src="icon.png" alt="Logo" width="22" height="22" style="border-radius:6px"></span>
+        <span class="brand-name">Campus Connect One</span>
+      </a>
+      <div class="top-actions" style="margin-left:auto">
+        <a class="btn ghost sm" href="index.html">Home</a>
+        <a class="btn primary sm" href="login.html?mode=login">Sign In</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="main container" style="max-width:960px;padding-block:36px">
+    <div class="page-head">
+      <div>
+        <div class="eyebrow">CAMPUS GUIDE 2026–2027</div>
+        <h1>Student Life Hub</h1>
+        <p class="landing-copy">Your guide to surviving and thriving on campus—from finding the best study groups to navigating placement prep and campus culture.</p>
+      </div>
+      <a class="btn primary sm" href="grouplist.html"><i data-lucide="users"></i> Explore Clubs</a>
+    </div>
+
+    <div class="feature-grid" style="margin-bottom:28px">
+      <div class="card feature">
+        <div class="feature-icon"><i data-lucide="book-open"></i></div>
+        <h3>Academic Success</h3>
+        <p>Access senior notes, exam preparation strategy groups, and study buddy matching across departments.</p>
+        <a class="btn ghost sm" href="grouplist.html" style="margin-top:10px">Find Study Groups</a>
+      </div>
+
+      <div class="card feature">
+        <div class="feature-icon"><i data-lucide="sparkles"></i></div>
+        <h3>Clubs & Cultural Fest</h3>
+        <p>Join coding clubs, robotics teams, music societies, dance crews, and annual festival organizing committees.</p>
+        <a class="btn ghost sm" href="events.html" style="margin-top:10px">Browse Events</a>
+      </div>
+
+      <div class="card feature">
+        <div class="feature-icon"><i data-lucide="briefcase"></i></div>
+        <h3>Placement & Internships</h3>
+        <p>Get referral opportunities, interview experience archives, and coding challenge updates from seniors.</p>
+        <a class="btn ghost sm" href="feed.html" style="margin-top:10px">Check Feed</a>
+      </div>
+
+      <div class="card feature">
+        <div class="feature-icon"><i data-lucide="message-square-warning"></i></div>
+        <h3>Campus Voice</h3>
+        <p>Raise hostel issues, Wi-Fi complaints, or cafeteria feedback anonymously with peer support voting.</p>
+        <a class="btn ghost sm" href="issues.html" style="margin-top:10px">Raise an Issue</a>
+      </div>
+    </div>
+
+    <section class="card stack" style="padding:28px;gap:20px">
+      <h2>Top Tips for Campus Life</h2>
+      <div class="grid grid-2" style="gap:16px">
+        <div class="notice">
+          <strong>1. Join at least 2 Student Groups</strong>
+          <p class="small muted" style="margin-top:4px">Connecting with technical and cultural groups builds your network and opens up senior mentorship opportunities early on.</p>
+        </div>
+        <div class="notice">
+          <strong>2. Stay Updated on Event RSVPs</strong>
+          <p class="small muted" style="margin-top:4px">Never miss hackathons or guest lectures—RSVP directly on Campus Events to sync dates to your profile.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer" style="margin-top:40px">
+    <div class="container" style="text-align:center">
+      <span class="small muted">© 2026 Campus Connect One. Built for student life. All rights reserved.</span>
+      <div class="toolbar" style="justify-content:center;margin-top:10px">
+        <a class="muted-link small" href="privacy.html">Privacy Policy</a>
+        <a class="muted-link small" href="terms.html">Terms of Service</a>
+        <a class="muted-link small" href="safety.html">Safety Guidelines</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => window.lucide?.createIcons());
+  </script>
+</body>
+</html>

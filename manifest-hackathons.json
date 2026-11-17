@@ -1,0 +1,32 @@
+{
+  "id": "/hackthons-portal.html",
+  "name": "Campus Connect One Hackathons",
+  "short_name": "Hackathons",
+  "description": "Discover, join and host college hackathons on Campus Connect One.",
+  "start_url": "hackthons-portal.html?pwa=1",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0e14",
+  "theme_color": "#178a54",
+  "categories": ["education", "productivity", "social"],
+  "icons": [
+    { "src": "icon/icon-hackathons.png", "sizes": "96x96", "type": "image/png", "purpose": "any" },
+    { "src": "icon/icon-hackathons-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon/icon-hackathons-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Explore Hackathons",
+      "short_name": "Explore",
+      "url": "hackthons-portal.html?pwa=1#/explore",
+      "icons": [{ "src": "icon/icon-96.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "My Hackathons",
+      "short_name": "My Hacks",
+      "url": "hackthons-portal.html?pwa=1#/my",
+      "icons": [{ "src": "icon/icon-96.png", "sizes": "96x96" }]
+    }
+  ]
+}
