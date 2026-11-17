@@ -17,8 +17,17 @@
 <div class="hk-layer hk-auth">
   <div class="hk-glass hk-auth-box">
     <div class="hk-auth-top">
-      <a class="hk-brand" href="hackthons-portal.html"><img src="icon.png" alt="Campus Connect One logo" width="38" height="38"><span>Campus Connect One<small class="hk-brand-sub"><i data-lucide="terminal"></i><span>Hackathons</span></small></span></a>
-      <div style="display:flex;gap:6px"><button class="hk-btn icon ghost" id="themeBtn" aria-label="Toggle theme"><i data-lucide="sun-moon"></i></button><a class="hk-btn icon ghost" href="home.html" id="hkCloseBtn" aria-label="Back to Campus Connect One"><i data-lucide="x"></i></a></div>
+      <a class="hk-brand" href="hackthons-portal.html" aria-label="Campus Connect One Hackathons Portal">
+        <img src="icon.png" alt="Campus Connect One logo" width="36" height="36">
+        <span class="hk-brand-label">
+          <span class="hk-brand-main">Campus Connect One</span>
+          <small class="hk-brand-sub"><i data-lucide="terminal"></i><span>Hackathons</span></small>
+        </span>
+      </a>
+      <div class="hk-auth-actions">
+        <button class="hk-btn icon ghost" id="themeBtn" aria-label="Toggle theme" title="Toggle dark/light theme"><i data-lucide="sun-moon"></i></button>
+        <a class="hk-btn icon ghost" href="home.html" id="hkCloseBtn" aria-label="Back to Campus Connect One" title="Back to Campus Connect One"><i data-lucide="x"></i></a>
+      </div>
     </div>
 
     <h1 id="title">How do you want to <span class="hk-grad-text">join in?</span></h1>
@@ -27,14 +36,34 @@
 
     <div class="hk-roles" role="group" aria-label="Choose a role">
       <button class="hk-role p" data-role="participant" type="button" aria-pressed="false">
-        <span class="ri"><i data-lucide="rocket"></i></span><h3>As a participant</h3><p>Discover, register and compete in hackathons.</p>
-        <ul><li><i data-lucide="check"></i>Your campus &amp; nearest events</li><li><i data-lucide="check"></i>Solo or team registration</li><li><i data-lucide="check"></i>Live updates from hosts</li></ul>
-        <span class="pick">Continue <i data-lucide="arrow-right"></i></span>
+        <div class="hk-role-head">
+          <div class="hk-role-title-wrap">
+            <span class="ri"><i data-lucide="rocket"></i></span>
+            <h3>As a participant</h3>
+          </div>
+          <span class="pick">Continue <i data-lucide="arrow-right"></i></span>
+        </div>
+        <p>Discover, register and compete in hackathons.</p>
+        <ul>
+          <li><i data-lucide="check"></i><span>Your campus &amp; nearest events</span></li>
+          <li><i data-lucide="check"></i><span>Solo or team registration</span></li>
+          <li><i data-lucide="check"></i><span>Live updates from hosts</span></li>
+        </ul>
       </button>
       <button class="hk-role h" data-role="host" type="button" aria-pressed="false">
-        <span class="ri"><i data-lucide="megaphone"></i></span><h3>As a host</h3><p>Create a hackathon and manage everything in one place.</p>
-        <ul><li><i data-lucide="check"></i>Guided create &amp; submit for approval</li><li><i data-lucide="check"></i>Registrations &amp; CSV export</li><li><i data-lucide="check"></i>Announce to all registrants</li></ul>
-        <span class="pick">Continue <i data-lucide="arrow-right"></i></span>
+        <div class="hk-role-head">
+          <div class="hk-role-title-wrap">
+            <span class="ri"><i data-lucide="megaphone"></i></span>
+            <h3>As a host</h3>
+          </div>
+          <span class="pick">Continue <i data-lucide="arrow-right"></i></span>
+        </div>
+        <p>Create a hackathon and manage everything in one place.</p>
+        <ul>
+          <li><i data-lucide="check"></i><span>Guided create &amp; submit for approval</span></li>
+          <li><i data-lucide="check"></i><span>Registrations &amp; CSV export</span></li>
+          <li><i data-lucide="check"></i><span>Announce to all registrants</span></li>
+        </ul>
       </button>
     </div>
 
