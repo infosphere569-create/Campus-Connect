@@ -54,7 +54,11 @@ async function finish(user, extra = {}){
   const site = await ensureProfile(user);
   await ensureHkProfile(user, site, role, extra);
   sessionStorage.setItem('hk-role', role);
-  const invQ = inviteId ? '?invite=' + encodeURIComponent(inviteId) : '';
+  const isPwa = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone || qs.get('pwa') === '1';
+  const pwaParam = isPwa ? 'pwa=1' : '';
+  const invParam = inviteId ? 'invite=' + encodeURIComponent(inviteId) : '';
+  const qStr = [invParam, pwaParam].filter(Boolean).join('&');
+  const invQ = qStr ? '?' + qStr : '';
   const targetHash = inviteId ? '#/host' : next;
   location.replace('hackthons-portal.html' + invQ + targetHash);
 }

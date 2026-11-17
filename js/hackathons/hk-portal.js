@@ -715,11 +715,20 @@ document.addEventListener('click', async e => {
 C.watchUser(async (user, { site, hk }) => {
   if(S.booted) return;
   const qs = new URLSearchParams(location.search);
+  const isPwa = qs.get('pwa') === '1' || window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
   const inviteId = (qs.get('invite') || '').trim();
-  const nextQuery = location.hash.length > 2 ? '&next=' + encodeURIComponent(location.hash) : '';
-  const back = inviteId
-    ? `login-hackthons.html?role=host&invite=${encodeURIComponent(inviteId)}${nextQuery}`
-    : 'login-hackthons.html' + (location.hash.length > 2 ? '?next=' + encodeURIComponent(location.hash) : '');
+  const params = [];
+  if(inviteId){
+    params.push('role=host');
+    params.push('invite=' + encodeURIComponent(inviteId));
+  }
+  if(location.hash.length > 2){
+    params.push('next=' + encodeURIComponent(location.hash));
+  }
+  if(isPwa){
+    params.push('pwa=1');
+  }
+  const back = 'login-hackthons.html' + (params.length ? '?' + params.join('&') : '');
   if(!user || !hk){ location.replace(back); return; }
   // The role is fixed at login (sessionStorage). An explicit invite targets the Host space.
   const chosen = sessionStorage.getItem('hk-role');

@@ -2,23 +2,60 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<script>(function(){try{var v=localStorage.getItem("cc-theme")||"system";document.documentElement.dataset.theme=v==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):v;}catch(e){}})();</script>
+<script>(function(){
+  try{var v=localStorage.getItem("cc-theme")||"system";document.documentElement.dataset.theme=v==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):v;}catch(e){}
+  try{
+    var isPWA=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone||Boolean(navigator.userAgent.match(/wv|PWA/i))||new URLSearchParams(location.search).get('pwa')==='1';
+    var isMobileOrTablet=/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)||(window.innerWidth<=1024&&('ontouchstart'in window||navigator.maxTouchPoints>0));
+    if(isPWA||isMobileOrTablet){document.documentElement.classList.add('is-mobile-or-pwa');}else{document.documentElement.classList.add('is-laptop-device');}
+    if(isPWA){
+      document.documentElement.classList.add('is-standalone-pwa');
+      if(!sessionStorage.getItem('hk-login-splash')){
+        sessionStorage.setItem('hk-login-splash', '1');
+        document.write('<style>#hkSplash{display:grid!important}</style>');
+        window.addEventListener('DOMContentLoaded', function(){
+          setTimeout(function(){
+            var sp = document.getElementById('hkSplash');
+            if(sp){
+              sp.classList.add('fade-out');
+              setTimeout(function(){ sp.remove(); }, 380);
+            }
+          }, 850);
+        });
+      }
+    }
+  }catch(e){}
+})();</script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Sign in — Hackathons · Campus Connect One</title>
 <meta name="robots" content="noindex,nofollow">
 <meta name="theme-color" content="#178a54">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Hackathons">
 <link rel="icon" type="image/png" href="icon.png"><link rel="apple-touch-icon" href="icon/icon-hackathons-192.png"><link rel="manifest" href="manifest-hackathons.json">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/hackathons.css">
 </head>
 <body class="hk-body" data-page="hk-login">
+<div id="hkSplash" style="display:none">
+  <div class="hk-splash-box">
+    <div class="hk-splash-icon">
+      <img src="icon/icon-hackathons.png" onerror="this.src='icon.png'" alt="Campus Connect One Hackathons logo" width="52" height="52">
+    </div>
+    <h2>Campus Connect One</h2>
+    <span class="hk-splash-tag"><i data-lucide="terminal"></i> Hackathons</span>
+  </div>
+</div>
 <canvas class="hk-bg" id="hkBg" aria-hidden="true"></canvas>
+<div class="hk-pwa-ambient-mesh" aria-hidden="true"></div>
 <div class="hk-layer hk-auth">
   <div class="hk-glass hk-auth-box">
     <div class="hk-auth-top">
       <a class="hk-brand" href="hackthons-portal.html" aria-label="Campus Connect One Hackathons Portal">
-        <img src="icon.png" alt="Campus Connect One logo" width="36" height="36">
+        <img src="icon/icon-hackathons.png" onerror="this.src='icon.png'" alt="Campus Connect One logo" width="36" height="36">
         <span class="hk-brand-label">
           <span class="hk-brand-main">Campus Connect One</span>
           <small class="hk-brand-sub"><i data-lucide="terminal"></i><span>Hackathons</span></small>
@@ -94,6 +131,11 @@
 if(window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone || new URLSearchParams(location.search).get('pwa') === '1'){
   var cb = document.getElementById('hkCloseBtn');
   if(cb) cb.style.display = 'none';
+}
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('sw-hackathons.js').catch(function(){});
+  });
 }
 </script>
 <script src="js/hackathons/hk-icons.js"></script>
