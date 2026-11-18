@@ -448,8 +448,8 @@ async function myHacks(t){
   const hMap = new Map((S.all || []).map(h => [h.id, h]));
   let stopTimers = null, unsubRegs = null;
   const ST_MAP = {
-    selected: { cls: 'selected', ic: 'trophy', label: 'Selected' },
-    shortlisted: { cls: 'shortlisted', ic: 'sparkles', label: 'Shortlisted' },
+    selected: { cls: 'selected', ic: 'award', label: 'Finalist · Selected' },
+    shortlisted: { cls: 'shortlisted', ic: 'sparkles', label: 'Shortlisted · Next Round' },
     waitlisted: { cls: 'waitlisted', ic: 'hourglass', label: 'Waitlisted' },
     rejected: { cls: 'rejected', ic: 'circle-x', label: 'Not Selected' },
     registered: { cls: 'registered', ic: 'ticket-check', label: 'Registered' }
@@ -475,14 +475,15 @@ async function myHacks(t){
       const roundLine = rounds.length
         ? `<div class="hk-sm hk-muted">Process: <b>${esc(curRound || 'Completed')}</b> (Step ${Math.min(curIdx + 1, rounds.length)} of ${rounds.length})</div>`
         : '';
-      const cd = countdownHtml(h, r, r.status === 'selected');
 
       const winRev = h.submission?.winnerReveal || {};
+      const winArr = Array.isArray(winRev.winners) ? winRev.winners : [];
       const isRevealed = !!(winRev.announced && (!winRev.revealAtMs || now >= winRev.revealAtMs));
-      const myWin = isRevealed && Array.isArray(winRev.winners) ? winRev.winners.find(w => w.uid === S.user.uid) : null;
-      const isWinnerCard = !!(myWin || (isRevealed && r.status === 'selected'));
+      const myWin = isRevealed ? winArr.find(w => w.uid === S.user.uid) : null;
+      const isWinnerCard = !!(myWin || (isRevealed && !winArr.length && r.status === 'selected'));
+      const cd = countdownHtml(h, r, isWinnerCard);
       const winRibbon = isWinnerCard
-        ? `<div class="hk-my-winribbon"><i data-lucide="trophy"></i><span>Winner · ${esc(myWin?.place || 'Selected')}${myWin?.prize ? ' · ' + esc(myWin.prize) : ''}</span></div>`
+        ? `<div class="hk-my-winribbon"><i data-lucide="trophy"></i><span>Winner · ${esc(myWin?.place || 'Official Winner')}${myWin?.prize ? ' · ' + esc(myWin.prize) : ''}</span></div>`
         : (winRev.revealAtMs && now < winRev.revealAtMs
             ? `<div class="hk-countdown gold"><i data-lucide="trophy"></i><span>Winners reveal ${C.fmtDT(winRev.revealAtMs)}</span><span class="tval" data-cd="${winRev.revealAtMs}">${C.countdownText(winRev.revealAtMs, now)}</span></div>`
             : '');

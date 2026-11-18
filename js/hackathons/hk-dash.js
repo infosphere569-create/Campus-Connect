@@ -15,8 +15,8 @@ const extractProto = sub => {
 };
 const STATUS_TXT = {
   registered: ['Registered', '', 'ticket-check'],
-  shortlisted: ['Shortlisted', '', 'sparkles'],
-  selected: ['Selected', 'gold', 'trophy'],
+  shortlisted: ['Shortlisted · Next Round', '', 'sparkles'],
+  selected: ['Selected · Finalist', 'gold', 'award'],
   waitlisted: ['Waitlisted', 'warn', 'hourglass'],
   rejected: ['Not selected', 'bad', 'circle-x']
 };
@@ -58,10 +58,10 @@ export async function dash(cx, hid){
       };
     }
 
-    if(winnersRevealed && (myWin || reg.status === 'selected')){
+    if(winnersRevealed && myWin){
       return {
-        tone: 'gold', icon: 'trophy', badge: myWin?.place || 'Winner',
-        title: `Congratulations! ${myWin?.place ? myWin.place + ' — ' : ''}Selected Winner`,
+        tone: 'gold', icon: 'trophy', badge: myWin?.place || 'Official Winner',
+        title: `Congratulations! ${myWin?.place ? myWin.place + ' — ' : ''}Official Winner`,
         desc: myWin?.prize
           ? `Prize / Recognition: ${myWin.prize}. Check your registered email and official logistics card below.`
           : (reg.hostNote ? `Organiser note: ${reg.hostNote}` : 'Your team has been officially announced as a Winner! Check event logistics and your email.'),
@@ -164,9 +164,9 @@ export async function dash(cx, hid){
 
     if(reg.status === 'selected'){
       return {
-        tone: 'gold', icon: 'trophy', badge: 'Selected',
-        title: `Congratulations! Selected${curRound ? ' · ' + curRound.name : ''}`,
-        desc: reg.hostNote || 'Check your event logistics below and watch your email for final instructions.',
+        tone: 'gold', icon: 'award', badge: 'Finalist · Selected',
+        title: `Selected as Finalist${curRound ? ' · ' + curRound.name : ''}`,
+        desc: reg.hostNote || 'Your team qualified for the final stage. Watch the winner reveal countdown and logistics details below.',
         cta: ''
       };
     }
@@ -219,18 +219,21 @@ export async function dash(cx, hid){
       ? `<ol class="hk-rounds">${rounds.map((r, i) => `<li class="${i < (reg.stage || 0) ? 'done' : i === (reg.stage || 0) ? 'cur' : ''}"><span class="n">${i < (reg.stage || 0) ? '<i data-lucide="check"></i>' : i + 1}</span><b>${esc(r.name)}</b>${r.desc ? `<small>${esc(r.desc)}</small>` : ''}${r.startMs ? `<small>${C.fmtDate(r.startMs)}${r.endMs ? ' → ' + C.fmtDate(r.endMs) : ''}</small>` : ''}</li>`).join('')}</ol>`
       : '<p class="hk-sm hk-muted">The organiser has not defined separate rounds for this hackathon.</p>';
 
+    const effectiveMyWin = myWin || (winnersRevealed && !winnersList.length && reg.status === 'selected' ? { place: 'Official Winner', uid: S.user.uid } : null);
+    const nextStep = computeNextStep(now, rounds, subCfg, ideaDl, subOpen, isSubReviewed, protoCfg, protoSub, winCfg, winnersRevealed, effectiveMyWin);
+
     /* ---------- 1. Winning Celebration & Official Winners Podium ---------- */
     let winnersSection = '';
-    if(winnersRevealed && (winnersList.length || reg.status === 'selected')){
-      const isWinner = !!(myWin || reg.status === 'selected');
+    if(winnersRevealed && (winnersList.length || effectiveMyWin)){
+      const isWinner = !!effectiveMyWin;
       const confetti = isWinner ? `<div class="hk-confetti" aria-hidden="true">${Array.from({ length: 18 }, (_, i) => `<i style="--i:${i}"></i>`).join('')}</div>` : '';
       const heroBanner = isWinner ? `<div class="hk-win-hero">
         ${confetti}
         <div class="wh-ic"><i data-lucide="trophy"></i></div>
         <div class="wh-body">
-          <span class="hk-chip gold"><i data-lucide="sparkles"></i>${esc(myWin?.place || 'Official Winner')}</span>
+          <span class="hk-chip gold"><i data-lucide="sparkles"></i>${esc(effectiveMyWin?.place || 'Official Winner')}</span>
           <h3>Congratulations, ${esc(reg.teamMode === 'solo' ? reg.name : (reg.teamName || reg.name))}!</h3>
-          <p>${myWin?.prize ? `Awarded: <b>${esc(myWin.prize)}</b>. ` : ''}You have been officially selected as a winner of <b>${esc(h.title)}</b>.</p>
+          <p>${effectiveMyWin?.prize ? `Awarded: <b>${esc(effectiveMyWin.prize)}</b>. ` : ''}You have been officially selected as a winner of <b>${esc(h.title)}</b>.</p>
         </div>
       </div>` : '';
 
@@ -572,9 +575,8 @@ export async function dash(cx, hid){
       <p class="hk-xs hk-muted" style="margin-top:8px">All updates are emailed to the team leader from team@campusconnectone.online.</p></section>`;
 
     const org = h.organiser || {};
-    const cd = countdownHtml(h, reg, reg.status === 'selected');
+    const cd = countdownHtml(h, reg, !!effectiveMyWin);
     const curRound = rounds[reg.stage || 0]?.name || '';
-    const nextStep = computeNextStep(now, rounds, subCfg, ideaDl, subOpen, isSubReviewed, protoCfg, protoSub, winCfg, winnersRevealed, myWin);
 
     const statusBanner = `<div class="hk-my-card" style="margin-bottom:14px">
       <div class="hk-my-banner ${esc(reg.status || 'registered')}"><span style="display:inline-flex;align-items:center;gap:6px"><i data-lucide="${st[2]}"></i>Status: ${st[0]}</span>${curRound ? `<span class="hk-xs">${esc(curRound)}</span>` : ''}</div>

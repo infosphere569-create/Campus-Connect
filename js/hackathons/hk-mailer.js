@@ -260,21 +260,21 @@ export function buildHackathonEmail(kind, ctx = {}) {
     const lgSched = scheduleText || (lgRepTs ? (fmtLongDT(lgRepTs) !== '—' ? fmtLongDT(lgRepTs) : String(lgRepTs)) : '');
     const extraNote = [note, lg.instructions || lg.reportingNote, lg.deskContact ? `Reporting Desk: ${lg.deskContact}` : '', lg.dressOrIdNote].filter(Boolean).join('\n');
 
-    subject = customSubj || (winPlace ? `🏆 Winner (${winPlace}) — ${title}!` : `Congratulations — Selected in ${title}!`);
-    heading = winPlace ? `Winner Announcement · ${winPlace}` : 'Selected / Finalist Announcement';
+    subject = customSubj || (winPlace ? `🏆 Winner (${winPlace}) — ${title}!` : `Congratulations — Selected as Finalist in ${title}!`);
+    heading = winPlace ? `Winner Announcement · ${winPlace}` : 'Selected Finalist Announcement';
     L.push(
       greet,
       '',
       winPlace
         ? `Thrilling news! Out of all participating entries in ${title}, ${isTeam ? `your team "${reg.teamName}" has` : 'you have'} been officially announced as ${winPlace}!`
-        : `Great news! We are thrilled to share that ${isTeam ? `your team "${reg.teamName}" has` : 'you have'} been officially SELECTED in ${title}${roundName ? ` (${roundName})` : ''}!`,
+        : `Great news! We are pleased to share that ${isTeam ? `your team "${reg.teamName}" has` : 'you have'} been SELECTED for the Final Stage of ${title}${roundName ? ` (${roundName})` : ''}!`,
       '',
       'Selection & Reporting Summary',
       '-----------------------------',
       `Hackathon     : ${title}`,
       `Organised by  : ${orgName}`,
       `Selected Entry: ${participant} · ${teamLabel}`,
-      `Honor / Stage : ${winPlace || roundName || 'Final Selection'}`
+      `Honor / Stage : ${winPlace || roundName || 'Finalist'}`
     );
     if (winPrize) L.push(`Prize / Honor : ${winPrize}`);
     else if (h.prizePool) L.push(`Prize Pool    : ₹${Number(h.prizePool).toLocaleString('en-IN')}`);

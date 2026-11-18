@@ -60,7 +60,7 @@ export async function manage(cx, id){
   let subsView = 'leaderboard', subRankBy = 'combined';
   let subQ = '', subFilter = 'all', subSort = 'score_desc', topSubN = 5, subCut = 75;
   let testQ = '', testFilter = 'attempted', testSort = 'score_desc', topTestN = 5, testCut = 60;
-  let winCriteria = 'combined', winTopN = 3, winMailMode = 'email';
+  let winCriteria = 'combined', winPool = 'qualified', winTopN = 3, winMailMode = 'email';
   const ph = C.phase(h), roundName = i => rounds[i]?.name || (rounds.length ? 'Completed' : '—');
   const slug = (h.title || 'hackathon').replace(/[^\w]+/g, '-').toLowerCase();
 
@@ -142,8 +142,12 @@ export async function manage(cx, id){
   }
 
   async function sendOne(targetReg, opts){
-    const { kind, note, roundVal, scheduleText, meetLink, customSubject, channel } = opts;
+    const { kind, note, roundVal, scheduleText, meetLink, customSubject, channel, winnerPlace, winnerPrize } = opts;
     const regObj = targetReg.reg || regs.find(x => x.id === targetReg.id || x.id === targetReg.regId) || targetReg;
+    const winCfg = h.submission?.winnerReveal;
+    const winEntry = winCfg?.announced && Array.isArray(winCfg.winners)
+      ? winCfg.winners.find(w => (regObj.uid && w.uid === regObj.uid) || (regObj.id && w.regId === regObj.id))
+      : null;
     const mail = M.buildHackathonEmail(kind, {
       hackathon: h,
       hackathonId: h.id,
@@ -153,6 +157,8 @@ export async function manage(cx, id){
       scheduleText,
       meetLink,
       customSubject,
+      winnerPlace: winnerPlace ?? winEntry?.place ?? '',
+      winnerPrize: winnerPrize ?? winEntry?.prize ?? '',
       org,
       testMeta: meta,
       att: regObj.uid ? attOf(regObj.uid) : null,
@@ -239,7 +245,7 @@ export async function manage(cx, id){
 
   const statusChipHtml = st => {
     const tone = st === 'selected' ? 'gold' : st === 'rejected' ? 'bad' : st === 'waitlisted' ? 'warn' : (st === 'shortlisted' ? '' : 'neutral');
-    const lbl = st === 'rejected' ? 'Not selected' : (st || 'registered');
+    const lbl = st === 'selected' ? 'Finalist' : (st === 'rejected' ? 'Not selected' : (st || 'registered'));
     return `<span class="hk-chip ${tone}">${esc(lbl)}</span>`;
   };
 
@@ -315,7 +321,8 @@ export async function manage(cx, id){
   };
 
   const subsTab = () => {
-    const winners = regs.filter(r => r.status === 'selected');
+    const finalists = regs.filter(r => r.status === 'selected');
+    const qualified = regs.filter(r => ['shortlisted', 'selected'].includes(r.status));
     const reviewedCount = subs.filter(s => s.reviewStatus === 'reviewed').length;
     const pendingCount = subs.length - reviewedCount;
     const testDoneCount = atts.filter(a => a.submittedAtMs).length;
@@ -323,39 +330,21 @@ export async function manage(cx, id){
     const topCombined = regs.reduce((m, r) => Math.max(m, evalMetrics(r.uid).combined), -1);
     const lbRows = subsView === 'leaderboard' ? getLeaderboardTeams() : [];
     const cardList = subsView === 'cards' ? getFilteredSubs() : [];
+    const winRevCfg = h.submission?.winnerReveal || {};
 
-    const winnersPodium = winners.length ? `<div class="hk-winners-box">
+    const roundProgressCard = qualified.length ? `<div class="hk-winners-box">
       <div class="wb-head">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="hk-win-ic"><i data-lucide="trophy"></i></span><div><b>Designated Winners (${winners.length})</b><div class="hk-xs hk-muted">Selected winning teams receive automated winner status &amp; alerts.</div></div></div>
-        <button type="button" class="hk-btn sm gold" data-mailwinners><i data-lucide="mail"></i>Email All Winners</button>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="hk-win-ic"><i data-lucide="sparkles"></i></span><div><b>Shortlisted for Next Round (${qualified.length})</b><div class="hk-xs hk-muted">${shortlistedCount} Shortlisted · ${finalists.length} Round 2 Finalists${winRevCfg.announced && (winRevCfg.winners || []).length ? ` · ${winRevCfg.winners.length} Official Winners announced` : ' · Official Winners are selected after Round 2'}</div></div></div>
+        <button type="button" class="hk-btn sm primary" data-tab="next"><i data-lucide="rocket"></i>Round 2 Prototype &amp; Winners</button>
       </div>
-      <div class="hk-winners-grid">${winners.map((w, wi) => {
-        const em = evalMetrics(w.uid), s = em.sub;
-        const tName = w.teamMode === 'solo' ? w.name : (w.teamName || w.name);
-        return `<div class="hk-winner-card">
-          <div class="wc-top"><span class="hk-rank top1"><i data-lucide="trophy" style="width:12px;height:12px;margin-right:3px"></i>Winner ${winners.length > 1 ? `#${wi + 1}` : ''}</span><span class="hk-xs hk-muted">${esc(roundName(w.stage || 0))}</span></div>
-          <button type="button" class="hk-rowlink" data-prof="${esc(w.id)}"><b>${esc(tName)}</b></button>
-          <div class="hk-xs hk-muted">${esc(w.name)}${w.college ? ' · ' + esc(w.college) : ''}</div>
-          ${s ? `<div class="hk-xs" style="margin-top:4px;font-weight:600">Project: ${esc(s.title)}</div>` : ''}
-          <div class="wc-scores">
-            ${em.testScore != null ? `<span class="hk-chip sky">Test ${em.testScore}/${em.testTotal} (${em.testPct}%)</span>` : ''}
-            ${s?.score != null ? `<span class="hk-chip gold">Project ${s.score}/100</span>` : ''}
-          </div>
-          <div class="wc-acts">
-            ${s ? `<button type="button" class="hk-btn sm" data-openreview="${esc(s.id)}"><i data-lucide="eye"></i>Review</button>` : ''}
-            ${mailBtn(w)}
-            <button type="button" class="hk-btn sm ghost" data-winunselect="${esc(w.id)}" title="Move back from Selected to Shortlisted"><i data-lucide="undo-2"></i>Unselect</button>
-          </div>
-        </div>`;
-      }).join('')}</div>
     </div>` : '';
 
     return `<div class="hk-stack">
       <div class="hk-card-s hk-rev-banner">
         <div>
-          <span class="hk-eyebrow" style="color:var(--hk-gold)">Evaluation &amp; Winners Console</span>
+          <span class="hk-eyebrow" style="color:var(--hk-p)">Round 1 · Evaluation &amp; Shortlisting</span>
           <h2 style="font-size:1.25rem;margin-top:2px">Review Submissions &amp; Team Leaderboard</h2>
-          <p class="hk-sm hk-muted" style="margin-top:2px">Rank participating teams by test results, project review score, or weighted criteria—then review work and click <b>Select</b> to designate winners.</p>
+          <p class="hk-sm hk-muted" style="margin-top:2px">Score Round 1 ideas, finalize reviews, and <b>Shortlist</b> top teams to unlock Round 2 (Prototype &amp; Finale). Official Winners are decided after Round 2 in <b>Next Step &amp; Winners</b>.</p>
         </div>
         <div class="hk-chseg" role="group" aria-label="Review Submissions view mode">
           <button type="button" class="${subsView === 'leaderboard' ? 'on' : ''}" data-subview="leaderboard"><i data-lucide="trophy"></i>Leaderboard (${regs.length})</button>
@@ -363,14 +352,14 @@ export async function manage(cx, id){
         </div>
       </div>
 
-      ${winnersPodium}
+      ${roundProgressCard}
 
       <div class="hk-eval-kpis">
         <div class="hk-ek"><span>Participating teams</span><b>${regs.length}</b></div>
         <div class="hk-ek"><span>Projects submitted</span><b>${subs.length} <small>(${reviewedCount} reviewed)</small></b></div>
         <div class="hk-ek warn"><span>Pending review</span><b>${pendingCount}</b></div>
-        <div class="hk-ek p"><span>Test attempted</span><b>${testDoneCount} <small>/ ${regs.length}</small></b></div>
-        <div class="hk-ek gold"><span>Winners selected</span><b>${winners.length}</b></div>
+        <div class="hk-ek p"><span>Shortlisted (Next Round)</span><b>${shortlistedCount}</b></div>
+        <div class="hk-ek gold"><span>Round 2 Finalists</span><b>${finalists.length}</b></div>
         <div class="hk-ek"><span>Top rank score</span><b>${topCombined >= 0 ? `${topCombined}%` : '—'}</b></div>
       </div>
 
@@ -397,18 +386,17 @@ export async function manage(cx, id){
           ['reviewed', `Finalized (${reviewedCount})`],
           ['test_done', `Test Done (${testDoneCount})`],
           ['shortlisted', `Shortlisted (${shortlistedCount})`],
-          ['selected', `Selected Winners (${winners.length})`],
+          ['selected', `Round 2 Finalists (${finalists.length})`],
           ['waitlisted', `Waitlisted (${regs.filter(r => r.status === 'waitlisted').length})`],
           ['rejected', `Not Selected (${regs.filter(r => r.status === 'rejected').length})`]
         ].map(([k, lbl]) => `<button type="button" class="hk-fchip ${subFilter === k ? 'on' : ''}" data-subf="${k}">${lbl}</button>`).join('')}
       </div>
 
       <div class="hk-qshortbar">
-        <div class="qs-lbl"><i data-lucide="sparkles"></i><b>Quick shortlist &amp; winner selection</b><span class="hk-xs hk-muted">Uses active ranking order (${subRankBy === 'test' ? 'Test Results' : subRankBy === 'project' ? 'Project Score' : subRankBy === 'readiness' ? 'Readiness' : 'Combined Criteria'})</span></div>
+        <div class="qs-lbl"><i data-lucide="sparkles"></i><b>Round 1 Shortlisting for Next Round</b><span class="hk-xs hk-muted">Promotes top ranked teams to Shortlisted (${subRankBy === 'test' ? 'Test Results' : subRankBy === 'project' ? 'Project Score' : subRankBy === 'readiness' ? 'Readiness' : 'Combined Criteria'})</span></div>
         <div class="qs-acts">
           <label class="hk-xs">Top <input class="hk-input hk-num-sm" id="topSubN" type="number" min="1" max="${Math.max(1, regs.length)}" value="${topSubN}"></label>
-          <button type="button" class="hk-btn sm primary" data-qshort="sub-top-shortlist"><i data-lucide="sparkles"></i>Shortlist Top ${topSubN}</button>
-          <button type="button" class="hk-btn sm gold" data-qshort="sub-top-select"><i data-lucide="trophy"></i>Select Top ${topSubN} Winners</button>
+          <button type="button" class="hk-btn sm primary" data-qshort="sub-top-shortlist"><i data-lucide="sparkles"></i>Shortlist Top ${topSubN} for Next Round</button>
           <span class="qs-sep"></span>
           <label class="hk-xs">Score ≥ <input class="hk-input hk-num-sm" id="subCut" type="number" min="0" max="100" value="${subCut}"></label>
           <button type="button" class="hk-btn sm" data-qshort="sub-cut">Shortlist ≥ ${subCut}</button>
@@ -431,11 +419,12 @@ export async function manage(cx, id){
             <th>Project Submission</th>
             <th>Criteria Score</th>
             <th>Round &amp; Status</th>
-            <th class="act" style="text-align:right">Review &amp; Select Winner</th>
+            <th class="act" style="text-align:right">Review &amp; Next Round</th>
           </tr></thead><tbody>${lbRows.map((x, idx) => {
             const { r, s, a, em, rankVal } = x;
             const rankCls = idx < 3 && rankVal >= 0 ? `top${idx + 1}` : '';
-            const isWin = r.status === 'selected';
+            const isShort = r.status === 'shortlisted';
+            const isFinalist = r.status === 'selected';
             const teamTitle = r.teamMode === 'solo' ? `${r.name} (Solo)` : `${r.teamName || 'Team'}`;
             const projLinks = s ? [
               C.safeUrl(s.pptUrl) ? `<a class="hk-chip btn" href="${esc(C.safeUrl(s.pptUrl))}" target="_blank" rel="noopener noreferrer">PPT</a>` : '',
@@ -444,7 +433,7 @@ export async function manage(cx, id){
               C.safeUrl(s.videoUrl) ? `<a class="hk-chip btn" href="${esc(C.safeUrl(s.videoUrl))}" target="_blank" rel="noopener noreferrer">Video</a>` : ''
             ].filter(Boolean).join('') : '';
 
-            return `<tr class="${subSel.has(r.id) ? 'sel' : ''} ${isWin ? 'hk-row-winner' : ''}">
+            return `<tr class="${subSel.has(r.id) ? 'sel' : ''} ${isFinalist ? 'hk-row-winner' : ''}">
               <td><input type="checkbox" data-subsel="${esc(r.id)}" ${subSel.has(r.id) ? 'checked' : ''} aria-label="Select ${esc(r.name)}"></td>
               <td><span class="hk-rank ${rankCls}">#${idx + 1}</span></td>
               <td>
@@ -481,9 +470,11 @@ export async function manage(cx, id){
               <td class="act" style="text-align:right;white-space:nowrap">
                 <div style="display:inline-flex;gap:6px;align-items:center;flex-wrap:nowrap">
                   ${s ? `<button type="button" class="hk-btn sm" data-openreview="${esc(s.id)}"><i data-lucide="clipboard-pen"></i>Review</button>` : ''}
-                  ${isWin
-                    ? `<button type="button" class="hk-btn sm gold" data-winunselect="${esc(r.id)}" title="Designated winner (click to unselect)"><i data-lucide="trophy"></i>Selected ✓</button>`
-                    : `<button type="button" class="hk-btn sm primary" data-winselect="${esc(r.id)}" title="Designate this team as a winner"><i data-lucide="trophy"></i>Select</button>`}
+                  ${isFinalist
+                    ? `<button type="button" class="hk-btn sm gold" data-unfinalist="${esc(r.id)}" title="Round 2 Finalist (click to move back to Shortlisted)"><i data-lucide="award"></i>Finalist ✓</button>`
+                    : isShort
+                      ? `<button type="button" class="hk-btn sm" data-unshortlist="${esc(r.id)}" title="Shortlisted for Next Round (click to revert)"><i data-lucide="sparkles"></i>Shortlisted ✓</button>`
+                      : `<button type="button" class="hk-btn sm primary" data-shortlist="${esc(r.id)}" title="Shortlist this team for Next Round"><i data-lucide="sparkles"></i>Shortlist</button>`}
                   ${mailBtn(r)}
                 </div>
               </td>
@@ -530,11 +521,11 @@ export async function manage(cx, id){
             </div>
 
             ${r ? `<div class="hk-eval-decide">
-              <div class="ed-pills" role="group" aria-label="Selection decision for ${esc(teamTitle)}">
+              <div class="ed-pills" role="group" aria-label="Round progression for ${esc(teamTitle)}">
                 <span class="hk-xs hk-muted" style="font-weight:700">Decision:</span>
                 ${[
-                  ['shortlisted', 'sparkles', 'Shortlist'],
-                  ['selected', 'trophy', 'Select Winner'],
+                  ['shortlisted', 'sparkles', 'Shortlist (Next Round)'],
+                  ['selected', 'award', 'Round 2 Finalist'],
                   ['waitlisted', 'hourglass', 'Waitlist'],
                   ['rejected', 'circle-x', 'Not selected']
                 ].map(([stVal, ic, lbl]) => `<button type="button" class="hk-decbtn ${stVal} ${r.status === stVal ? 'on' : ''}" data-quickst="${esc(r.id)}:${stVal}"><i data-lucide="${ic}"></i>${lbl}</button>`).join('')}
@@ -669,7 +660,7 @@ export async function manage(cx, id){
         <div class="hk-ek warn"><span>Pending test</span><b>${pendCount}</b></div>
         <div class="hk-ek gold"><span>Highest score</span><b>${high != null ? `${high}/${totalPossible}` : '—'}</b></div>
         <div class="hk-ek"><span>Average accuracy</span><b>${avgPct != null ? `${avgPct}%` : '—'}</b></div>
-        <div class="hk-ek p"><span>Shortlisted / Selected</span><b>${testQualCount}</b></div>
+        <div class="hk-ek p"><span>Shortlisted / Finalists</span><b>${testQualCount}</b></div>
       </div>
 
       <div class="hk-toolbar">
@@ -679,7 +670,7 @@ export async function manage(cx, id){
           <option value="pending" ${testFilter === 'pending' ? 'selected' : ''}>Not Attempted Yet (${pendCount})</option>
           <option value="all" ${testFilter === 'all' ? 'selected' : ''}>All Registrants (${regs.length})</option>
           <option value="shortlisted" ${testFilter === 'shortlisted' ? 'selected' : ''}>Shortlisted Only</option>
-          <option value="selected" ${testFilter === 'selected' ? 'selected' : ''}>Selected Only</option>
+          <option value="selected" ${testFilter === 'selected' ? 'selected' : ''}>Finalists Only</option>
         </select>
         <select class="hk-select" id="ts" style="width:auto;min-height:46px" aria-label="Sort test results">
           <option value="score_desc" ${testSort === 'score_desc' ? 'selected' : ''}>Sort: Highest Test Score</option>
@@ -689,11 +680,10 @@ export async function manage(cx, id){
       </div>
 
       ${(done.length || (testFilter === 'pending' && pendCount)) ? `<div class="hk-qshortbar">
-        <div class="qs-lbl"><i data-lucide="trophy"></i><b>Top scorer shortlisting &amp; winner selection</b><span class="hk-xs hk-muted">Rank &amp; promote top performers in one click</span></div>
+        <div class="qs-lbl"><i data-lucide="sparkles"></i><b>Screening Test Shortlisting (Next Round)</b><span class="hk-xs hk-muted">Advance top performers from Round 1 screening to the next round</span></div>
         <div class="qs-acts">
           ${done.length ? `<label class="hk-xs">Top <input class="hk-input hk-num-sm" id="topTestN" type="number" min="1" max="${done.length}" value="${topTestN}"></label>
-          <button type="button" class="hk-btn sm primary" data-qshort="test-top-shortlist"><i data-lucide="sparkles"></i>Shortlist Top ${topTestN}</button>
-          <button type="button" class="hk-btn sm gold" data-qshort="test-top-select"><i data-lucide="trophy"></i>Select Top ${topTestN} Winners</button>
+          <button type="button" class="hk-btn sm primary" data-qshort="test-top-shortlist"><i data-lucide="sparkles"></i>Shortlist Top ${topTestN} for Next Round</button>
           <span class="qs-sep"></span>
           <label class="hk-xs">Accuracy ≥ <input class="hk-input hk-num-sm" id="testCut" type="number" min="0" max="100" value="${testCut}">%</label>
           <button type="button" class="hk-btn sm" data-qshort="test-cut">Shortlist ≥ ${testCut}%</button>` : ''}
@@ -710,15 +700,16 @@ export async function manage(cx, id){
 
       ${rows.length ? `<div class="hk-tablewrap"><table class="hk-table hk-lb-table"><thead><tr>
         <th><input type="checkbox" id="testSelAll" ${rows.some(x => x.r) && rows.filter(x => x.r).every(x => testSel.has(x.r.id)) ? 'checked' : ''} aria-label="Select all"></th>
-        <th>Rank</th><th>Team &amp; Leader</th><th>Score &amp; Right / Wrong</th><th>Project</th><th>Round &amp; Status</th><th class="act" style="text-align:right">Inspect &amp; Select</th>
+        <th>Rank</th><th>Team &amp; Leader</th><th>Score &amp; Right / Wrong</th><th>Project</th><th>Round &amp; Status</th><th class="act" style="text-align:right">Inspect &amp; Next Round</th>
       </tr></thead><tbody>${rows.map((x, i) => {
         const r = x.r, a = x.att, em = x.em;
         const pct = em.testPct;
         const pctCls = pct == null ? 'neutral' : pct >= 75 ? 'gold' : pct >= 50 ? '' : 'warn';
         const rankCls = a && i < 3 ? `top${i + 1}` : '';
         const st = attStats(a);
-        const isWin = r?.status === 'selected';
-        return `<tr class="${r && testSel.has(r.id) ? 'sel' : ''} ${isWin ? 'hk-row-winner' : ''}">
+        const isShort = r?.status === 'shortlisted';
+        const isFinalist = r?.status === 'selected';
+        return `<tr class="${r && testSel.has(r.id) ? 'sel' : ''} ${isFinalist ? 'hk-row-winner' : ''}">
           <td>${r ? `<input type="checkbox" data-testsel="${esc(r.id)}" ${testSel.has(r.id) ? 'checked' : ''} aria-label="Select ${esc(r.name)}">` : ''}</td>
           <td>${a ? `<span class="hk-rank ${rankCls}">#${i + 1}</span>` : '<span class="hk-muted">—</span>'}</td>
           <td>${r ? `<button type="button" class="hk-rowlink" data-prof="${esc(r.id)}"><b>${esc(r.teamMode === 'solo' ? r.name : (r.teamName || r.name))}</b></button><div class="hk-xs hk-muted">${r.teamMode !== 'solo' ? esc(r.name) + ' · ' : ''}${esc(r.college || r.email)}</div>` : `<b>${esc(a?.uid || 'Unknown')}</b>`}</td>
@@ -732,9 +723,11 @@ export async function manage(cx, id){
           <td>${r ? `<div style="display:grid;gap:4px">${statusChipHtml(r.status)}${rounds.length ? `<select class="hk-select sm" data-stage="${esc(r.id)}" aria-label="Round">${rounds.map((rd, ri) => `<option value="${ri}" ${(r.stage || 0) === ri ? 'selected' : ''}>${esc(rd.name)}</option>`).join('')}</select>` : ''}</div>` : '—'}</td>
           <td class="act" style="text-align:right;white-space:nowrap"><div style="display:inline-flex;gap:6px;align-items:center">
             ${a ? `<button type="button" class="hk-btn sm" data-viewatt="${esc(a.uid)}" title="Inspect Right / Wrong Q&amp;A breakdown"><i data-lucide="list-checks"></i>Q&amp;A</button>` : ''}
-            ${r ? (isWin
-              ? `<button type="button" class="hk-btn sm gold" data-winunselect="${esc(r.id)}"><i data-lucide="trophy"></i>Selected ✓</button>`
-              : `<button type="button" class="hk-btn sm primary" data-winselect="${esc(r.id)}"><i data-lucide="trophy"></i>Select</button>`) : ''}
+            ${r ? (isFinalist
+              ? `<button type="button" class="hk-btn sm gold" data-unfinalist="${esc(r.id)}" title="Round 2 Finalist (click to move back to Shortlisted)"><i data-lucide="award"></i>Finalist ✓</button>`
+              : isShort
+                ? `<button type="button" class="hk-btn sm" data-unshortlist="${esc(r.id)}" title="Shortlisted for Next Round"><i data-lucide="sparkles"></i>Shortlisted ✓</button>`
+                : `<button type="button" class="hk-btn sm primary" data-shortlist="${esc(r.id)}" title="Shortlist for Next Round"><i data-lucide="sparkles"></i>Shortlist</button>`) : ''}
             ${r ? mailBtn(r) : ''}
           </div></td>
         </tr>`;
@@ -743,31 +736,40 @@ export async function manage(cx, id){
     </div>`;
   };
 
-  /* ---------- Next Step & Winners Studio Tab (Prototype Round, Logistics, Auto Winner & Mailer) ---------- */
+  /* ---------- Next Step & Winners Studio Tab (Round 2 Prototype, Logistics, Two-Round Official Winner Selection) ---------- */
   const nextTab = () => {
     const subCfg = C.normalizeSubmissionConfig(h.submission);
     const protoCfg = subCfg.prototype && typeof subCfg.prototype === 'object' ? subCfg.prototype : {};
     const logi = subCfg.logistics && typeof subCfg.logistics === 'object' ? subCfg.logistics : {};
     const winCfg = subCfg.winnerReveal && typeof subCfg.winnerReveal === 'object' ? subCfg.winnerReveal : {};
-    const winners = regs.filter(r => r.status === 'selected');
+    const qualifiedRegs = regs.filter(r => ['shortlisted', 'selected'].includes(r.status));
+    const finalists = regs.filter(r => r.status === 'selected');
     const protoSubs = subs.map(s => ({ s, r: regOf(s.uid), proto: extractProto(s) })).filter(x => !!x.proto);
+    const announcedWinners = winCfg.announced && Array.isArray(winCfg.winners) ? winCfg.winners : [];
 
-    const rankedCandidates = [...regs]
-      .filter(r => r.status !== 'rejected')
+    const candidateSource = winPool === 'qualified' && qualifiedRegs.length
+      ? qualifiedRegs
+      : regs.filter(r => r.status !== 'rejected');
+
+    const rankedCandidates = [...candidateSource]
       .map(r => {
         const em = evalMetrics(r.uid);
         let pts = 0;
         if(winCriteria === 'project') pts = em.subScore ?? -1;
         else if(winCriteria === 'test') pts = em.testPct ?? -1;
         else pts = em.combined;
-        return { r, em, pts };
+        const hasProto = !!(em.sub && extractProto(em.sub));
+        return { r, em, pts, hasProto };
       })
-      .sort((a, b) => b.pts - a.pts || (b.em.subScore ?? -1) - (a.em.subScore ?? -1) || (b.em.testPct ?? -1) - (a.em.testPct ?? -1));
+      .sort((a, b) => (b.r.status === 'selected' ? 1 : 0) - (a.r.status === 'selected' ? 1 : 0) || (b.hasProto ? 1 : 0) - (a.hasProto ? 1 : 0) || b.pts - a.pts || (b.em.subScore ?? -1) - (a.em.subScore ?? -1) || (b.em.testPct ?? -1) - (a.em.testPct ?? -1));
 
     const placeLabels = ['1st Prize · Champion', '2nd Prize · Runner Up', '3rd Prize · 2nd Runner Up'];
-    const defaultWinnersMailTarget = winners[0] || rankedCandidates[0]?.r || { name: 'Team Leader', email: 'team@example.com', teamName: 'Sample Team', status: 'selected' };
+    const firstAnnouncedWin = announcedWinners[0] || null;
+    const defaultWinnersMailTarget = (firstAnnouncedWin ? regs.find(r => r.uid === firstAnnouncedWin.uid) : null) || finalists[0] || rankedCandidates[0]?.r || { name: 'Team Leader', email: 'team@example.com', teamName: 'Sample Team', status: 'selected' };
     const winMailPreview = M.buildHackathonEmail('selected', {
       hackathon: h, hackathonId: h.id, reg: defaultWinnersMailTarget,
+      winnerPlace: firstAnnouncedWin?.place || placeLabels[0],
+      winnerPrize: firstAnnouncedWin?.prize || '',
       round: rounds[rounds.length - 1]?.name || 'Grand Finale',
       org, testMeta: meta,
       att: defaultWinnersMailTarget?.uid ? attOf(defaultWinnersMailTarget.uid) : null,
@@ -777,14 +779,15 @@ export async function manage(cx, id){
     return `<div class="hk-stack">
       <div class="hk-card-s hk-rev-banner">
         <div>
-          <span class="hk-eyebrow" style="color:var(--hk-p)">Next Step &amp; Finale Orchestrator</span>
+          <span class="hk-eyebrow" style="color:var(--hk-p)">Round 2 &amp; Finale Orchestrator</span>
           <h2 style="font-size:1.25rem;margin-top:2px">Prototype Round, Event Logistics &amp; Official Winners</h2>
-          <p class="hk-sm hk-muted" style="margin-top:2px">Send prototype submission fields to teams, configure Online/Offline venue details, auto-select top winners by points, and dispatch winner announcements in one place.</p>
+          <p class="hk-sm hk-muted" style="margin-top:2px">After Round 1 shortlisting (${qualifiedRegs.length} qualified), open the Round 2 Prototype form, mark Finalists, share Online/Offline logistics, and announce Official Winners after both rounds are evaluated.</p>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <span class="hk-chip ${qualifiedRegs.length ? '' : 'neutral'}">Shortlisted: ${qualifiedRegs.length}</span>
           <span class="hk-chip ${protoCfg.open ? '' : 'neutral'}">Prototype: ${protoCfg.open ? 'Open' : 'Off'}</span>
-          <span class="hk-chip ${logi.mode ? 'sky' : 'neutral'}">Mode: ${logi.mode ? esc(logi.mode) : 'Unset'}</span>
-          <span class="hk-chip ${winCfg.announced ? 'gold' : 'neutral'}">Winners: ${winners.length} Selected</span>
+          <span class="hk-chip ${finalists.length ? 'sky' : 'neutral'}">Finalists: ${finalists.length}</span>
+          <span class="hk-chip ${announcedWinners.length ? 'gold' : 'neutral'}">Winners: ${announcedWinners.length}</span>
         </div>
       </div>
 
@@ -794,8 +797,8 @@ export async function manage(cx, id){
           <div class="dh" style="margin-bottom:0">
             <i data-lucide="rocket"></i>
             <div>
-              <h3>1. Prototype / Next Round Submission Form</h3>
-              <div class="hk-xs hk-muted">Choose fields &amp; deadline — sent directly to participants' dashboard card.</div>
+              <h3>1. Round 2 · Prototype / Next Round Submission Form</h3>
+              <div class="hk-xs hk-muted">Sent directly to Shortlisted teams' dashboards after Round 1 shortlisting.</div>
             </div>
           </div>
           <span class="hk-chip">${protoSubs.length} Prototype${protoSubs.length === 1 ? '' : 's'} Received</span>
@@ -810,7 +813,7 @@ export async function manage(cx, id){
             </div>
             <div class="hk-field"><label>Who Can Submit?</label>
               <select class="hk-select" name="audience">
-                <option value="shortlisted" ${protoCfg.audience !== 'all' ? 'selected' : ''}>Shortlisted &amp; Selected Only</option>
+                <option value="shortlisted" ${protoCfg.audience !== 'all' ? 'selected' : ''}>Shortlisted &amp; Finalist Teams (${qualifiedRegs.length})</option>
                 <option value="all" ${protoCfg.audience === 'all' ? 'selected' : ''}>All Non-Rejected Teams</option>
               </select>
             </div>
@@ -840,17 +843,17 @@ export async function manage(cx, id){
         </form>
 
         ${protoSubs.length ? `<div class="hk-stack" style="margin-top:8px;padding-top:14px;border-top:1px dashed var(--hk-line)">
-          <b class="hk-sm">Submitted Prototypes (${protoSubs.length})</b>
+          <b class="hk-sm">Round 2 Submitted Prototypes (${protoSubs.length})</b>
           <div class="hk-stack" style="gap:10px">${protoSubs.map(({ s, r, proto }) => {
             const tName = r ? (r.teamMode === 'solo' ? r.name : (r.teamName || r.name)) : (s.teamName || s.leaderName);
-            const isWin = r?.status === 'selected';
+            const isFinalist = r?.status === 'selected';
             return `<div class="hk-lrow" style="align-items:flex-start">
               <div class="info">
                 <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
                   <b>${esc(proto.title)}</b>
                   <span class="hk-chip neutral">${esc(tName)}</span>
                   ${s.score != null ? `<span class="hk-chip gold">Score ${esc(s.score)}/100</span>` : ''}
-                  ${isWin ? `<span class="hk-chip gold">Winner ✓</span>` : ''}
+                  ${isFinalist ? `<span class="hk-chip gold">Finalist ✓</span>` : ''}
                 </div>
                 <p class="hk-sm hk-muted" style="margin:4px 0">${esc(proto.details)}</p>
                 <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
@@ -862,9 +865,9 @@ export async function manage(cx, id){
               </div>
               <div class="acts">
                 <button type="button" class="hk-btn sm" data-openreview="${esc(s.id)}"><i data-lucide="clipboard-pen"></i>Score</button>
-                ${r ? (isWin
-                  ? `<button type="button" class="hk-btn sm gold" data-winunselect="${esc(r.id)}"><i data-lucide="trophy"></i>Selected ✓</button>`
-                  : `<button type="button" class="hk-btn sm primary" data-winselect="${esc(r.id)}"><i data-lucide="trophy"></i>Select</button>`) : ''}
+                ${r ? (isFinalist
+                  ? `<button type="button" class="hk-btn sm gold" data-unfinalist="${esc(r.id)}" title="Finalist (click to move back to Shortlisted)"><i data-lucide="award"></i>Finalist ✓</button>`
+                  : `<button type="button" class="hk-btn sm primary" data-finalist="${esc(r.id)}" title="Select this team as Finalist for Round 2 / Finale"><i data-lucide="award"></i>Mark Finalist</button>`) : ''}
               </div>
             </div>`;
           }).join('')}</div>
@@ -931,75 +934,85 @@ export async function manage(cx, id){
         </form>
       </section>
 
-      <!-- 3. Auto Winner Selection by Points + Official Winners Podium + Built-in Emailer -->
+      <!-- 3. Final Winner Selection (After Two Rounds) + Official Winners Podium + Built-in Emailer -->
       <section class="hk-card-s hk-stack hk-win-studio" id="winSection">
         <div class="hk-sub-head">
           <div class="dh" style="margin-bottom:0">
             <i data-lucide="trophy" style="color:var(--hk-gold)"></i>
             <div>
-              <h3>3. Auto Winner Selection &amp; Official Announcement</h3>
-              <div class="hk-xs hk-muted">Auto-pick top scorers by points, schedule or reveal immediately, and send auto-filled Winner Emails / WhatsApp.</div>
+              <h3>3. Decide Official Winners (After Round 1 &amp; Round 2) &amp; Publish Podium</h3>
+              <div class="hk-xs hk-muted">Rank Shortlisted &amp; Round 2 Finalist teams by scores, assign 1st / 2nd / 3rd prizes, schedule or reveal immediately, and send Winner Emails.</div>
             </div>
           </div>
           ${winCfg.announced ? `<button type="button" class="hk-btn sm danger" data-unannouncewin>Hide Public Podium</button>` : ''}
         </div>
 
         <form id="autoWinForm" class="hk-form">
-          <div class="hk-grid3">
+          <div class="hk-grid2" style="grid-template-columns:repeat(auto-fit,minmax(175px,1fr))">
+            <div class="hk-field"><label>Candidate Pool</label>
+              <select class="hk-select" id="winPoolSel" name="pool">
+                <option value="qualified" ${winPool === 'qualified' ? 'selected' : ''}>Shortlisted &amp; Finalists (${qualifiedRegs.length})</option>
+                <option value="all" ${winPool === 'all' ? 'selected' : ''}>All Active Teams (${regs.filter(r => r.status !== 'rejected').length})</option>
+              </select>
+            </div>
             <div class="hk-field"><label>Rank &amp; Pick Criteria</label>
               <select class="hk-select" id="winCritSel" name="criteria">
                 <option value="combined" ${winCriteria === 'combined' ? 'selected' : ''}>Combined (Test + Project)</option>
-                <option value="project" ${winCriteria === 'project' ? 'selected' : ''}>Project Review Score</option>
+                <option value="project" ${winCriteria === 'project' ? 'selected' : ''}>Project / Prototype Score</option>
                 <option value="test" ${winCriteria === 'test' ? 'selected' : ''}>Screening Test Score</option>
               </select>
             </div>
             <div class="hk-field"><label>How Many Top Winners?</label>
               <input class="hk-input" id="winTopNIn" type="number" min="1" max="${Math.max(1, rankedCandidates.length)}" name="topN" value="${Math.min(winTopN, Math.max(1, rankedCandidates.length))}">
             </div>
-            <div class="hk-field"><label>Winner Reveal Time <small>leave blank = Reveal Now</small></label>
+            <div class="hk-field"><label>Winner Reveal Time <small>blank = Reveal Now</small></label>
               <input class="hk-input" type="datetime-local" name="revealAt" value="${C.toLocalInput(winCfg.revealAtMs)}">
             </div>
           </div>
 
           ${rankedCandidates.length ? `<div class="hk-stack" style="gap:8px">
-            <small class="hk-eyebrow">Preview Auto-Selected Top ${Math.min(winTopN, rankedCandidates.length)} Teams &amp; Assign Prizes</small>
+            <small class="hk-eyebrow">Preview Top ${Math.min(winTopN, rankedCandidates.length)} Winner Candidates &amp; Assign Prizes</small>
             ${rankedCandidates.slice(0, Math.min(winTopN, rankedCandidates.length)).map((c, idx) => {
               const tName = c.r.teamMode === 'solo' ? c.r.name : (c.r.teamName || c.r.name);
               const existingW = (winCfg.winners || []).find(w => w.uid === c.r.uid);
               return `<div class="hk-win-pick-row">
                 <span class="hk-rank top${Math.min(idx + 1, 3)}">#${idx + 1}</span>
                 <div style="flex:1;min-width:160px">
-                  <b>${esc(tName)}</b>
+                  <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                    <b>${esc(tName)}</b>
+                    ${statusChipHtml(c.r.status)}
+                    ${c.hasProto ? '<span class="hk-chip sky">Prototype ✓</span>' : ''}
+                  </div>
                   <div class="hk-xs hk-muted">${esc(c.r.name)} · ${c.pts >= 0 ? `Score: <b>${c.pts}%</b>` : 'Not scored yet'}${c.em.sub ? ` · ${esc(c.em.sub.title)}` : ''}</div>
                 </div>
                 <input class="hk-input" style="max-width:190px;min-height:40px" data-wplace="${esc(c.r.uid)}" value="${esc(existingW?.place || placeLabels[idx] || `${idx + 1}th Place`)}" placeholder="Place label">
                 <input class="hk-input" style="max-width:210px;min-height:40px" data-wprize="${esc(c.r.uid)}" value="${esc(existingW?.prize || '')}" placeholder="Prize (e.g. ₹25,000 + Trophy)">
               </div>`;
             }).join('')}
-          </div>` : '<p class="hk-sm hk-muted">No active participants yet.</p>'}
+          </div>` : '<p class="hk-sm hk-muted">Shortlist teams from Round 1 first (or switch Candidate Pool to All Active Teams).</p>'}
 
           <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap">
-            <button type="submit" class="hk-btn gold lg" ${rankedCandidates.length ? '' : 'disabled'}><i data-lucide="trophy"></i>Auto-Select Winners &amp; Publish Podium</button>
+            <button type="submit" class="hk-btn gold lg" ${rankedCandidates.length ? '' : 'disabled'}><i data-lucide="trophy"></i>Decide Winners &amp; Publish Official Podium</button>
           </div>
         </form>
 
-        ${winners.length ? `<div class="hk-winners-box" style="margin-top:8px">
+        ${announcedWinners.length ? `<div class="hk-winners-box" style="margin-top:8px">
           <div class="wb-head">
-            <div style="display:flex;align-items:center;gap:8px"><span class="hk-win-ic"><i data-lucide="trophy"></i></span><div><b>Selected &amp; Announced Winners (${winners.length})</b><div class="hk-xs hk-muted">${winCfg.revealAtMs && winCfg.revealAtMs > Date.now() ? `Countdown live · reveals ${C.fmtDT(winCfg.revealAtMs)}` : 'Live on participants\' dashboards & My Hackathons cards'}</div></div></div>
-            <button type="button" class="hk-btn sm gold" data-mailwinners><i data-lucide="send"></i>Open Auto-Emailer for All ${winners.length} Winners</button>
+            <div style="display:flex;align-items:center;gap:8px"><span class="hk-win-ic"><i data-lucide="trophy"></i></span><div><b>Official Announced Winners (${announcedWinners.length})</b><div class="hk-xs hk-muted">${winCfg.revealAtMs && winCfg.revealAtMs > Date.now() ? `Countdown live · reveals ${C.fmtDT(winCfg.revealAtMs)}` : 'Live on participants\' dashboards & My Hackathons cards'}</div></div></div>
+            <button type="button" class="hk-btn sm gold" data-mailwinners><i data-lucide="send"></i>Open Auto-Emailer for Winners</button>
           </div>
-          <div class="hk-winners-grid">${winners.map((w, wi) => {
-            const wMeta = (winCfg.winners || []).find(x => x.uid === w.uid);
-            const tName = w.teamMode === 'solo' ? w.name : (w.teamName || w.name);
+          <div class="hk-winners-grid">${announcedWinners.map((wMeta, wi) => {
+            const w = regs.find(x => x.uid === wMeta.uid) || { id: wMeta.regId || '', uid: wMeta.uid, name: wMeta.leaderName || 'Winner', teamName: wMeta.teamName || '', email: '', phone: '' };
+            const tName = wMeta.teamName || w.teamName || w.name;
             return `<div class="hk-winner-card">
-              <div class="wc-top"><span class="hk-rank top${Math.min(wi + 1, 3)}">${esc(wMeta?.place || `Winner #${wi + 1}`)}</span>${wMeta?.prize ? `<span class="hk-chip gold">${esc(wMeta.prize)}</span>` : ''}</div>
-              <button type="button" class="hk-rowlink" data-prof="${esc(w.id)}"><b>${esc(tName)}</b></button>
-              <div class="hk-xs hk-muted">${esc(w.name)} · ${esc(w.email)}</div>
-              <div class="wc-acts">
+              <div class="wc-top"><span class="hk-rank top${Math.min(wi + 1, 3)}">${esc(wMeta.place || `Winner #${wi + 1}`)}</span>${wMeta.prize ? `<span class="hk-chip gold">${esc(wMeta.prize)}</span>` : ''}</div>
+              ${w.id ? `<button type="button" class="hk-rowlink" data-prof="${esc(w.id)}"><b>${esc(tName)}</b></button>` : `<b>${esc(tName)}</b>`}
+              <div class="hk-xs hk-muted">${esc(w.name)}${w.email ? ' · ' + esc(w.email) : ''}</div>
+              ${w.id ? `<div class="wc-acts">
                 <button type="button" class="hk-btn sm primary" data-winchan="${esc(w.id)}:platform"><i data-lucide="sparkles"></i>Auto Email</button>
                 <button type="button" class="hk-btn sm" data-winchan="${esc(w.id)}:gmail"><i data-lucide="mail"></i>Gmail</button>
                 ${w.phone ? `<button type="button" class="hk-btn sm" data-winchan="${esc(w.id)}:whatsapp"><i data-lucide="message-circle"></i>WhatsApp</button>` : ''}
-              </div>
+              </div>` : ''}
             </div>`;
           }).join('')}</div>
 
@@ -1651,7 +1664,7 @@ export async function manage(cx, id){
 
       <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
         <button type="submit" class="hk-btn primary"><i data-lucide="check"></i>Save Review Status</button>
-        ${r && r.status !== 'selected' ? `<button type="button" class="hk-btn gold" id="rmSaveWin"><i data-lucide="trophy"></i>Finalize Review &amp; Select Winner</button>` : ''}
+        ${r && !['shortlisted', 'selected'].includes(r.status) ? `<button type="button" class="hk-btn gold" id="rmSaveWin"><i data-lucide="sparkles"></i>Finalize &amp; Shortlist (Next Round)</button>` : ''}
       </div>
     </form>`, { wide: true, onMount(b, close){
       $$('[data-rmst]', b).forEach(btn => {
@@ -1661,19 +1674,20 @@ export async function manage(cx, id){
           $$('[data-rmst]', b).forEach(x => x.classList.toggle('on', x.dataset.rmst === val));
         };
       });
-      const saveRev = async (alsoSelectWinner) => {
+      const saveRev = async (alsoShortlist) => {
         const scVal = $('#rmScore', b).value;
         const fbVal = $('#rmFb', b).value.trim();
-        const revSt = alsoSelectWinner ? 'reviewed' : ($('#rmRevVal', b).value || 'reviewed');
+        const revSt = alsoShortlist ? 'reviewed' : ($('#rmRevVal', b).value || 'reviewed');
         const patch = { score: scVal === '' ? null : Math.max(0, Math.min(100, +scVal)), feedback: fbVal, reviewStatus: revSt };
         await C.reviewSubmission(s.id, patch);
         Object.assign(s, patch);
         if(revSt === 'reviewed'){
           C.notify({ toUid: s.uid, fromUid: S.user.uid, hackathonId: h.id, type: 'submission_review', title: `Marked as Reviewed · ${h.title}`, body: `Your submission "${s.title}" was finalized & marked as reviewed${patch.score != null ? ` (Score: ${patch.score}/100)` : ''}. Editing is now locked.` }).catch(() => {});
         }
-        if(alsoSelectWinner && r){
-          await patchReg(r, { status: 'selected' });
-          toast(`Finalized review & designated ${teamTitle} as Winner!`, 'success');
+        if(alsoShortlist && r){
+          const regPatch = { status: 'shortlisted', ...(rounds.length > 1 && (r.stage || 0) === 0 ? { stage: 1 } : {}) };
+          await patchReg(r, regPatch);
+          toast(`Finalized review & shortlisted ${teamTitle} for Next Round!`, 'success');
         } else {
           toast(revSt === 'reviewed' ? 'Marked as Reviewed (Finalized) — student editing locked' : 'Saved as Reviewing — student can still edit');
         }
@@ -1818,17 +1832,21 @@ export async function manage(cx, id){
         ev.preventDefault();
         const fd = new FormData(wForm);
         const crit = String(fd.get('criteria') || 'combined');
+        const poolMode = String(fd.get('pool') || 'qualified');
         const count = Math.max(1, Math.min(20, +fd.get('topN') || 3));
         const revMs = C.fromLocalInput(fd.get('revealAt'));
-        const candidates = [...regs].filter(r => r.status !== 'rejected').map(r => {
+        const qualPool = regs.filter(r => ['shortlisted', 'selected'].includes(r.status));
+        const basePool = poolMode === 'qualified' && qualPool.length ? qualPool : regs.filter(r => r.status !== 'rejected');
+        const candidates = [...basePool].map(r => {
           const em = evalMetrics(r.uid);
           const pts = crit === 'project' ? (em.subScore ?? -1) : crit === 'test' ? (em.testPct ?? -1) : em.combined;
-          return { r, em, pts };
-        }).sort((a, b) => b.pts - a.pts || (b.em.subScore ?? -1) - (a.em.subScore ?? -1) || (b.em.testPct ?? -1) - (a.em.testPct ?? -1));
+          const hasProto = !!(em.sub && extractProto(em.sub));
+          return { r, em, pts, hasProto };
+        }).sort((a, b) => (b.r.status === 'selected' ? 1 : 0) - (a.r.status === 'selected' ? 1 : 0) || (b.hasProto ? 1 : 0) - (a.hasProto ? 1 : 0) || b.pts - a.pts || (b.em.subScore ?? -1) - (a.em.subScore ?? -1) || (b.em.testPct ?? -1) - (a.em.testPct ?? -1));
 
         const chosen = candidates.slice(0, count);
         if(!chosen.length) return toast('No teams available to select.', 'error');
-        if(!confirm(`Auto-select top ${chosen.length} team(s) as Winners and ${revMs && revMs > Date.now() ? 'schedule reveal for ' + C.fmtDT(revMs) : 'reveal Winners immediately'}?`)) return;
+        if(!confirm(`Publish top ${chosen.length} team(s) as Official Winners and ${revMs && revMs > Date.now() ? 'schedule reveal for ' + C.fmtDT(revMs) : 'reveal immediately'}?`)) return;
 
         const btn = $('button[type=submit]', wForm);
         btn.disabled = true; btn.innerHTML = '<span class="hk-spin"></span> Publishing winners…';
@@ -1884,7 +1902,7 @@ export async function manage(cx, id){
     if(!list.length) return toast('No matching registrations found.', 'info');
     if(!confirm(`${actionLabel} for ${list.length} team${list.length === 1 ? '' : 's'}?${h.autoEmail === false ? '' : ' Teams will be emailed automatically.'}`)) return false;
     try {
-      for(const r of list) await patchReg(r, patch);
+      for(const r of list) await patchReg(r, typeof patch === 'function' ? patch(r) : patch);
       toast(`Updated ${list.length} team${list.length === 1 ? '' : 's'}`);
       return true;
     } catch(err){
@@ -1920,6 +1938,7 @@ export async function manage(cx, id){
     if(t.id === 'subWeight'){ subWeight = t.value; return redrawRows(); }
     if(t.id === 'tf'){ testFilter = t.value; return redrawRows(); }
     if(t.id === 'ts'){ testSort = t.value; return redrawRows(); }
+    if(t.id === 'winPoolSel'){ winPool = t.value; return redrawRows(); }
     if(t.id === 'winCritSel'){ winCriteria = t.value; return redrawRows(); }
     if(t.id === 'winTopNIn'){ winTopN = Math.max(1, +t.value || 1); return redrawRows(); }
     if(t.id === 'recKind'){ mailer.recKind = t.value; return redrawRows(); }
@@ -1980,32 +1999,63 @@ export async function manage(cx, id){
     const orv = t.closest('[data-openreview]'); if(orv){ const s = subs.find(x => x.id === orv.dataset.openreview); if(s) openReviewModal(s); return; }
 
     if(t.closest('[data-mailwinners]')){
-      const w = regs.filter(r => r.status === 'selected');
-      return w.length ? compose(w, 'selected') : toast('No winners selected yet.', 'info');
+      const winCfg = h.submission?.winnerReveal;
+      const winList = winCfg?.announced && Array.isArray(winCfg.winners) ? winCfg.winners : [];
+      const w = winList.length
+        ? regs.filter(r => winList.some(x => (r.uid && x.uid === r.uid) || x.regId === r.id))
+        : regs.filter(r => r.status === 'selected');
+      return w.length ? compose(w, 'selected') : toast('Announce official winners or mark Finalists first.', 'info');
     }
 
-    const wsel = t.closest('[data-winselect]');
-    if(wsel){
-      const r = regs.find(x => x.id === wsel.dataset.winselect); if(!r) return;
-      wsel.disabled = true;
+    const shBtn = t.closest('[data-shortlist]');
+    if(shBtn){
+      const r = regs.find(x => x.id === shBtn.dataset.shortlist); if(!r) return;
+      shBtn.disabled = true;
       try {
-        await patchReg(r, { status: 'selected' });
-        toast(`${r.teamName || r.name} designated as Winner! 🏆${h.autoEmail === false ? '' : ' · Team notified'}`);
+        await patchReg(r, { status: 'shortlisted', ...(rounds.length > 1 && (r.stage || 0) === 0 ? { stage: 1 } : {}) });
+        toast(`${r.teamName || r.name} shortlisted for Next Round! ✨${h.autoEmail === false ? '' : ' · Team notified'}`);
         paint();
-      } catch(err){ toast(err.message, 'error'); wsel.disabled = false; }
+      } catch(err){ toast(err.message, 'error'); shBtn.disabled = false; }
       return;
     }
 
-    const wunsel = t.closest('[data-winunselect]');
-    if(wunsel){
-      const r = regs.find(x => x.id === wunsel.dataset.winunselect); if(!r) return;
-      if(!confirm(`Remove "${r.teamName || r.name}" from Selected Winners (moves to Shortlisted)?`)) return;
-      wunsel.disabled = true;
+    const unshBtn = t.closest('[data-unshortlist]');
+    if(unshBtn){
+      const r = regs.find(x => x.id === unshBtn.dataset.unshortlist); if(!r) return;
+      if(!confirm(`Remove "${r.teamName || r.name}" from Shortlisted?`)) return;
+      unshBtn.disabled = true;
+      try {
+        await patchReg(r, { status: 'registered', ...(rounds.length > 1 && (r.stage || 0) === 1 ? { stage: 0 } : {}) });
+        toast(`${r.teamName || r.name} moved back to Registered`);
+        paint();
+      } catch(err){ toast(err.message, 'error'); unshBtn.disabled = false; }
+      return;
+    }
+
+    const finBtn = t.closest('[data-finalist], [data-winselect]');
+    if(finBtn){
+      const rid = finBtn.dataset.finalist || finBtn.dataset.winselect;
+      const r = regs.find(x => x.id === rid); if(!r) return;
+      finBtn.disabled = true;
+      try {
+        await patchReg(r, { status: 'selected', ...(rounds.length > 1 && (r.stage || 0) === 0 ? { stage: 1 } : {}) });
+        toast(`${r.teamName || r.name} marked as Round 2 Finalist!${h.autoEmail === false ? '' : ' · Team notified'}`);
+        paint();
+      } catch(err){ toast(err.message, 'error'); finBtn.disabled = false; }
+      return;
+    }
+
+    const unfinBtn = t.closest('[data-unfinalist], [data-winunselect]');
+    if(unfinBtn){
+      const rid = unfinBtn.dataset.unfinalist || unfinBtn.dataset.winunselect;
+      const r = regs.find(x => x.id === rid); if(!r) return;
+      if(!confirm(`Remove "${r.teamName || r.name}" from Round 2 Finalists (moves back to Shortlisted)?`)) return;
+      unfinBtn.disabled = true;
       try {
         await patchReg(r, { status: 'shortlisted' });
-        toast(`${r.teamName || r.name} moved to Shortlisted`);
+        toast(`${r.teamName || r.name} moved back to Shortlisted`);
         paint();
-      } catch(err){ toast(err.message, 'error'); wunsel.disabled = false; }
+      } catch(err){ toast(err.message, 'error'); unfinBtn.disabled = false; }
       return;
     }
 
@@ -2016,8 +2066,11 @@ export async function manage(cx, id){
       if(!r || r.status === nextSt) return;
       qstBtn.disabled = true;
       try {
-        await patchReg(r, { status: nextSt });
-        toast(`Marked ${r.teamName || r.name} as ${nextSt === 'rejected' ? 'not selected' : nextSt}${h.autoEmail === false ? '' : ' · Team notified'}`);
+        const regPatch = { status: nextSt };
+        if(nextSt === 'shortlisted' && rounds.length > 1 && (r.stage || 0) === 0) regPatch.stage = 1;
+        await patchReg(r, regPatch);
+        const stLbl = nextSt === 'selected' ? 'Finalist' : (nextSt === 'rejected' ? 'not selected' : nextSt);
+        toast(`Marked ${r.teamName || r.name} as ${stLbl}${h.autoEmail === false ? '' : ' · Team notified'}`);
         paint();
       } catch(err){ toast(err.message, 'error'); qstBtn.disabled = false; }
       return;
@@ -2026,25 +2079,24 @@ export async function manage(cx, id){
     const qs = t.closest('[data-qshort]');
     if(qs){
       const mode = qs.dataset.qshort;
-      if(mode === 'sub-top-shortlist' || mode === 'sub-top-select'){
-        const targetStatus = mode === 'sub-top-select' ? 'selected' : 'shortlisted';
+      const shortlistPatch = r => ({ status: 'shortlisted', ...(rounds.length > 1 && (r.stage || 0) === 0 ? { stage: 1 } : {}) });
+      if(mode === 'sub-top-shortlist'){
         const ranked = getLeaderboardTeams().filter(x => x.rankVal >= 0).map(x => x.r);
         if(!ranked.length) return toast('Score submissions or run the screening test first so teams can be ranked.', 'info');
-        const list = ranked.slice(0, Math.max(1, topSubN)).filter(r => r && r.status !== targetStatus);
-        if(await applyBulkRegUpdate(list, { status: targetStatus }, `Mark top ${Math.min(topSubN, ranked.length)} ranked teams as ${targetStatus === 'selected' ? 'Winners (selected)' : targetStatus}`)) paint();
+        const list = ranked.slice(0, Math.max(1, topSubN)).filter(r => r && !['shortlisted', 'selected'].includes(r.status));
+        if(await applyBulkRegUpdate(list, shortlistPatch, `Shortlist top ${Math.min(topSubN, ranked.length)} ranked teams for Next Round`)) paint();
         return;
       }
       if(mode === 'sub-cut'){
         const list = getLeaderboardTeams().filter(x => x.rankVal >= subCut).map(x => x.r).filter(r => r && !['shortlisted', 'selected'].includes(r.status));
-        if(await applyBulkRegUpdate(list, { status: 'shortlisted' }, `Shortlist teams with score ≥ ${subCut}`)) paint();
+        if(await applyBulkRegUpdate(list, shortlistPatch, `Shortlist teams with score ≥ ${subCut} for Next Round`)) paint();
         return;
       }
-      if(mode === 'test-top-shortlist' || mode === 'test-top-select'){
-        const targetStatus = mode === 'test-top-select' ? 'selected' : 'shortlisted';
+      if(mode === 'test-top-shortlist'){
         const ranked = [...atts].filter(a => a.submittedAtMs && regOf(a.uid)).sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || (a.submittedAtMs || 0) - (b.submittedAtMs || 0));
         if(!ranked.length) return toast('No attempted test records found.', 'info');
-        const list = ranked.slice(0, Math.max(1, topTestN)).map(a => regOf(a.uid)).filter(r => r && r.status !== targetStatus);
-        if(await applyBulkRegUpdate(list, { status: targetStatus }, `Mark top ${Math.min(topTestN, ranked.length)} test scorers as ${targetStatus}`)) paint();
+        const list = ranked.slice(0, Math.max(1, topTestN)).map(a => regOf(a.uid)).filter(r => r && !['shortlisted', 'selected'].includes(r.status));
+        if(await applyBulkRegUpdate(list, shortlistPatch, `Shortlist top ${Math.min(topTestN, ranked.length)} test scorers for Next Round`)) paint();
         return;
       }
       if(mode === 'test-cut'){
@@ -2054,7 +2106,7 @@ export async function manage(cx, id){
           const pct = tot > 0 ? Math.round(((a.score ?? 0) / tot) * 100) : 0;
           return pct >= testCut;
         }).map(a => regOf(a.uid)).filter(r => r && !['shortlisted', 'selected'].includes(r.status));
-        if(await applyBulkRegUpdate(list, { status: 'shortlisted' }, `Shortlist teams with test accuracy ≥ ${testCut}%`)) paint();
+        if(await applyBulkRegUpdate(list, shortlistPatch, `Shortlist teams with test accuracy ≥ ${testCut}% for Next Round`)) paint();
         return;
       }
     }
