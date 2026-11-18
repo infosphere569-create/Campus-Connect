@@ -243,6 +243,14 @@ export async function manage(cx, id){
     return `<span class="hk-chip ${tone}">${esc(lbl)}</span>`;
   };
 
+  const subStatusToggleHtml = s => {
+    const isFinal = s?.reviewStatus === 'reviewed';
+    return `<div class="hk-revtoggle" role="group" aria-label="Review status for ${esc(s.title || 'project')}">
+      <button type="button" class="rt-btn reviewing ${!isFinal ? 'on' : ''}" data-revstate="${esc(s.id)}:reviewing" title="Mark as Reviewing (student can still edit)"><i data-lucide="hourglass"></i>Reviewing</button>
+      <button type="button" class="rt-btn finalized ${isFinal ? 'on' : ''}" data-revstate="${esc(s.id)}:reviewed" title="Mark as Finalized (Marked as Reviewed &amp; locks student editing)"><i data-lucide="lock"></i>Finalized</button>
+    </div>`;
+  };
+
   const getFilteredSubs = () => {
     const qLower = subQ.trim().toLowerCase();
     const list = subs.filter(s => {
@@ -385,8 +393,8 @@ export async function manage(cx, id){
         ${[
           ['all', `All Teams (${regs.length})`],
           ['submitted', `Submitted (${subs.length})`],
-          ['pending', `To Review (${pendingCount})`],
-          ['reviewed', `Reviewed (${reviewedCount})`],
+          ['pending', `Reviewing (${pendingCount})`],
+          ['reviewed', `Finalized (${reviewedCount})`],
           ['test_done', `Test Done (${testDoneCount})`],
           ['shortlisted', `Shortlisted (${shortlistedCount})`],
           ['selected', `Selected Winners (${winners.length})`],
@@ -452,10 +460,11 @@ export async function manage(cx, id){
                 ${s
                   ? `<div style="font-weight:700;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(s.title)}">${esc(s.title)}</div>
                       <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;align-items:center">
-                        ${s.score != null ? `<span class="hk-chip ${+s.score >= 80 ? 'gold' : ''}">Score ${esc(s.score)}/100</span>` : `<span class="hk-chip warn">Needs review</span>`}
+                        ${s.score != null ? `<span class="hk-chip ${+s.score >= 80 ? 'gold' : ''}">Score ${esc(s.score)}/100</span>` : ''}
                         ${extractProto(s) ? `<span class="hk-chip sky">Proto ✓</span>` : ''}
                         ${projLinks}
-                      </div>`
+                      </div>
+                      <div style="margin-top:6px">${subStatusToggleHtml(s)}</div>`
                   : '<span class="hk-xs hk-muted">No project submitted</span>'}
               </td>
               <td>
@@ -501,8 +510,9 @@ export async function manage(cx, id){
                 </div>
               </div>
               <div class="eh-badges">
+                ${subStatusToggleHtml(s)}
                 ${em.testScore != null ? `<span class="hk-chip sky" title="Screening test score"><i data-lucide="clipboard-check"></i>Test ${em.testScore}/${em.testTotal}${em.testPct != null ? ` (${em.testPct}%)` : ''}</span>` : ''}
-                ${s.reviewStatus === 'reviewed' ? `<span class="hk-chip ${s.score != null && +s.score >= 80 ? 'gold' : ''}"><i data-lucide="award"></i>Reviewed${s.score != null ? ` · ${esc(s.score)}/100` : ''}</span>` : '<span class="hk-chip warn">To review</span>'}
+                ${s.reviewStatus === 'reviewed' ? `<span class="hk-chip gold"><i data-lucide="badge-check"></i>Marked as Reviewed${s.score != null ? ` · ${esc(s.score)}/100` : ''}</span>` : (s.score != null ? `<span class="hk-chip warn">Draft Score ${esc(s.score)}/100</span>` : '')}
                 ${r ? statusChipHtml(r.status) : ''}
                 ${r && rounds.length ? `<span class="hk-chip neutral">${esc(roundName(r.stage || 0))}</span>` : ''}
               </div>
@@ -515,7 +525,7 @@ export async function manage(cx, id){
               <div class="er-inputs">
                 <input class="hk-input hk-score-in" type="number" min="0" max="100" placeholder="Score /100" data-score value="${s.score ?? ''}">
                 <input class="hk-input" placeholder="Feedback for the team (saved &amp; shown on their dashboard)" data-fb maxlength="500" value="${esc(s.feedback || '')}">
-                <button class="hk-btn sm primary" data-review="${esc(s.id)}"><i data-lucide="check"></i>Save review</button>
+                <button class="hk-btn sm primary" data-review="${esc(s.id)}"><i data-lucide="check"></i>Save &amp; Finalize</button>
               </div>
             </div>
 
@@ -1613,23 +1623,42 @@ export async function manage(cx, id){
         <div class="hk-field"><label for="rmFb">Judge Feedback <small>visible to team</small></label><input class="hk-input" id="rmFb" name="feedback" maxlength="500" placeholder="Share strengths, criteria notes, or suggestions…" value="${esc(s.feedback || '')}"></div>
       </div>
 
+      <div class="hk-field">
+        <label>Review Status <small>Finalized disables student editing &amp; shows "Marked as Reviewed"</small></label>
+        <div class="hk-chseg" id="rmRevMode" role="group" aria-label="Review status mode">
+          <button type="button" class="${s.reviewStatus !== 'reviewed' ? '' : ''}" data-rmst="reviewing"><i data-lucide="hourglass"></i>Reviewing (Keep Editable)</button>
+          <button type="button" class="on" data-rmst="reviewed"><i data-lucide="lock"></i>Finalized (Marked as Reviewed)</button>
+        </div>
+        <input type="hidden" id="rmRevVal" value="reviewed">
+      </div>
+
       <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
-        <button type="submit" class="hk-btn primary"><i data-lucide="check"></i>Save Review</button>
-        ${r && r.status !== 'selected' ? `<button type="button" class="hk-btn gold" id="rmSaveWin"><i data-lucide="trophy"></i>Save Review &amp; Select Winner</button>` : ''}
+        <button type="submit" class="hk-btn primary"><i data-lucide="check"></i>Save Review Status</button>
+        ${r && r.status !== 'selected' ? `<button type="button" class="hk-btn gold" id="rmSaveWin"><i data-lucide="trophy"></i>Finalize Review &amp; Select Winner</button>` : ''}
       </div>
     </form>`, { wide: true, onMount(b, close){
+      $$('[data-rmst]', b).forEach(btn => {
+        btn.onclick = () => {
+          const val = btn.dataset.rmst;
+          $('#rmRevVal', b).value = val;
+          $$('[data-rmst]', b).forEach(x => x.classList.toggle('on', x.dataset.rmst === val));
+        };
+      });
       const saveRev = async (alsoSelectWinner) => {
         const scVal = $('#rmScore', b).value;
         const fbVal = $('#rmFb', b).value.trim();
-        const patch = { score: scVal === '' ? null : Math.max(0, Math.min(100, +scVal)), feedback: fbVal, reviewStatus: 'reviewed' };
+        const revSt = alsoSelectWinner ? 'reviewed' : ($('#rmRevVal', b).value || 'reviewed');
+        const patch = { score: scVal === '' ? null : Math.max(0, Math.min(100, +scVal)), feedback: fbVal, reviewStatus: revSt };
         await C.reviewSubmission(s.id, patch);
         Object.assign(s, patch);
-        C.notify({ toUid: s.uid, fromUid: S.user.uid, hackathonId: h.id, type: 'submission_review', title: `Project reviewed · ${h.title}`, body: `Your submission "${s.title}" was reviewed${patch.score != null ? ` (Score: ${patch.score}/100)` : ''}${fbVal ? ': ' + fbVal : '.'}` }).catch(() => {});
+        if(revSt === 'reviewed'){
+          C.notify({ toUid: s.uid, fromUid: S.user.uid, hackathonId: h.id, type: 'submission_review', title: `Marked as Reviewed · ${h.title}`, body: `Your submission "${s.title}" was finalized & marked as reviewed${patch.score != null ? ` (Score: ${patch.score}/100)` : ''}. Editing is now locked.` }).catch(() => {});
+        }
         if(alsoSelectWinner && r){
           await patchReg(r, { status: 'selected' });
-          toast(`Reviewed & designated ${teamTitle} as Winner!`, 'success');
+          toast(`Finalized review & designated ${teamTitle} as Winner!`, 'success');
         } else {
-          toast('Submission review saved');
+          toast(revSt === 'reviewed' ? 'Marked as Reviewed (Finalized) — student editing locked' : 'Saved as Reviewing — student can still edit');
         }
         close();
         paint();
@@ -2206,14 +2235,40 @@ export async function manage(cx, id){
       } catch(err){ toast(err.message, 'error'); }
       return;
     }
+    const rvs = t.closest('[data-revstate]');
+    if(rvs){
+      const [sid, nextState] = rvs.dataset.revstate.split(':');
+      const s = subs.find(x => x.id === sid);
+      if(!s || (s.reviewStatus === nextState)) return;
+      const card = rvs.closest('[data-sub]');
+      const patch = { reviewStatus: nextState };
+      if(card){
+        const scIn = $('[data-score]', card), fbIn = $('[data-fb]', card);
+        if(scIn && scIn.value !== '') patch.score = Math.max(0, Math.min(100, +scIn.value));
+        if(fbIn) patch.feedback = fbIn.value.trim();
+      }
+      rvs.disabled = true;
+      try {
+        await C.reviewSubmission(s.id, patch);
+        Object.assign(s, patch);
+        if(nextState === 'reviewed'){
+          C.notify({ toUid: s.uid, fromUid: S.user.uid, hackathonId: h.id, type: 'submission_review', title: `Marked as Reviewed · ${h.title}`, body: `Your project "${s.title}" was finalized and marked as reviewed${patch.score != null ? ` (Score: ${patch.score}/100)` : ''}. Editing is now locked.` }).catch(() => {});
+          toast(`"${s.title}" marked as Finalized (Reviewed) — student editing disabled`, 'success');
+        } else {
+          toast(`"${s.title}" set to Reviewing — student can edit`, 'info');
+        }
+        paint();
+      } catch(err){ toast(err.message, 'error'); rvs.disabled = false; }
+      return;
+    }
     const rv = t.closest('[data-review]');
     if(rv){
       const card = rv.closest('[data-sub]'), s = subs.find(x => x.id === rv.dataset.review), sc = $('[data-score]', card).value, fb = $('[data-fb]', card).value.trim();
       try {
         const patch = { score: sc === '' ? null : Math.max(0, Math.min(100, +sc)), feedback: fb, reviewStatus: 'reviewed' };
         await C.reviewSubmission(s.id, patch); Object.assign(s, patch);
-        C.notify({ toUid: s.uid, fromUid: S.user.uid, hackathonId: h.id, type: 'submission_review', title: `Project reviewed · ${h.title}`, body: `Your submission "${s.title}" was reviewed${patch.score != null ? ` (Score: ${patch.score}/100)` : ''}${fb ? ': ' + fb : '.'}` }).catch(() => {});
-        toast('Review saved'); paint();
+        C.notify({ toUid: s.uid, fromUid: S.user.uid, hackathonId: h.id, type: 'submission_review', title: `Marked as Reviewed · ${h.title}`, body: `Your submission "${s.title}" was finalized & marked as reviewed${patch.score != null ? ` (Score: ${patch.score}/100)` : ''}${fb ? ': ' + fb : '.'}` }).catch(() => {});
+        toast('Marked as Finalized (Reviewed) — student editing locked'); paint();
       } catch(err){ toast(err.message, 'error'); }
       return;
     }

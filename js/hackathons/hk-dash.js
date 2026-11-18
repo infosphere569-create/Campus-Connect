@@ -26,7 +26,7 @@ export async function dash(cx, hid){
   let editingSub = false, showFullIdea = false, justSubmittedSub = false;
   let editingProto = false, justSubmittedProto = false;
   let h = null, reg = null, sub = null, meta = null, att = null;
-  let stopTimer = null, unsubReg = null, unsubHack = null, revealReloadTimer = 0;
+  let stopTimer = null, unsubReg = null, unsubHack = null, unsubSub = null, revealReloadTimer = 0;
 
   async function loadAll(){
     [h, reg] = await Promise.all([C.fetchOne(hid, { fresh: true }), C.getRegistration(hid, S.user.uid, { fresh: true })]);
@@ -126,11 +126,11 @@ export async function dash(cx, hid){
       }
       if(sub && isSubReviewed){
         return {
-          tone: 'ok', icon: 'badge-check', badge: 'Reviewed · Locked',
-          title: `Project reviewed${sub.score != null ? ` · Score ${sub.score}/100` : ''}${nextRound ? ` → Next: ${nextRound.name}` : ''}`,
+          tone: 'ok', icon: 'badge-check', badge: 'Marked as Reviewed',
+          title: `Marked as Reviewed${sub.score != null ? ` · Score ${sub.score}/100` : ''}${nextRound ? ` → Next: ${nextRound.name}` : ''}`,
           desc: sub.feedback
-            ? `Judge note: ${sub.feedback}`
-            : (nextRound ? `Get ready for ${nextRound.name}${nextRound.startMs ? ' (' + C.fmtDT(nextRound.startMs) + ')' : ''}.` : 'Editing is locked after review. Watch this space for results & next round updates.'),
+            ? `Judge feedback: ${sub.feedback}`
+            : (nextRound ? `Editing is locked. Get ready for ${nextRound.name}${nextRound.startMs ? ' (' + C.fmtDT(nextRound.startMs) + ')' : ''}.` : 'Your project has been Marked as Reviewed and editing is now disabled.'),
           cta: `<button type="button" class="hk-btn sm" data-jump="#subCard"><i data-lucide="eye"></i>View project card</button>`
         };
       }
@@ -203,7 +203,8 @@ export async function dash(cx, hid){
     const myWin = winnersRevealed ? winnersList.find(w => w.uid === S.user.uid) : null;
 
     const protoSub = extractProto(sub);
-    const isSubReviewed = !!(sub && (sub.reviewStatus === 'reviewed' || sub.score != null || (sub.feedback || '').trim()));
+    const isSubReviewed = !!(sub && sub.reviewStatus === 'reviewed');
+    const isSubReviewing = !!(sub && sub.reviewStatus === 'reviewing');
     const subOpen = subCfg.open !== false && (!ideaDl || now <= ideaDl) && reg.status !== 'rejected';
     const canEditSub = subOpen && !isSubReviewed;
     const members = reg.members || [];
@@ -421,30 +422,34 @@ export async function dash(cx, hid){
         const savedCustom = (Array.isArray(sub.customAnswers) ? sub.customAnswers : []).filter(a => a && a.value && a.id !== '__proto_meta');
         const ideaLong = (sub.idea || '').length > 165;
         const statusChip = isSubReviewed
-          ? `<span class="hk-chip gold"><i data-lucide="badge-check"></i>Reviewed${sub.score != null ? ` · ${esc(sub.score)}/100` : ''}</span>`
-          : `<span class="hk-chip"><i data-lucide="circle-check"></i>Submitted</span>`;
-        const lockChip = !canEditSub ? `<span class="hk-chip neutral"><i data-lucide="lock"></i>Locked</span>` : '';
+          ? `<span class="hk-chip gold"><i data-lucide="badge-check"></i>Marked as Reviewed${sub.score != null ? ` · ${esc(sub.score)}/100` : ''}</span>`
+          : isSubReviewing
+            ? `<span class="hk-chip sky"><i data-lucide="hourglass"></i>Reviewing (Editable)</span>`
+            : `<span class="hk-chip"><i data-lucide="circle-check"></i>Submitted</span>`;
+        const lockChip = !canEditSub ? `<span class="hk-chip neutral"><i data-lucide="lock"></i>Edit Disabled</span>` : '';
 
         subCard = `<section class="hk-card-s hk-dcard hk-sub-saved ${justSubmittedSub ? 'hk-submit-celeb' : ''}" id="subCard">
           ${justSubmittedSub ? `<div class="hk-celeb-strip"><i data-lucide="sparkles"></i><span>Project submitted &amp; saved cleanly! You can edit anytime before review.</span></div>` : ''}
           <div class="hk-prof-head hk-sub-compact-head">
-            <div class="hk-sub-badge"><i data-lucide="lightbulb"></i></div>
+            <div class="hk-sub-badge ${isSubReviewed ? 'gold' : ''}"><i data-lucide="${isSubReviewed ? 'badge-check' : 'lightbulb'}"></i></div>
             <div class="grow">
               <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                 <h3 style="font-size:1.12rem">${esc(sub.title)}</h3>
                 ${statusChip}
                 ${lockChip}
               </div>
-              <div class="hk-xs hk-muted" style="margin-top:3px">Project Submission · Saved ${sub.updatedAtMs ? C.ago(sub.updatedAtMs) : 'now'}${isSubReviewed ? ' · Locked after review' : (ideaDl ? ` · Editable until ${C.fmtDT(ideaDl)}` : '')}</div>
+              <div class="hk-xs hk-muted" style="margin-top:3px">Project Submission · Saved ${sub.updatedAtMs ? C.ago(sub.updatedAtMs) : 'now'}${isSubReviewed ? ' · Marked as Reviewed (Locked)' : (ideaDl ? ` · Editable until ${C.fmtDT(ideaDl)}` : '')}</div>
             </div>
-            ${canEditSub ? `<button type="button" class="hk-btn primary sm" id="editSubBtn"><i data-lucide="pencil"></i>Edit</button>` : ''}
+            ${canEditSub
+              ? `<button type="button" class="hk-btn primary sm" id="editSubBtn"><i data-lucide="pencil"></i>Edit</button>`
+              : `<button type="button" class="hk-btn sm ghost" disabled title="Editing disabled after review"><i data-lucide="lock"></i>Edit Disabled</button>`}
           </div>
 
-          ${isSubReviewed && (sub.score != null || sub.feedback) ? `<div class="hk-msg ok" style="margin-top:12px"><i data-lucide="message-square-text"></i><span>${sub.score != null ? `Judge score: <b>${esc(sub.score)} / 100</b>. ` : ''}${sub.feedback ? esc(sub.feedback) : 'Submission reviewed and locked.'}</span></div>` : ''}
+          ${isSubReviewed ? `<div class="hk-msg ok" style="margin-top:12px"><i data-lucide="badge-check"></i><span><b>Marked as Reviewed</b>${sub.score != null ? ` · Score: <b>${esc(sub.score)} / 100</b>` : ''}. ${sub.feedback ? `Judge feedback: ${esc(sub.feedback)}` : 'Editing is disabled for this finalized submission.'}</span></div>` : ''}
 
           <div class="hk-kv-grid" style="margin-top:12px">
             <div class="hk-kv-item"><small>Project Title</small><b>${esc(sub.title)}</b></div>
-            <div class="hk-kv-item"><small>Submission Status</small><b>${isSubReviewed ? 'Reviewed (Locked)' : (subOpen ? 'Submitted (Editable until review)' : 'Submitted (Locked)')}</b></div>
+            <div class="hk-kv-item"><small>Submission Status</small><b>${isSubReviewed ? 'Marked as Reviewed (Locked)' : (isSubReviewing ? 'Reviewing (Editable)' : (subOpen ? 'Submitted (Editable)' : 'Submitted (Locked)'))}</b></div>
           </div>
 
           <div class="hk-sub-compact-idea" style="margin-top:10px">
@@ -772,11 +777,31 @@ export async function dash(cx, hid){
     }
   }, () => {});
 
+  unsubSub = FS.onSnapshot(FS.doc(C.db, 'hkSubmissions', `${hid}_${S.user.uid}`), snap => {
+    if(cx.stale()) return;
+    const liveSub = snap.exists() ? { id: snap.id, ...snap.data() } : null;
+    if(!liveSub) return;
+    const changed = liveSub.reviewStatus !== sub?.reviewStatus || liveSub.score !== sub?.score || (liveSub.feedback || '') !== (sub?.feedback || '');
+    if(changed){
+      const becameFinal = liveSub.reviewStatus === 'reviewed' && sub?.reviewStatus !== 'reviewed';
+      sub = liveSub;
+      if(becameFinal){
+        editingSub = false;
+        toast('Your project was Marked as Reviewed — editing is now disabled.', 'info');
+      }
+      const activeTag = document.activeElement?.tagName;
+      if(becameFinal || (!editingSub && !editingProto && !['INPUT', 'TEXTAREA'].includes(activeTag))){
+        render();
+      }
+    }
+  }, () => {});
+
   cx.S.cleanup = () => {
     stopTimer?.();
     clearTimeout(revealReloadTimer);
     unsubReg?.();
     unsubHack?.();
+    unsubSub?.();
     view.onclick = null;
   };
   render();

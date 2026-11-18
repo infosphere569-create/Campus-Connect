@@ -736,7 +736,7 @@ export async function saveSubmission(h, user, reg, d){
   try {
     if(ex.exists()){
       if(exData?.reviewStatus === 'reviewed'){
-        throw new Error('Your project submission has already been reviewed by the organiser and is now locked.');
+        throw new Error('This submission has been Marked as Reviewed by the organiser and editing is disabled.');
       }
       const updatePatch = {
         title: cleanTitle,
