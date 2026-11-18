@@ -27,7 +27,7 @@ export async function hostDash(cx){
       changes_requested: blocked ? `${blockedDraftAct}<a class="hk-btn sm" href="#/h/${h.id}">Preview</a>` : `<a class="hk-btn sm primary" href="#/host/edit/${h.id}">Fix & resubmit</a>`,
       rejected: blocked ? `<a class="hk-btn sm" href="#/h/${h.id}">Preview</a>` : `<a class="hk-btn sm" href="#/host/edit/${h.id}">Edit</a>`,
       pending: `<a class="hk-btn sm" href="#/h/${h.id}">Preview</a>${blocked ? '' : `<a class="hk-btn sm" href="#/host/edit/${h.id}">Edit</a>`}`,
-      approved: `<a class="hk-btn sm gold" href="#/host/manage/${h.id}"><i data-lucide="users"></i>Manage</a><a class="hk-btn sm" href="#/h/${h.id}">View</a>${blocked ? '' : `<a class="hk-btn sm" href="#/host/edit/${h.id}">Edit</a>`}`,
+      approved: `<a class="hk-btn sm gold" href="#/host/manage/${h.id}"><i data-lucide="users"></i>Manage</a><a class="hk-btn sm primary" href="#/host/manage/${h.id}/review"><i data-lucide="trophy"></i>Review Submissions</a><a class="hk-btn sm" href="#/h/${h.id}">View</a>${blocked ? '' : `<a class="hk-btn sm" href="#/host/edit/${h.id}">Edit</a>`}`,
       closed: `<a class="hk-btn sm" href="#/h/${h.id}">View</a>`
     }[h.status] || '';
     const moreBtn = `<button type="button" class="hk-btn icon sm ghost" data-more="${esc(h.id)}" title="Give access &amp; options" aria-label="Give access and options"><i data-lucide="more-vertical"></i></button>`;

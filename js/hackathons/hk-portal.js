@@ -91,7 +91,7 @@ function locModal(){
 const ROUTES = [
   [/^\/home$/, home], [/^\/explore$/, explore], [/^\/h\/([\w-]+)$/, detail], [/^\/my$/, myHacks], [/^\/my\/([\w-]+)$/, (t, id) => guardPart(t, () => dash(ctx(t), id))],
   [/^\/host$/, (t) => guardHost(t, () => hostDash(ctx(t)))], [/^\/host\/new$/, (t) => guardHost(t, () => wizard(ctx(t), null))],
-  [/^\/host\/edit\/([\w-]+)$/, (t, id) => guardHost(t, () => wizard(ctx(t), id))], [/^\/host\/manage\/([\w-]+)$/, (t, id) => guardHost(t, () => manage(ctx(t), id))],
+  [/^\/host\/edit\/([\w-]+)$/, (t, id) => guardHost(t, () => wizard(ctx(t), id))], [/^\/host\/manage\/([\w-]+)(?:\/([\w-]+))?$/, (t, id, initTab) => guardHost(t, () => manage({ ...ctx(t), initialTab: initTab || 'regs' }, id))],
   [/^\/alerts$/, alerts], [/^\/profile$/, profile]
 ];
 const ctx = t => ({ S, view, stale: () => stale(t), nav, refreshMine, ensureAll, fail, myCollege });

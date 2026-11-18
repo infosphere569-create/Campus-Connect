@@ -1395,3 +1395,31 @@ i[data-lucide]>svg{width:100%;height:100%;display:block}
   .hk-eval-decide .ed-acts{width:100%;justify-content:flex-end}
 }
 
+/* ---------- Review Submissions Leaderboard & Winners Podium ---------- */
+.hk-rev-banner{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;border-color:color-mix(in srgb,var(--hk-gold) 32%,var(--hk-line));background:linear-gradient(125deg,color-mix(in srgb,var(--hk-gold2) 10%,var(--hk-surface)),color-mix(in srgb,var(--hk-p) 5%,var(--hk-surface)))}
+.hk-winners-box{padding:16px 18px;border-radius:18px;background:linear-gradient(135deg,color-mix(in srgb,var(--hk-gold2) 18%,var(--hk-surface)),color-mix(in srgb,var(--hk-p) 6%,var(--hk-surface)));border:1.5px solid color-mix(in srgb,var(--hk-gold) 42%,var(--hk-line));display:grid;gap:14px}
+.hk-winners-box .wb-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.hk-win-ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(135deg,var(--hk-gold),var(--hk-gold2));color:#2a1c00;flex:none;box-shadow:0 6px 14px -8px rgba(201,138,16,.7)}
+.hk-win-ic i{width:19px;height:19px}
+.hk-winners-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:12px}
+.hk-winner-card{padding:14px;border-radius:15px;background:var(--hk-surface);border:1.5px solid color-mix(in srgb,var(--hk-gold) 38%,var(--hk-line));display:grid;gap:6px;box-shadow:var(--hk-shadow-sm)}
+.hk-winner-card .wc-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:2px}
+.hk-winner-card .wc-scores{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.hk-winner-card .wc-acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:10px;border-top:1px dashed var(--hk-line)}
+
+.hk-lb-table th,.hk-lb-table td{vertical-align:middle}
+.hk-row-winner td{background:color-mix(in srgb,var(--hk-gold2) 9%,var(--hk-surface))}
+.hk-row-winner td.act{background:color-mix(in srgb,var(--hk-gold2) 12%,var(--hk-surface))}
+.hk-row-winner:hover td,.hk-row-winner:hover td.act{background:color-mix(in srgb,var(--hk-gold2) 15%,var(--hk-surface))}
+
+.hk-crit-meter{display:grid;gap:5px;min-width:96px}
+.hk-crit-meter b{font-family:var(--hk-mono);font-size:.82rem;color:var(--hk-ink);line-height:1.1}
+.hk-crit-meter .bar{height:7px;border-radius:99px;background:var(--hk-surface2);border:1px solid var(--hk-line);overflow:hidden}
+.hk-crit-meter .bar>i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--hk-p),var(--hk-gold2));transition:width .35s var(--hk-ease)}
+
+@media (max-width:640px){
+  .hk-rev-banner .hk-chseg{width:100%;display:grid;grid-template-columns:1fr 1fr}
+  .hk-rev-banner .hk-chseg button{justify-content:center}
+  .hk-winners-grid{grid-template-columns:1fr}
+  .hk-winners-box .wb-head .hk-btn{width:100%}
+}
