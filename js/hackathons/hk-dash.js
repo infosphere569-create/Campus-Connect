@@ -290,19 +290,23 @@ export async function dash(cx, hid){
         const total = att.total ?? meta.total ?? 0;
         const pct = total ? Math.round(((att.score ?? 0) / total) * 100) : 0;
         const ansCount = att.answers ? Object.keys(att.answers).length : (att.correctCount != null ? (att.correctCount + (att.wrongCount || 0)) : null);
-        const reasonText = att.submitReason && att.submitReason !== 'manual' ? ` · ${att.submitReason === 'time_up' ? 'Auto-submitted (Time ended)' : 'Auto-submitted (Proctor alert)'}` : '';
+        const reasonChip = att.submitReason === 'time_up'
+          ? '<span class="hk-chip gold"><i data-lucide="timer"></i>Auto-submitted · Time Up</span>'
+          : att.submitReason === 'tab_switch'
+            ? '<span class="hk-chip bad"><i data-lucide="log-out"></i>Auto-submitted · Left Tab</span>'
+            : '<span class="hk-chip"><i data-lucide="circle-check"></i>Test Submitted</span>';
 
         body = `<div class="hk-test-done">
           <div class="td-head">
-            <span class="hk-chip"><i data-lucide="circle-check"></i>Test Submitted</span>
-            <span class="hk-xs hk-muted">${C.fmtDT(att.submittedAtMs)} (${C.ago(att.submittedAtMs)})${esc(reasonText)}</span>
+            ${reasonChip}
+            <span class="hk-xs hk-muted">${C.fmtDT(att.submittedAtMs)} (${C.ago(att.submittedAtMs)})</span>
           </div>
           ${ansCount != null ? `<div class="hk-kv-grid">
-            <div class="hk-kv-item"><small>Questions Attempted</small><b>${ansCount} / ${meta.count}</b></div>
-            <div class="hk-kv-item"><small>Duration</small><b>${meta.durationMin} minutes</b></div>
-          </div>` : ''}
+            <div class="hk-kv-item"><small>Progress Saved</small><b>${ansCount} / ${meta.count} Answered</b></div>
+            <div class="hk-kv-item"><small>Result Reveal Time</small><b>${revMs > 0 ? C.fmtDT(revMs) : 'Immediate'}</b></div>
+          </div>` : `<div class="hk-kv-grid"><div class="hk-kv-item"><small>Result Reveal Time</small><b>${revMs > 0 ? C.fmtDT(revMs) : 'Immediate'}</b></div></div>`}
           ${scoreHidden
-            ? `<div class="hk-countdown gold"><i data-lucide="clock"></i><span>Results &amp; points reveal at ${C.fmtDT(revMs)}</span><span class="tval" data-cd="${revMs}">${C.countdownText(revMs, now)}</span></div>`
+            ? `<div class="hk-countdown gold"><i data-lucide="clock"></i><span>Results &amp; points reveal on ${C.fmtDT(revMs)}</span><span class="tval" data-cd="${revMs}">${C.countdownText(revMs, now)}</span></div>`
             : `<div class="hk-test-scorebox">
                 <div class="ts-main">
                   <small class="hk-eyebrow">Your Test Result</small>
@@ -328,19 +332,29 @@ export async function dash(cx, hid){
           <div class="hk-countdown"><i data-lucide="clock"></i><span>Test starts at ${C.fmtDT(meta.startMs)}</span><span class="tval" data-cd="${meta.startMs}">${C.countdownText(meta.startMs, now)}</span></div>
         </div>`;
       } else {
-        body = `<div class="hk-stack" style="gap:12px">
-          <div class="hk-kv-grid">
-            <div class="hk-kv-item"><small>Format</small><b>${meta.count} Questions · ${meta.total} Marks</b></div>
-            <div class="hk-kv-item"><small>Time Limit</small><b>${meta.durationMin} min (Unpausable)</b></div>
-          </div>
-          ${meta.endMs ? `<div class="hk-countdown"><i data-lucide="timer"></i><span>Window closes ${C.fmtDT(meta.endMs)}</span><span class="tval" data-cd="${meta.endMs}">${C.countdownText(meta.endMs, now)}</span></div>` : ''}
-          <ul class="hk-test-rules">
-            <li><i data-lucide="zap"></i><span>Single attempt per team; answers auto-save continuously.</span></li>
-            <li><i data-lucide="shield-alert"></i><span>Switching tabs, leaving the screen, or pressing Back triggers a warning and auto-submits on repeat.</span></li>
-            <li><i data-lucide="clock"></i><span>Auto-submits immediately when your timer reaches 00:00.</span></li>
-          </ul>
-          <button type="button" class="hk-btn primary lg block" data-start><i data-lucide="play"></i>${att ? 'Resume Test Now' : 'Start Test'}</button>
-        </div>`;
+        const attDeadline = att ? Math.min(att.startedAtMs + ((+meta.durationMin || 30) * 60000), meta.endMs || Infinity) : 0;
+        const attExpiredGrace = att && attDeadline && now > attDeadline && now <= attDeadline + 60000;
+        const attExpiredLost = att && attDeadline && now > attDeadline + 60000;
+        if(attExpiredLost){
+          body = `<div class="hk-stack" style="gap:10px">
+            <div class="hk-msg err"><i data-lucide="timer-off"></i><span>Your test timer ended on ${C.fmtDT(attDeadline)} before final submission completed.</span></div>
+            ${revMs > 0 ? `<div class="hk-kv-grid"><div class="hk-kv-item"><small>Scheduled Result Reveal</small><b>${C.fmtDT(revMs)}</b></div></div>` : ''}
+          </div>`;
+        } else {
+          body = `<div class="hk-stack" style="gap:12px">
+            <div class="hk-kv-grid">
+              <div class="hk-kv-item"><small>Format</small><b>${meta.count} Questions · ${meta.total} Marks</b></div>
+              <div class="hk-kv-item"><small>Time Limit · Reveal</small><b>${meta.durationMin} min · ${revMs > 0 ? C.fmtDT(revMs) : 'Instant'}</b></div>
+            </div>
+            ${meta.endMs ? `<div class="hk-countdown"><i data-lucide="timer"></i><span>Window closes ${C.fmtDT(meta.endMs)}</span><span class="tval" data-cd="${meta.endMs}">${C.countdownText(meta.endMs, now)}</span></div>` : ''}
+            <ul class="hk-test-rules">
+              <li><i data-lucide="zap"></i><span>Single attempt per team; answers auto-save continuously as you mark them.</span></li>
+              <li><i data-lucide="shield-alert"></i><span>Leaving the test tab or closing the window immediately saves your progress and auto-submits your test.</span></li>
+              <li><i data-lucide="clock"></i><span>Automatically saves &amp; finalizes when the timer hits 00:00, then displays your result reveal time.</span></li>
+            </ul>
+            <button type="button" class="hk-btn primary lg block" data-start><i data-lucide="play"></i>${attExpiredGrace ? 'Finalize Saved Progress Now' : att ? 'Resume Test Now' : 'Start Test'}</button>
+          </div>`;
+        }
       }
 
       testCard = `<section class="hk-card-s hk-dcard hk-test-card-clean" id="testCard">
@@ -763,28 +777,54 @@ async function runTest(cx, h, meta, done){
   const { view } = cx;
   const loadEl = view;
   const startBtn = $('[data-start]');
+  const prevBtnHtml = startBtn ? startBtn.innerHTML : '';
   if(startBtn){ startBtn.disabled = true; startBtn.innerHTML = '<span class="hk-spin"></span> Starting test…'; }
 
   let t;
   try { t = await C.callFn('hkStartTest', { hackathonId: h.id }); }
   catch(e){
-    if(startBtn){ startBtn.disabled = false; startBtn.innerHTML = '<i data-lucide="play"></i>Start Test'; icons(); }
+    if(startBtn){ startBtn.disabled = false; startBtn.innerHTML = prevBtnHtml || '<i data-lucide="play"></i>Start Test'; icons(); }
     return toast(e.message, 'error');
   }
+  cx.S.cleanup?.();
+  cx.S.cleanup = null;
 
   const draftKey = `hk-test-draft-${h.id}_${cx.S.user.uid}`;
-  let ans = {};
-  try {
-    const saved = JSON.parse(localStorage.getItem(draftKey) || '{}');
-    if(saved && typeof saved === 'object') ans = saved;
-  } catch {}
-
   const qs = t.questions || [];
-  let i = 0, timer = 0, over = false, warnings = 0, warnModal = null, lastViolationAt = 0;
+  let ans = {};
+  let i = 0, timer = 0, backupTimer = 0, over = false, warnings = 0, warnModal = null, lastViolationAt = 0, stopFinalCd = null;
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(draftKey) || 'null');
+    if(saved && typeof saved === 'object'){
+      const loadedAns = saved.answers && typeof saved.answers === 'object' ? saved.answers : saved;
+      Object.entries(loadedAns).forEach(([k, v]) => {
+        if(Number.isInteger(v)) ans[k] = v;
+      });
+      if(Number.isInteger(saved.i) && saved.i >= 0 && saved.i < qs.length) i = saved.i;
+    }
+  } catch {}
 
   const left = () => Math.max(0, Math.floor((t.deadlineMs - Date.now()) / 1000));
   const fmt = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
-  const saveDraft = () => { try { localStorage.setItem(draftKey, JSON.stringify(ans)); } catch {} };
+  const flashSavedPill = () => {
+    const el = $('#draftSavedPill');
+    if(!el) return;
+    el.innerHTML = '<i data-lucide="cloud-check"></i>Progress saved';
+    el.classList.add('saved');
+    icons(el);
+  };
+  const saveDraft = () => {
+    try {
+      localStorage.setItem(draftKey, JSON.stringify({
+        answers: ans,
+        i,
+        savedAtMs: Date.now(),
+        deadlineMs: t.deadlineMs || 0
+      }));
+      flashSavedPill();
+    } catch {}
+  };
 
   // Build static shell once for zero-lag switching & option toggling
   loadEl.innerHTML = `<div class="hk-view hk-test">
@@ -794,13 +834,14 @@ async function runTest(cx, h, meta, done){
         <div class="th-sub"><b id="qProg">Question 1 of ${qs.length}</b> · <span id="ansCount" class="hk-muted">0/${qs.length} answered</span></div>
       </div>
       <div class="th-right">
-        <span class="hk-chip neutral" id="warnPill"><i data-lucide="shield-check"></i>Proctored · <span id="warnCnt">0</span>/1</span>
+        <span class="hk-chip neutral" id="draftSavedPill"><i data-lucide="cloud-check"></i>Auto-saving</span>
+        <span class="hk-chip neutral" id="warnPill"><i data-lucide="shield-alert"></i>Auto-submit on tab leave</span>
         <span class="hk-timer" id="tleft">${fmt(left())}</span>
         <button type="button" class="hk-btn sm gold" data-finish><i data-lucide="send"></i>Submit</button>
       </div>
     </div>
-    <div class="hk-progress"><i id="qBar" style="width:${Math.round((1 / Math.max(1, qs.length)) * 100)}%"></i></div>
-    <div class="hk-qpal" id="qPal">${qs.map((q, idx) => `<button type="button" class="hk-qdot ${idx === 0 ? 'cur' : ''} ${ans[q.id] !== undefined ? 'ans' : ''}" data-qidx="${idx}">${idx + 1}</button>`).join('')}</div>
+    <div class="hk-progress"><i id="qBar" style="width:${Math.round(((i + 1) / Math.max(1, qs.length)) * 100)}%"></i></div>
+    <div class="hk-qpal" id="qPal">${qs.map((q, idx) => `<button type="button" class="hk-qdot ${idx === i ? 'cur' : ''} ${ans[q.id] !== undefined ? 'ans' : ''}" data-qidx="${idx}">${idx + 1}</button>`).join('')}</div>
     <section class="hk-card-s hk-dcard hk-test-qbox" id="qBox"></section>
     <div class="hk-test-nav">
       <button type="button" class="hk-btn" data-prev disabled><i data-lucide="arrow-left"></i>Previous</button>
@@ -811,7 +852,7 @@ async function runTest(cx, h, meta, done){
   icons();
 
   const qBox = $('#qBox', view), qProg = $('#qProg', view), ansCountEl = $('#ansCount', view);
-  const qBar = $('#qBar', view), qPal = $('#qPal', view), warnCnt = $('#warnCnt', view), warnPill = $('#warnPill', view);
+  const qBar = $('#qBar', view), qPal = $('#qPal', view), warnPill = $('#warnPill', view);
   const prevBtn = $('[data-prev]', view), nextBtn = $('[data-next]', view);
 
   const updateCounts = () => {
@@ -851,8 +892,9 @@ async function runTest(cx, h, meta, done){
 
   const teardownListeners = () => {
     clearInterval(timer);
+    clearInterval(backupTimer);
     document.removeEventListener('visibilitychange', onVis);
-    window.removeEventListener('blur', onBlur);
+    window.removeEventListener('pagehide', onPageHide);
     window.removeEventListener('popstate', onPop);
     window.removeEventListener('hashchange', onHash);
     window.removeEventListener('beforeunload', onBeforeUnload);
@@ -860,43 +902,135 @@ async function runTest(cx, h, meta, done){
     warnModal = null;
   };
 
+  const renderFinalizedView = ({ reason, result, errMsg, revMs, submittedAtMs, answeredCount }) => {
+    const now = Date.now();
+    const hidePts = revMs > 0 && now < revMs;
+    const isTime = reason === 'time_up';
+    const isTab = reason === 'tab_switch';
+    const badgeHtml = isTime
+      ? '<span class="hk-chip gold"><i data-lucide="timer"></i>Auto-Submitted · Timer Hit 00:00</span>'
+      : isTab
+        ? '<span class="hk-chip bad"><i data-lucide="log-out"></i>Auto-Submitted · Tab Left</span>'
+        : '<span class="hk-chip"><i data-lucide="circle-check"></i>Test Finalized</span>';
+    const headline = isTime
+      ? 'Time is up — your test has been auto-submitted'
+      : isTab
+        ? 'You left the test tab — progress saved & auto-submitted'
+        : 'Your test has been saved and finalized';
+
+    const revealSection = revMs > 0
+      ? (hidePts
+          ? `<div class="hk-countdown gold"><i data-lucide="clock"></i><span>Result Reveal Time: <b>${C.fmtDT(revMs)}</b></span><span class="tval" data-cd="${revMs}">${C.countdownText(revMs, now)}</span></div>
+             <p class="hk-xs hk-muted" style="margin:6px 0 0">Your score is sealed until ${C.fmtDT(revMs)}. You can safely track the countdown here or on your dashboard.</p>`
+          : `<div class="hk-msg ok"><i data-lucide="sparkles"></i><span>Results were scheduled to reveal on <b>${C.fmtDT(revMs)}</b> and are now unlocked below.</span></div>`)
+      : `<div class="hk-msg ok"><i data-lucide="sparkles"></i><span><b>Result Reveal Time:</b> Immediate (${C.fmtDT(submittedAtMs)})</span></div>`;
+
+    const scoreSection = (!hidePts && result && typeof result.score === 'number')
+      ? `<div class="hk-test-scorebox" style="margin-top:12px">
+          <div class="ts-main">
+            <small class="hk-eyebrow">Your Final Score</small>
+            <b>${result.score} <small>/ ${result.total} pts (${result.total ? Math.round((result.score / result.total) * 100) : 0}%)</small></b>
+          </div>
+        </div>`
+      : '';
+
+    view.innerHTML = `<div class="hk-view">
+      <section class="hk-card-s hk-dcard hk-test-final">
+        <div class="td-head">${badgeHtml}<span class="hk-xs hk-muted">${C.fmtDT(submittedAtMs)}</span></div>
+        <h2 style="margin:10px 0 6px;font-size:1.25rem">${headline}</h2>
+        <div class="hk-kv-grid" style="margin:12px 0">
+          <div class="hk-kv-item"><small>Progress Saved &amp; Finalized</small><b>${answeredCount} / ${qs.length} Answered</b></div>
+          <div class="hk-kv-item"><small>Result Reveal Time</small><b>${revMs > 0 ? C.fmtDT(revMs) : 'Immediate'}</b></div>
+        </div>
+        ${errMsg ? `<div class="hk-msg err" style="margin-bottom:10px"><i data-lucide="wifi-off"></i><span>${esc(errMsg)}</span></div>` : ''}
+        ${revealSection}
+        ${scoreSection}
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;margin-top:16px">
+          ${errMsg ? `<button type="button" class="hk-btn primary" id="retrySubBtn"><i data-lucide="refresh-cw"></i>Retry Finalize Submission</button>` : ''}
+          <button type="button" class="hk-btn ${errMsg ? '' : 'primary'}" id="testDoneBtn"><i data-lucide="layout-dashboard"></i>Back to Hackathon Dashboard</button>
+        </div>
+      </section>
+    </div>`;
+    icons(view);
+    stopFinalCd?.();
+    stopFinalCd = startCountdowns(view);
+
+    $('#retrySubBtn', view)?.addEventListener('click', () => {
+      over = false;
+      finish(true, reason);
+    });
+    $('#testDoneBtn', view)?.addEventListener('click', () => {
+      stopFinalCd?.();
+      done();
+    });
+  };
+
   const finish = async (auto, reason = 'manual') => {
     if(over) return;
     over = true;
+    saveDraft();
     teardownListeners();
-    try { localStorage.removeItem(draftKey); } catch {}
-    view.innerHTML = '<div class="hk-view"><div class="hk-card-s" style="text-align:center;padding:40px"><span class="hk-spin" style="margin:0 auto 12px;display:block"></span><b>Submitting your test securely…</b><p class="hk-sm hk-muted" style="margin-top:6px">Grading responses on the server.</p></div></div>';
+
+    const answeredCount = qs.filter(q => ans[q.id] !== undefined).length;
+    const revMs = Number(t.resultRevealMs || meta?.resultRevealMs || 0);
+    const submittingMsg = reason === 'time_up'
+      ? 'Time hit 00:00 — saving progress & finalizing submission…'
+      : reason === 'tab_switch'
+        ? 'Tab leave detected — saving progress & auto-submitting…'
+        : 'Saving answers & finalizing your submission…';
+
+    view.innerHTML = `<div class="hk-view"><div class="hk-card-s" style="text-align:center;padding:40px"><span class="hk-spin" style="margin:0 auto 12px;display:block"></span><b>${submittingMsg}</b><p class="hk-sm hk-muted" style="margin-top:6px">Grading responses securely and loading result reveal time.</p></div></div>`;
+
     try {
-      const r = await C.callFn('hkSubmitTest', { hackathonId: h.id, answers: ans, tabSwitches: warnings, submitReason: reason });
-      const revMs = Number(t.resultRevealMs || meta?.resultRevealMs || 0);
-      const hidePts = revMs > 0 && Date.now() < revMs;
-      const prefix = reason === 'time_up' ? 'Time up — auto-submitted! ' : reason === 'tab_switch' ? 'Auto-submitted due to leaving test screen! ' : 'Test submitted! ';
+      const r = await C.callFn('hkSubmitTest', {
+        hackathonId: h.id,
+        answers: ans,
+        tabSwitches: reason === 'tab_switch' ? Math.max(1, warnings) : warnings,
+        submitReason: reason
+      });
+      try { localStorage.removeItem(draftKey); } catch {}
+      const submittedAtMs = Date.now();
+      const hidePts = revMs > 0 && submittedAtMs < revMs;
+      const prefix = reason === 'time_up' ? 'Time up — auto-submitted! ' : reason === 'tab_switch' ? 'Tab left — auto-submitted! ' : 'Test submitted! ';
       toast(hidePts ? `${prefix}Results reveal on ${C.fmtDT(revMs)}.` : `${prefix}Score ${r.score} / ${r.total}`);
+      renderFinalizedView({ reason, result: r, revMs, submittedAtMs, answeredCount });
     } catch(e){
-      toast(e.message, 'error');
+      const msg = String(e?.message || 'Submission could not complete.');
+      if(/already submitted/i.test(msg)){
+        try { localStorage.removeItem(draftKey); } catch {}
+        renderFinalizedView({ reason, result: null, revMs, submittedAtMs: Date.now(), answeredCount });
+        return;
+      }
+      toast(msg, 'error');
+      renderFinalizedView({
+        reason,
+        result: null,
+        errMsg: `${msg} Your ${answeredCount} answer(s) remain safely saved on this device — tap Retry below.`,
+        revMs,
+        submittedAtMs: Date.now(),
+        answeredCount
+      });
     }
-    done();
   };
 
-  const triggerViolation = (kind) => {
+  const triggerBackGuard = () => {
     if(over) return;
     const nowMs = Date.now();
-    if(nowMs - lastViolationAt < 1100) return;
+    if(nowMs - lastViolationAt < 900) return;
     lastViolationAt = nowMs;
     warnings++;
-    if(warnCnt) warnCnt.textContent = String(warnings);
+    saveDraft();
     if(warnPill){ warnPill.className = 'hk-chip bad'; }
 
     if(warnings >= 2){
       finish(true, 'tab_switch');
       return;
     }
-
     if(!warnModal){
-      warnModal = C.modal('⚠️ Test Warning (1 of 2)', `<div class="hk-stack">
-        <div class="hk-msg err"><i data-lucide="shield-alert"></i><span><b>${kind === 'back' ? 'Back navigation blocked!' : 'Tab / Window switch detected!'}</b> Leaving or switching away from the test is not allowed. On the next violation your test will be <b>automatically submitted</b>.</span></div>
+      warnModal = C.modal('⚠️ Confirm Exit or Return to Test', `<div class="hk-stack">
+        <div class="hk-msg err"><i data-lucide="shield-alert"></i><span><b>Back navigation blocked!</b> Leaving the test automatically saves your progress and submits your current answers.</span></div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end">
-          <button type="button" class="hk-btn danger sm" id="wAutoSub">Submit &amp; Exit Now</button>
+          <button type="button" class="hk-btn danger sm" id="wAutoSub">Save Progress &amp; Submit Now</button>
           <button type="button" class="hk-btn primary" id="wResume">Return to Test</button>
         </div>
       </div>`, {
@@ -908,32 +1042,48 @@ async function runTest(cx, h, meta, done){
     }
   };
 
-  // Push a state entry so Back button stays in test and fires warning instead of leaving silently
+  // Push a state entry so Back button stays in test unless confirmed
   try { history.pushState({ hkTest: h.id }, '', location.href); } catch {}
   const onPop = () => {
     if(over) return;
     try { history.pushState({ hkTest: h.id }, '', location.href); } catch {}
-    triggerViolation('back');
+    triggerBackGuard();
   };
   const onHash = () => {
     if(over) return;
     if(!location.hash.includes(h.id)){
       try { history.replaceState({ hkTest: h.id }, '', `#/my/${h.id}`); } catch {}
     }
-    triggerViolation('back');
+    triggerBackGuard();
   };
-  const onVis = () => { if(document.hidden && !over) triggerViolation('tab'); };
-  const onBlur = () => {
-    setTimeout(() => {
-      if(!over && !document.hasFocus()) triggerViolation('tab');
-    }, 250);
+  // Leaving the tab immediately saves progress and finalizes submission
+  const onVis = () => {
+    if(over) return;
+    if(document.hidden || document.visibilityState === 'hidden'){
+      warnings++;
+      saveDraft();
+      finish(true, 'tab_switch');
+    } else if(left() <= 0){
+      saveDraft();
+      finish(true, 'time_up');
+    }
+  };
+  const onPageHide = () => {
+    if(over) return;
+    warnings++;
+    saveDraft();
+    finish(true, 'tab_switch');
   };
   const onBeforeUnload = e => {
-    if(!over){ e.preventDefault(); e.returnValue = ''; }
+    if(!over){
+      saveDraft();
+      e.preventDefault();
+      e.returnValue = '';
+    }
   };
 
   document.addEventListener('visibilitychange', onVis);
-  window.addEventListener('blur', onBlur);
+  window.addEventListener('pagehide', onPageHide);
   window.addEventListener('popstate', onPop);
   window.addEventListener('hashchange', onHash);
   window.addEventListener('beforeunload', onBeforeUnload);
@@ -955,6 +1105,7 @@ async function runTest(cx, h, meta, done){
     const qd = e.target.closest('[data-qidx]');
     if(qd){
       i = +qd.dataset.qidx;
+      saveDraft();
       renderQuestion();
       return;
     }
@@ -966,7 +1117,7 @@ async function runTest(cx, h, meta, done){
       updateCounts();
       return;
     }
-    if(e.target.closest('[data-prev]') && i > 0){ i--; renderQuestion(); return; }
+    if(e.target.closest('[data-prev]') && i > 0){ i--; saveDraft(); renderQuestion(); return; }
     if(e.target.closest('[data-finish]')){
       const un = qs.filter(q => ans[q.id] === undefined).length;
       if(!un){ finish(false, 'manual'); return; }
@@ -984,23 +1135,34 @@ async function runTest(cx, h, meta, done){
       });
       return;
     }
-    if(e.target.closest('[data-next]') && i < qs.length - 1){ i++; renderQuestion(); }
+    if(e.target.closest('[data-next]') && i < qs.length - 1){ i++; saveDraft(); renderQuestion(); }
   };
 
-  timer = setInterval(() => {
+  const updateTimerTick = () => {
     const s = left();
     const el = $('#tleft');
     if(el){
       el.textContent = fmt(s);
+      el.classList.toggle('warn', s <= 120 && s > 60);
       el.classList.toggle('low', s <= 60);
     }
     if(s <= 0) finish(true, 'time_up');
-  }, 1000);
+  };
+
+  timer = setInterval(updateTimerTick, 1000);
+  backupTimer = setInterval(() => { if(!over) saveDraft(); }, 5000);
 
   cx.S.cleanup = () => {
-    teardownListeners();
+    if(!over){
+      saveDraft();
+      finish(true, left() <= 0 ? 'time_up' : 'tab_switch');
+    } else {
+      teardownListeners();
+      stopFinalCd?.();
+    }
     view.onclick = null;
   };
   updateCounts();
   renderQuestion();
+  updateTimerTick();
 }

@@ -1534,3 +1534,8 @@ i[data-lucide]>svg{width:100%;height:100%;display:block}
   .hk-test-scorebox{flex-direction:column;align-items:flex-start}
 }
 
+#draftSavedPill.saved{background:color-mix(in srgb,var(--hk-p) 14%,var(--hk-surface));color:var(--hk-p);border-color:color-mix(in srgb,var(--hk-p) 35%,var(--hk-line))}
+.hk-timer.warn{background:color-mix(in srgb,var(--hk-gold) 18%,var(--hk-surface));color:var(--hk-gold);border-color:color-mix(in srgb,var(--hk-gold) 45%,var(--hk-line))}
+.hk-test-final .td-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+
+
