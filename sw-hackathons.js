@@ -1,5 +1,5 @@
-// Campus Connect One Hackathons Service Worker v2
-const CACHE_VERSION = 'hk-pwa-v2';
+// Campus Connect One Hackathons Service Worker v3
+const CACHE_VERSION = 'hk-pwa-v3';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 

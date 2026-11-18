@@ -27,9 +27,7 @@ function buildHkInstallBanner() {
     + 'background:#0b1410;border:1px solid #178a54;'
     + 'box-shadow:0 18px 50px rgba(0,0,0,.55);animation:hkInstallUp .25s ease;max-width:540px;margin:0 auto;color:#fff;';
   bar.innerHTML = `
-    <div style="width:40px;height:40px;border-radius:12px;background:#178a54;display:grid;place-items:center;flex:0 0 auto;color:#fff">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
-    </div>
+    <img src="icon/icon-hackathons.png" onerror="this.src='icon.png'" alt="Hackathons App" width="42" height="42" style="width:42px;height:42px;border-radius:12px;object-fit:cover;flex:0 0 auto;box-shadow:0 4px 12px rgba(23,138,84,.35)">
     <div style="flex:1;min-width:0">
       <strong style="display:block;font-size:.92rem;color:#fff">Install Hackathons App</strong>
       <span style="font-size:.8rem;color:#98a0b3">Launch campus hackathons instantly from your home screen.</span>

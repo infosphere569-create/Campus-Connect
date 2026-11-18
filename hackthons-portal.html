@@ -2,32 +2,43 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<script>(function(){try{var v=localStorage.getItem("cc-theme")||"system";document.documentElement.dataset.theme=v==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):v;}catch(e){}})();</script>
+<script>(function(){
+  try{var v=localStorage.getItem("cc-theme")||"system";document.documentElement.dataset.theme=v==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):v;}catch(e){}
+  try{
+    var isPWA=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone||Boolean(navigator.userAgent.match(/wv|PWA/i))||new URLSearchParams(location.search).get('pwa')==='1';
+    if(isPWA){document.documentElement.classList.add('is-standalone-pwa');}
+  }catch(e){}
+})();</script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Hackathons — Campus Connect One</title>
 <meta name="robots" content="noindex,nofollow">
 <meta name="theme-color" content="#178a54">
-<link rel="icon" type="image/png" href="icon.png"><link rel="apple-touch-icon" href="icon.png"><link rel="manifest" href="manifest-hackathons.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Hackathons">
+<link rel="icon" type="image/png" href="icon/icon-hackathons.png"><link rel="apple-touch-icon" href="icon/icon-hackathons-192.png"><link rel="manifest" href="manifest-hackathons.json">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/hackathons.css">
 <style>
-#hkSplash{position:fixed;inset:0;background:#0b1410;z-index:999999;display:grid;place-items:center;transition:opacity .4s ease,visibility .4s ease}
+#hkSplash{display:none}
+.is-standalone-pwa #hkSplash{position:fixed;inset:0;background:#0b1410;z-index:999999;display:grid;place-items:center;transition:opacity .4s ease,visibility .4s ease}
 #hkSplash.fade-out{opacity:0;visibility:hidden}
 .hk-splash-box{text-align:center;display:grid;justify-items:center;gap:12px;animation:hkSplashBounce .8s cubic-bezier(0.175, 0.885, 0.32, 1.275) both}
-.hk-splash-box h2{color:#fff;font-size:1.4rem;font-weight:800;margin:0;letter-spacing:-.02em}
-.hk-splash-box span{color:#98a0b3;font-size:.85rem;font-weight:600}
+.hk-splash-box h2{color:#fff;font-size:1.35rem;font-weight:800;margin:0;letter-spacing:-.02em}
+.hk-splash-tag{color:#a3e3c2;font-size:.84rem;font-weight:700;display:inline-flex;align-items:center;gap:6px;letter-spacing:.08em;text-transform:uppercase}
 @keyframes hkSplashBounce{from{transform:scale(0.85);opacity:0}to{transform:none;opacity:1}}
 </style>
 </head>
 <body class="hk-body" data-page="hk-portal">
 <div id="hkSplash">
   <div class="hk-splash-box">
-    <div style="width:76px;height:76px;border-radius:22px;background:#178a54;display:grid;place-items:center;color:#fff;box-shadow:0 12px 36px rgba(23,138,84,.45)">
-      <svg viewBox="0 0 24 24" width="38" height="38" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+    <div class="hk-splash-icon">
+      <img src="icon/icon-hackathons.png" onerror="this.src='icon.png'" alt="Campus Connect One Hackathons logo" width="84" height="84">
     </div>
     <h2>Campus Connect One</h2>
-    <span>Hackathons Portal</span>
+    <span class="hk-splash-tag"><i data-lucide="terminal"></i> Hackathons</span>
   </div>
 </div>
 
@@ -53,12 +64,20 @@
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => { navigator.serviceWorker.register('sw-hackathons.js').catch(() => {}); });
 }
-window.addEventListener('DOMContentLoaded', () => {
-  setTimeout(() => {
-    const sp = document.getElementById('hkSplash');
-    if(sp) { sp.classList.add('fade-out'); setTimeout(() => sp.remove(), 400); }
-  }, 900);
-});
+(function(){
+  var sp = document.getElementById('hkSplash');
+  var isPwa = document.documentElement.classList.contains('is-standalone-pwa');
+  if(!isPwa || sessionStorage.getItem('hk-splash-shown')){
+    if(sp) sp.remove();
+    return;
+  }
+  sessionStorage.setItem('hk-splash-shown', '1');
+  window.addEventListener('DOMContentLoaded', function(){
+    setTimeout(function(){
+      if(sp){ sp.classList.add('fade-out'); setTimeout(function(){ sp.remove(); }, 400); }
+    }, 900);
+  });
+})();
 </script>
 <script src="js/hackathons/hk-icons.js"></script>
 <script type="module" src="js/hackathons/hk-portal.js"></script>
