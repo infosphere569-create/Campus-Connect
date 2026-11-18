@@ -27,8 +27,24 @@ export async function manage(cx, id){
     email: S.hk?.orgEmail || h.contactEmail || h.hostEmail || S.user?.email || '',
     phone: S.hk?.orgPhone || h.contactPhone || h.organiser?.phone || ''
   };
-  const subOf = uid => subs.find(x => x.uid === uid), attOf = uid => atts.find(x => x.uid === uid);
-  const sel = new Set(); let tab = 'regs', q = '', fs = '', fr = '';
+  const subOf = uid => subs.find(x => x.uid === uid), attOf = uid => atts.find(x => x.uid === uid), regOf = uid => regs.find(x => x.uid === uid);
+  const evalMetrics = uid => {
+    const att = attOf(uid), sub = subOf(uid);
+    const testScore = att?.submittedAtMs ? Number(att.score ?? 0) : null;
+    const testTotal = att?.total ?? meta?.total ?? 0;
+    const testPct = testScore != null && testTotal > 0 ? Math.round((testScore / testTotal) * 100) : null;
+    const subScore = sub?.score != null ? Number(sub.score) : null;
+    let combined = -1;
+    if(subScore != null && testPct != null) combined = Math.round((subScore * 0.7) + (testPct * 0.3));
+    else if(subScore != null) combined = subScore;
+    else if(testPct != null) combined = testPct;
+    return { att, sub, testScore, testTotal, testPct, subScore, combined };
+  };
+  const sel = new Set();
+  const subSel = new Set(), testSel = new Set();
+  let tab = 'regs', q = '', fs = '', fr = '', regSort = 'recent';
+  let subQ = '', subFilter = 'all', subSort = 'score_desc', topSubN = 5, subCut = 75;
+  let testQ = '', testFilter = 'attempted', testSort = 'score_desc', topTestN = 5, testCut = 60;
   const ph = C.phase(h), roundName = i => rounds[i]?.name || (rounds.length ? 'Completed' : '—');
   const slug = (h.title || 'hackathon').replace(/[^\w]+/g, '-').toLowerCase();
 
@@ -157,7 +173,14 @@ export async function manage(cx, id){
     return { ok: true, mode: 'platform', mail };
   }
 
-  const filtered = () => regs.filter(r => (!fs || r.status === fs) && (fr === '' || (r.stage || 0) === +fr) && (!q || [r.name, r.email, r.phone, r.college, r.teamName, ...(r.members || []).map(m => m.name)].join(' ').toLowerCase().includes(q)));
+  const filtered = () => {
+    const list = regs.filter(r => (!fs || r.status === fs) && (fr === '' || (r.stage || 0) === +fr) && (!q || [r.name, r.email, r.phone, r.college, r.teamName, ...(r.members || []).map(m => m.name)].join(' ').toLowerCase().includes(q)));
+    if(regSort === 'combined_desc') return [...list].sort((a, b) => evalMetrics(b.uid).combined - evalMetrics(a.uid).combined || (b.createdAtMs || 0) - (a.createdAtMs || 0));
+    if(regSort === 'sub_desc') return [...list].sort((a, b) => (evalMetrics(b.uid).subScore ?? -1) - (evalMetrics(a.uid).subScore ?? -1) || (b.createdAtMs || 0) - (a.createdAtMs || 0));
+    if(regSort === 'test_desc') return [...list].sort((a, b) => (evalMetrics(b.uid).testPct ?? -1) - (evalMetrics(a.uid).testPct ?? -1) || (b.createdAtMs || 0) - (a.createdAtMs || 0));
+    if(regSort === 'name_asc') return [...list].sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    return list;
+  };
   const mailBtn = r => {
     const sent = M.isMailSent(r, null, localMail);
     const lastTs = M.lastMailTimestamp(r, null, localMail);
@@ -167,37 +190,295 @@ export async function manage(cx, id){
       : `<button class="hk-mailbtn" data-mail="${esc(r.id)}" title="Open smart email composer" aria-label="Notify team"><i data-lucide="mail"></i><span>Mail</span></button>`;
   };
 
-  const row = r => { const s = subOf(r.uid), a = attOf(r.uid); return `<tr class="${sel.has(r.id) ? 'sel' : ''}">
+  const row = (r, idx) => { const em = evalMetrics(r.uid), s = em.sub, a = em.att; const rankBadge = regSort !== 'recent' && regSort !== 'name_asc' && em.combined >= 0 ? `<span class="hk-rank ${idx < 3 ? 'top' + (idx + 1) : ''}">#${idx + 1}</span> ` : ''; return `<tr class="${sel.has(r.id) ? 'sel' : ''}">
     <td><input type="checkbox" data-sel="${esc(r.id)}" ${sel.has(r.id) ? 'checked' : ''} aria-label="Select ${esc(r.name)}"></td>
-    <td><button type="button" data-prof="${esc(r.id)}" style="background:none;border:0;padding:0;text-align:left;font:inherit;color:inherit;cursor:pointer"><b style="text-decoration:underline;text-underline-offset:2px">${esc(r.name)}</b></button><div class="hk-xs hk-muted">${esc(r.email)} · ${esc(r.phone)}</div></td>
+    <td>${rankBadge}<button type="button" data-prof="${esc(r.id)}" style="background:none;border:0;padding:0;text-align:left;font:inherit;color:inherit;cursor:pointer"><b style="text-decoration:underline;text-underline-offset:2px">${esc(r.name)}</b></button><div class="hk-xs hk-muted">${esc(r.email)} · ${esc(r.phone)}</div></td>
     <td>${r.teamMode === 'solo' ? '<span class="hk-chip neutral">Solo</span>' : `<b>${esc(r.teamName || 'Team')}</b><div class="hk-xs hk-muted">${(r.members || []).length + 1} members</div>`}</td>
     <td>${esc(r.college)}<div class="hk-xs hk-muted">${esc(r.year || '')}</div></td>
     <td><select class="hk-select sm" data-stage="${esc(r.id)}" aria-label="Round">${(rounds.length ? rounds : [{ name: 'Registered' }]).map((x, i) => `<option value="${i}" ${(r.stage || 0) === i ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></td>
     <td><select class="hk-select sm" data-st="${esc(r.id)}" aria-label="Status">${STS.map(x => `<option ${x === r.status ? 'selected' : ''}>${x}</option>`).join('')}</select></td>
-    <td class="hk-xs">${s ? `<span class="hk-chip">${s.score != null ? 'Score ' + esc(s.score) : 'Submitted'}</span>` : '<span class="hk-muted">—</span>'}${a?.submittedAtMs ? `<div class="hk-muted" style="margin-top:4px">Test ${a.score}/${a.total}</div>` : ''}</td>
+    <td class="hk-xs">${s ? `<span class="hk-chip">${s.score != null ? 'Project ' + esc(s.score) : 'Submitted'}</span>` : '<span class="hk-muted">—</span>'}${a?.submittedAtMs ? `<div class="hk-muted" style="margin-top:4px">Test ${a.score}/${a.total}${em.testPct != null ? ` (${em.testPct}%)` : ''}</div>` : ''}${em.combined >= 0 ? `<div style="margin-top:3px;font-weight:700;color:var(--hk-p)">Overall ${em.combined}%</div>` : ''}</td>
     <td class="act" style="text-align:right;white-space:nowrap"><button type="button" class="hk-btn sm" data-prof="${esc(r.id)}" title="View full applicant profile"><i data-lucide="user-round"></i>Profile</button> ${mailBtn(r)}</td></tr>`; };
 
   const regsTab = () => { const l = filtered(); return `
     <div class="hk-toolbar"><div class="hk-search"><i data-lucide="search"></i><input class="hk-input" id="rq" value="${esc(q)}" placeholder="Search name, email, college, team…"></div>
       <select class="hk-select" id="fs" style="width:auto;min-height:46px"><option value="">All statuses</option>${STS.map(x => `<option ${x === fs ? 'selected' : ''}>${x}</option>`).join('')}</select>
-      ${rounds.length ? `<select class="hk-select" id="fr" style="width:auto;min-height:46px"><option value="">All rounds</option>${rounds.map((x, i) => `<option value="${i}" ${fr !== '' && +fr === i ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>` : ''}</div>
+      ${rounds.length ? `<select class="hk-select" id="fr" style="width:auto;min-height:46px"><option value="">All rounds</option>${rounds.map((x, i) => `<option value="${i}" ${fr !== '' && +fr === i ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>` : ''}
+      <select class="hk-select" id="rs" style="width:auto;min-height:46px" aria-label="Sort registrations">
+        <option value="recent" ${regSort === 'recent' ? 'selected' : ''}>Sort: Newest</option>
+        <option value="combined_desc" ${regSort === 'combined_desc' ? 'selected' : ''}>Sort: Overall Rank</option>
+        <option value="sub_desc" ${regSort === 'sub_desc' ? 'selected' : ''}>Sort: Project Score</option>
+        <option value="test_desc" ${regSort === 'test_desc' ? 'selected' : ''}>Sort: Test Score</option>
+        <option value="name_asc" ${regSort === 'name_asc' ? 'selected' : ''}>Sort: Leader A–Z</option>
+      </select></div>
     <div class="hk-bulk ${sel.size ? 'on' : ''}"><b>${sel.size} selected</b>
       <select class="hk-select sm" id="bSt"><option value="">Set status…</option>${STS.map(x => `<option>${x}</option>`).join('')}</select>
       ${rounds.length ? `<select class="hk-select sm" id="bRd"><option value="">Move to round…</option>${rounds.map((x, i) => `<option value="${i}">${esc(x.name)}</option>`).join('')}</select>` : ''}
-      <button class="hk-btn sm" data-bulkmail><i data-lucide="mail"></i>Compose email (${sel.size})</button>
-      <button class="hk-btn sm" data-bulkqueue><i data-lucide="list-plus"></i>Load into Mailer</button></div>
-    ${l.length ? `<div class="hk-tablewrap"><table class="hk-table"><thead><tr><th><input type="checkbox" id="selAll" aria-label="Select all"></th><th>Team leader</th><th>Team</th><th>College</th><th>Round</th><th>Status</th><th>Work</th><th class="act" style="text-align:right">Profile &amp; mail</th></tr></thead><tbody id="rb">${l.map(row).join('')}</tbody></table></div>` : empty('users', regs.length ? 'No matches' : 'No registrations yet', regs.length ? 'Try clearing the filters.' : 'Registrations appear here as soon as teams sign up. Share your hackathon link to get started.', regs.length ? '' : '<button class="hk-btn gold" data-share>Copy link</button>')}`; };
+      <button class="hk-btn sm" data-bulkmail="regs"><i data-lucide="mail"></i>Compose email (${sel.size})</button>
+      <button class="hk-btn sm" data-bulkqueue="regs"><i data-lucide="list-plus"></i>Load into Mailer</button></div>
+    ${l.length ? `<div class="hk-tablewrap"><table class="hk-table"><thead><tr><th><input type="checkbox" id="selAll" ${l.length && l.every(r => sel.has(r.id)) ? 'checked' : ''} aria-label="Select all"></th><th>Team leader</th><th>Team</th><th>College</th><th>Round</th><th>Status</th><th>Work &amp; Rank</th><th class="act" style="text-align:right">Profile &amp; mail</th></tr></thead><tbody id="rb">${l.map((r, i) => row(r, i)).join('')}</tbody></table></div>` : empty('users', regs.length ? 'No matches' : 'No registrations yet', regs.length ? 'Try clearing the filters.' : 'Registrations appear here as soon as teams sign up. Share your hackathon link to get started.', regs.length ? '' : '<button class="hk-btn gold" data-share>Copy link</button>')}`; };
 
   const link = (u, l) => C.safeUrl(u) ? `<a class="hk-chip btn" href="${esc(C.safeUrl(u))}" target="_blank" rel="noopener noreferrer"><i data-lucide="external-link"></i>${esc(l)}</a>` : '';
   const subCustomHtml = s => (s.customAnswers || []).filter(a => a && a.value).map(a => C.isUrl(a.value) ? link(a.value, a.label || 'Link') : `<span class="hk-chip neutral">${esc(a.label)}: ${esc(a.value)}</span>`).join('');
-  const subsTab = () => subs.length ? `<div class="hk-stack">${subs.map(s => `<div class="hk-card-s" data-sub="${esc(s.id)}"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><b>${esc(s.title)}</b><div class="hk-sm hk-muted">${esc(s.teamName || s.leaderName)} · ${C.ago(s.updatedAtMs)}</div></div>${s.reviewStatus === 'reviewed' ? '<span class="hk-chip">Reviewed</span>' : '<span class="hk-chip warn">To review</span>'}</div>
-      <p class="hk-sm" style="margin:10px 0;white-space:pre-wrap">${esc(s.idea)}</p><div style="display:flex;gap:8px;flex-wrap:wrap">${link(s.pptUrl, 'PPT')}${link(s.repoUrl, 'Repo')}${link(s.demoUrl, 'Demo')}${link(s.videoUrl, 'Prototype Video')}${link(s.introVideoUrl, 'Intro Video')}${link(s.extraUrl, 'Other')}${subCustomHtml(s)}</div>
-      <div class="hk-grid2" style="margin-top:12px;grid-template-columns:110px 1fr"><input class="hk-input" type="number" min="0" max="100" placeholder="Score" data-score value="${s.score ?? ''}"><input class="hk-input" placeholder="Feedback for the team" data-fb maxlength="500" value="${esc(s.feedback || '')}"></div>
-      <button class="hk-btn sm primary" style="margin-top:10px" data-review="${esc(s.id)}">Save review</button></div>`).join('')}</div>` : empty('lightbulb', 'No submissions yet', h.submission?.open === false ? 'Project submissions are switched off for this hackathon.' : 'Teams submit ideas, project links and PPT links from their dashboard.');
 
-  const testTab = () => { const done = atts.filter(a => a.submittedAtMs).sort((a, b) => (b.score || 0) - (a.score || 0));
-    return `<div class="hk-card-s" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center"><div><b>${meta ? esc(meta.title) : 'No screening test yet'}</b><div class="hk-sm hk-muted">${meta ? `${meta.count} questions · ${meta.durationMin} min · ${meta.total} marks${meta.endMs ? ' · closes ' + C.fmtDT(meta.endMs) : ''}` : 'Create a timed MCQ test. Answers are graded on the server.'}</div></div><div style="display:flex;gap:8px">${meta ? '<button class="hk-btn sm danger" data-rmtest>Remove</button>' : ''}<button class="hk-btn sm gold" data-test>${meta ? 'Edit test' : 'Create test'}</button></div></div>
-    ${meta ? `<div class="hk-sec"><h2><i data-lucide="trophy"></i>Results · ${done.length} of ${regs.length} attempted</h2></div>${done.length ? `<div class="hk-tablewrap"><table class="hk-table"><thead><tr><th>#</th><th>Team leader</th><th>Score</th><th>Submitted</th></tr></thead><tbody>${done.map((a, i) => { const r = regs.find(x => x.uid === a.uid); return `<tr><td>${i + 1}</td><td><b>${esc(r?.name || a.uid)}</b><div class="hk-xs hk-muted">${esc(r?.teamName || '')}</div></td><td><b>${a.score}</b> / ${a.total}</td><td>${C.fmtDT(a.submittedAtMs)}</td></tr>`; }).join('')}</tbody></table></div>` : empty('clipboard-check', 'No attempts yet', 'Scores appear here once teams submit.')}` : ''}`; };
+  const statusChipHtml = st => {
+    const tone = st === 'selected' ? 'gold' : st === 'rejected' ? 'bad' : st === 'waitlisted' ? 'warn' : (st === 'shortlisted' ? '' : 'neutral');
+    const lbl = st === 'rejected' ? 'Not selected' : (st || 'registered');
+    return `<span class="hk-chip ${tone}">${esc(lbl)}</span>`;
+  };
+
+  const getFilteredSubs = () => {
+    const qLower = subQ.trim().toLowerCase();
+    const list = subs.filter(s => {
+      const r = regOf(s.uid);
+      const st = r?.status || 'registered';
+      if(subFilter === 'pending' && s.reviewStatus === 'reviewed') return false;
+      if(subFilter === 'reviewed' && s.reviewStatus !== 'reviewed') return false;
+      if(['shortlisted', 'selected', 'waitlisted', 'rejected', 'registered'].includes(subFilter) && st !== subFilter) return false;
+      if(qLower){
+        const hay = [s.title, s.idea, s.teamName, s.leaderName, r?.name, r?.email, r?.college].join(' ').toLowerCase();
+        if(!hay.includes(qLower)) return false;
+      }
+      return true;
+    });
+    return [...list].sort((a, b) => {
+      const ea = evalMetrics(a.uid), eb = evalMetrics(b.uid);
+      if(subSort === 'score_desc') return (eb.subScore ?? -1) - (ea.subScore ?? -1) || (b.updatedAtMs || 0) - (a.updatedAtMs || 0);
+      if(subSort === 'combined_desc') return eb.combined - ea.combined || (eb.subScore ?? -1) - (ea.subScore ?? -1);
+      if(subSort === 'pending_first') return (a.reviewStatus === 'reviewed' ? 1 : 0) - (b.reviewStatus === 'reviewed' ? 1 : 0) || (b.updatedAtMs || 0) - (a.updatedAtMs || 0);
+      return (b.updatedAtMs || 0) - (a.updatedAtMs || 0);
+    });
+  };
+
+  const subsTab = () => {
+    if(!subs.length) return empty('lightbulb', 'No submissions yet', h.submission?.open === false ? 'Project submissions are switched off for this hackathon.' : 'Teams submit ideas, project links and PPT links from their dashboard.');
+    const list = getFilteredSubs();
+    const reviewedCount = subs.filter(s => s.reviewStatus === 'reviewed').length;
+    const pendingCount = subs.length - reviewedCount;
+    const selectedSubsCount = subs.filter(s => ['shortlisted', 'selected'].includes(regOf(s.uid)?.status)).length;
+    const topScore = subs.reduce((m, s) => s.score != null && +s.score > m ? +s.score : m, -1);
+
+    return `<div class="hk-stack">
+      <div class="hk-eval-kpis">
+        <div class="hk-ek"><span>Total submitted</span><b>${subs.length} <small>/ ${regs.length}</small></b></div>
+        <div class="hk-ek"><span>Reviewed</span><b>${reviewedCount}</b></div>
+        <div class="hk-ek warn"><span>Pending review</span><b>${pendingCount}</b></div>
+        <div class="hk-ek p"><span>Shortlisted / Selected</span><b>${selectedSubsCount}</b></div>
+        <div class="hk-ek gold"><span>Top project score</span><b>${topScore >= 0 ? `${topScore}/100` : '—'}</b></div>
+      </div>
+
+      <div class="hk-toolbar">
+        <div class="hk-search"><i data-lucide="search"></i><input class="hk-input" id="sq" value="${esc(subQ)}" placeholder="Search project title, team, leader, college…"></div>
+        <select class="hk-select" id="ss" style="width:auto;min-height:46px" aria-label="Sort submissions">
+          <option value="score_desc" ${subSort === 'score_desc' ? 'selected' : ''}>Sort: Highest Project Score</option>
+          <option value="combined_desc" ${subSort === 'combined_desc' ? 'selected' : ''}>Sort: Combined Rank (Project + Test)</option>
+          <option value="pending_first" ${subSort === 'pending_first' ? 'selected' : ''}>Sort: To Review First</option>
+          <option value="recent" ${subSort === 'recent' ? 'selected' : ''}>Sort: Recently Updated</option>
+        </select>
+      </div>
+
+      <div class="hk-filter-row" role="group" aria-label="Filter submissions">
+        ${[
+          ['all', `All (${subs.length})`],
+          ['pending', `To Review (${pendingCount})`],
+          ['reviewed', `Reviewed (${reviewedCount})`],
+          ['shortlisted', `Shortlisted (${subs.filter(s => regOf(s.uid)?.status === 'shortlisted').length})`],
+          ['selected', `Selected (${subs.filter(s => regOf(s.uid)?.status === 'selected').length})`],
+          ['waitlisted', `Waitlisted (${subs.filter(s => regOf(s.uid)?.status === 'waitlisted').length})`],
+          ['rejected', `Not Selected (${subs.filter(s => regOf(s.uid)?.status === 'rejected').length})`]
+        ].map(([k, lbl]) => `<button type="button" class="hk-fchip ${subFilter === k ? 'on' : ''}" data-subf="${k}">${lbl}</button>`).join('')}
+      </div>
+
+      <div class="hk-qshortbar">
+        <div class="qs-lbl"><i data-lucide="sparkles"></i><b>Quick shortlist &amp; select</b><span class="hk-xs hk-muted">Directly updates team selection &amp; notifications</span></div>
+        <div class="qs-acts">
+          <label class="hk-xs">Top <input class="hk-input hk-num-sm" id="topSubN" type="number" min="1" max="${subs.length}" value="${topSubN}"></label>
+          <button type="button" class="hk-btn sm primary" data-qshort="sub-top-shortlist"><i data-lucide="sparkles"></i>Shortlist Top ${topSubN}</button>
+          <button type="button" class="hk-btn sm gold" data-qshort="sub-top-select"><i data-lucide="trophy"></i>Select Top ${topSubN}</button>
+          <span class="qs-sep"></span>
+          <label class="hk-xs">Score ≥ <input class="hk-input hk-num-sm" id="subCut" type="number" min="0" max="100" value="${subCut}"></label>
+          <button type="button" class="hk-btn sm" data-qshort="sub-cut">Shortlist ≥ ${subCut}</button>
+        </div>
+      </div>
+
+      <div class="hk-bulk ${subSel.size ? 'on' : ''}"><b>${subSel.size} selected</b>
+        <select class="hk-select sm" id="bSubSt"><option value="">Set status…</option>${STS.map(x => `<option>${x}</option>`).join('')}</select>
+        ${rounds.length ? `<select class="hk-select sm" id="bSubRd"><option value="">Move to round…</option>${rounds.map((x, i) => `<option value="${i}">${esc(x.name)}</option>`).join('')}</select>` : ''}
+        <button class="hk-btn sm" data-bulkmail="subs"><i data-lucide="mail"></i>Compose email (${subSel.size})</button>
+        <button class="hk-btn sm" data-bulkqueue="subs"><i data-lucide="list-plus"></i>Load into Mailer</button>
+      </div>
+
+      ${list.length ? `<div class="hk-stack">${list.map((s, idx) => {
+        const r = regOf(s.uid), em = evalMetrics(s.uid);
+        const showRank = (subSort === 'score_desc' && s.score != null) || (subSort === 'combined_desc' && em.combined >= 0);
+        const rankCls = idx < 3 ? `top${idx + 1}` : '';
+        const teamTitle = r ? (r.teamMode === 'solo' ? `${r.name} (Solo)` : `${r.teamName || 'Team'} · ${r.name}`) : (s.teamName || s.leaderName);
+        return `<div class="hk-card-s hk-eval-card ${r?.status === 'selected' ? 'is-selected' : r?.status === 'shortlisted' ? 'is-shortlisted' : ''}" data-sub="${esc(s.id)}">
+          <div class="hk-eval-head">
+            <div class="eh-left">
+              ${r ? `<input type="checkbox" data-subsel="${esc(r.id)}" ${subSel.has(r.id) ? 'checked' : ''} aria-label="Select ${esc(s.title)}">` : ''}
+              ${showRank ? `<span class="hk-rank ${rankCls}">#${idx + 1}</span>` : ''}
+              <div style="min-width:0">
+                <b class="eh-title">${esc(s.title)}</b>
+                <div class="hk-sm hk-muted" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:2px">
+                  ${r ? `<button type="button" class="hk-rowlink" data-prof="${esc(r.id)}"><b>${esc(teamTitle)}</b></button>` : `<span>${esc(teamTitle)}</span>`}
+                  ${r?.college ? `<span>· ${esc(r.college)}</span>` : ''}
+                  ${r && (r.members || []).length ? `<span>· ${(r.members || []).length + 1} members</span>` : ''}
+                  <span>· Updated ${C.ago(s.updatedAtMs)}</span>
+                </div>
+              </div>
+            </div>
+            <div class="eh-badges">
+              ${em.testScore != null ? `<span class="hk-chip sky" title="Screening test score"><i data-lucide="clipboard-check"></i>Test ${em.testScore}/${em.testTotal}${em.testPct != null ? ` (${em.testPct}%)` : ''}</span>` : ''}
+              ${s.reviewStatus === 'reviewed' ? `<span class="hk-chip ${s.score != null && +s.score >= 80 ? 'gold' : ''}"><i data-lucide="award"></i>Reviewed${s.score != null ? ` · ${esc(s.score)}/100` : ''}</span>` : '<span class="hk-chip warn">To review</span>'}
+              ${r ? statusChipHtml(r.status) : ''}
+              ${r && rounds.length ? `<span class="hk-chip neutral">${esc(roundName(r.stage || 0))}</span>` : ''}
+            </div>
+          </div>
+
+          <p class="hk-sm" style="margin:10px 0;white-space:pre-wrap">${esc(s.idea)}</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">${link(s.pptUrl, 'PPT')}${link(s.repoUrl, 'Repo')}${link(s.demoUrl, 'Demo')}${link(s.videoUrl, 'Prototype Video')}${link(s.introVideoUrl, 'Intro Video')}${link(s.extraUrl, 'Other')}${subCustomHtml(s)}</div>
+
+          <div class="hk-eval-review">
+            <div class="er-inputs">
+              <input class="hk-input hk-score-in" type="number" min="0" max="100" placeholder="Score /100" data-score value="${s.score ?? ''}">
+              <input class="hk-input" placeholder="Feedback for the team (saved &amp; shown on their dashboard)" data-fb maxlength="500" value="${esc(s.feedback || '')}">
+              <button class="hk-btn sm primary" data-review="${esc(s.id)}"><i data-lucide="check"></i>Save review</button>
+            </div>
+          </div>
+
+          ${r ? `<div class="hk-eval-decide">
+            <div class="ed-pills" role="group" aria-label="Selection decision for ${esc(teamTitle)}">
+              <span class="hk-xs hk-muted" style="font-weight:700">Selection:</span>
+              ${[
+                ['shortlisted', 'sparkles', 'Shortlist'],
+                ['selected', 'trophy', 'Select'],
+                ['waitlisted', 'hourglass', 'Waitlist'],
+                ['rejected', 'circle-x', 'Not selected']
+              ].map(([stVal, ic, lbl]) => `<button type="button" class="hk-decbtn ${stVal} ${r.status === stVal ? 'on' : ''}" data-quickst="${esc(r.id)}:${stVal}"><i data-lucide="${ic}"></i>${lbl}</button>`).join('')}
+            </div>
+            <div class="ed-acts">
+              ${rounds.length ? `<select class="hk-select sm" data-stage="${esc(r.id)}" aria-label="Move round">${rounds.map((x, i) => `<option value="${i}" ${(r.stage || 0) === i ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>` : ''}
+              <button type="button" class="hk-btn sm" data-prof="${esc(r.id)}"><i data-lucide="user-round"></i>Profile</button>
+              ${mailBtn(r)}
+            </div>
+          </div>` : ''}
+        </div>`;
+      }).join('')}</div>` : empty('search-x', 'No matching submissions', 'Try clearing your search or changing the submission filter.')}
+    </div>`;
+  };
+
+  const getFilteredTestRows = () => {
+    const qLower = testQ.trim().toLowerCase();
+    const attByUid = new Map(atts.filter(a => a.submittedAtMs).map(a => [a.uid, a]));
+    let rows = regs.map(r => ({ r, att: attByUid.get(r.uid) || null, em: evalMetrics(r.uid) }));
+    // include orphaned attempts whose registration isn't loaded
+    atts.filter(a => a.submittedAtMs && !regOf(a.uid)).forEach(a => {
+      rows.push({ r: null, att: a, em: { att: a, testScore: a.score ?? 0, testTotal: a.total ?? meta?.total ?? 0, testPct: a.total ? Math.round(((a.score ?? 0) / a.total) * 100) : 0, sub: subOf(a.uid), subScore: subOf(a.uid)?.score ?? null, combined: -1 } });
+    });
+
+    if(testFilter === 'attempted') rows = rows.filter(x => !!x.att);
+    else if(testFilter === 'pending') rows = rows.filter(x => !x.att && x.r?.status !== 'rejected');
+    else if(testFilter === 'shortlisted') rows = rows.filter(x => x.r?.status === 'shortlisted');
+    else if(testFilter === 'selected') rows = rows.filter(x => x.r?.status === 'selected');
+
+    if(qLower){
+      rows = rows.filter(x => [x.r?.name, x.r?.email, x.r?.teamName, x.r?.college, x.att?.uid].join(' ').toLowerCase().includes(qLower));
+    }
+
+    rows.sort((a, b) => {
+      if(testSort === 'combined_desc') return (b.em.combined ?? -1) - (a.em.combined ?? -1);
+      if(testSort === 'earliest') return (a.att?.submittedAtMs || Infinity) - (b.att?.submittedAtMs || Infinity);
+      return (b.att?.score ?? -1) - (a.att?.score ?? -1) || (a.att?.submittedAtMs || Infinity) - (b.att?.submittedAtMs || Infinity);
+    });
+    return rows;
+  };
+
+  const testTab = () => {
+    const done = atts.filter(a => a.submittedAtMs);
+    const totalPossible = meta?.total || done[0]?.total || 0;
+    const high = done.length ? Math.max(...done.map(a => Number(a.score ?? 0))) : null;
+    const avgPct = done.length && totalPossible > 0
+      ? Math.round(done.reduce((sum, a) => sum + ((Number(a.score ?? 0) / totalPossible) * 100), 0) / done.length)
+      : null;
+    const pendCount = regs.filter(r => r.status !== 'rejected' && !done.some(a => a.uid === r.uid)).length;
+    const testQualCount = done.filter(a => ['shortlisted', 'selected'].includes(regOf(a.uid)?.status)).length;
+    const rows = meta ? getFilteredTestRows() : [];
+
+    return `<div class="hk-stack">
+      <div class="hk-card-s" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
+        <div><b>${meta ? esc(meta.title) : 'No screening test yet'}</b><div class="hk-sm hk-muted">${meta ? `${meta.count} questions · ${meta.durationMin} min · ${meta.total} marks${meta.endMs ? ' · closes ' + C.fmtDT(meta.endMs) : ''}` : 'Create a timed MCQ test. Answers are graded automatically on the server.'}</div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">${meta ? '<button class="hk-btn sm danger" data-rmtest>Remove</button>' : ''}<button class="hk-btn sm gold" data-test>${meta ? 'Edit test' : 'Create test'}</button></div>
+      </div>
+
+      ${meta ? `
+      <div class="hk-eval-kpis">
+        <div class="hk-ek"><span>Attempted</span><b>${done.length} <small>/ ${regs.length}</small></b></div>
+        <div class="hk-ek warn"><span>Pending test</span><b>${pendCount}</b></div>
+        <div class="hk-ek gold"><span>Highest score</span><b>${high != null ? `${high}/${totalPossible}` : '—'}</b></div>
+        <div class="hk-ek"><span>Average accuracy</span><b>${avgPct != null ? `${avgPct}%` : '—'}</b></div>
+        <div class="hk-ek p"><span>Shortlisted / Selected</span><b>${testQualCount}</b></div>
+      </div>
+
+      <div class="hk-toolbar">
+        <div class="hk-search"><i data-lucide="search"></i><input class="hk-input" id="tq" value="${esc(testQ)}" placeholder="Search leader, team, college, email…"></div>
+        <select class="hk-select" id="tf" style="width:auto;min-height:46px" aria-label="Filter test results">
+          <option value="attempted" ${testFilter === 'attempted' ? 'selected' : ''}>Attempted Leaderboard (${done.length})</option>
+          <option value="pending" ${testFilter === 'pending' ? 'selected' : ''}>Not Attempted Yet (${pendCount})</option>
+          <option value="all" ${testFilter === 'all' ? 'selected' : ''}>All Registrants (${regs.length})</option>
+          <option value="shortlisted" ${testFilter === 'shortlisted' ? 'selected' : ''}>Shortlisted Only</option>
+          <option value="selected" ${testFilter === 'selected' ? 'selected' : ''}>Selected Only</option>
+        </select>
+        <select class="hk-select" id="ts" style="width:auto;min-height:46px" aria-label="Sort test results">
+          <option value="score_desc" ${testSort === 'score_desc' ? 'selected' : ''}>Sort: Highest Test Score</option>
+          <option value="combined_desc" ${testSort === 'combined_desc' ? 'selected' : ''}>Sort: Combined (Test + Project)</option>
+          <option value="earliest" ${testSort === 'earliest' ? 'selected' : ''}>Sort: Earliest Submitted</option>
+        </select>
+      </div>
+
+      ${(done.length || (testFilter === 'pending' && pendCount)) ? `<div class="hk-qshortbar">
+        <div class="qs-lbl"><i data-lucide="trophy"></i><b>Top scorer shortlisting</b><span class="hk-xs hk-muted">Rank &amp; shortlist top performers safely in one click</span></div>
+        <div class="qs-acts">
+          ${done.length ? `<label class="hk-xs">Top <input class="hk-input hk-num-sm" id="topTestN" type="number" min="1" max="${done.length}" value="${topTestN}"></label>
+          <button type="button" class="hk-btn sm primary" data-qshort="test-top-shortlist"><i data-lucide="sparkles"></i>Shortlist Top ${topTestN}</button>
+          <button type="button" class="hk-btn sm gold" data-qshort="test-top-select"><i data-lucide="trophy"></i>Select Top ${topTestN}</button>
+          <span class="qs-sep"></span>
+          <label class="hk-xs">Accuracy ≥ <input class="hk-input hk-num-sm" id="testCut" type="number" min="0" max="100" value="${testCut}">%</label>
+          <button type="button" class="hk-btn sm" data-qshort="test-cut">Shortlist ≥ ${testCut}%</button>` : ''}
+          ${testFilter === 'pending' && pendCount ? `<button type="button" class="hk-btn sm primary" data-qload-pendingtest><i data-lucide="mail-plus"></i>Load ${pendCount} Pending into Mailer</button>` : ''}
+        </div>
+      </div>` : ''}
+
+      <div class="hk-bulk ${testSel.size ? 'on' : ''}"><b>${testSel.size} selected</b>
+        <select class="hk-select sm" id="bTestSt"><option value="">Set status…</option>${STS.map(x => `<option>${x}</option>`).join('')}</select>
+        ${rounds.length ? `<select class="hk-select sm" id="bTestRd"><option value="">Move to round…</option>${rounds.map((x, i) => `<option value="${i}">${esc(x.name)}</option>`).join('')}</select>` : ''}
+        <button class="hk-btn sm" data-bulkmail="test"><i data-lucide="mail"></i>Compose email (${testSel.size})</button>
+        <button class="hk-btn sm" data-bulkqueue="test"><i data-lucide="list-plus"></i>Load into Mailer</button>
+      </div>
+
+      ${rows.length ? `<div class="hk-tablewrap"><table class="hk-table"><thead><tr>
+        <th><input type="checkbox" id="testSelAll" ${rows.some(x => x.r) && rows.filter(x => x.r).every(x => testSel.has(x.r.id)) ? 'checked' : ''} aria-label="Select all"></th>
+        <th>Rank</th><th>Team leader</th><th>Team &amp; College</th><th>Score &amp; Accuracy</th><th>Project</th><th>Round</th><th>Status</th><th class="act" style="text-align:right">Actions</th>
+      </tr></thead><tbody>${rows.map((x, i) => {
+        const r = x.r, a = x.att, em = x.em;
+        const pct = em.testPct;
+        const pctCls = pct == null ? 'neutral' : pct >= 75 ? 'gold' : pct >= 50 ? '' : 'warn';
+        const rankCls = a && i < 3 ? `top${i + 1}` : '';
+        return `<tr class="${r && testSel.has(r.id) ? 'sel' : ''}">
+          <td>${r ? `<input type="checkbox" data-testsel="${esc(r.id)}" ${testSel.has(r.id) ? 'checked' : ''} aria-label="Select ${esc(r.name)}">` : ''}</td>
+          <td>${a ? `<span class="hk-rank ${rankCls}">#${i + 1}</span>` : '<span class="hk-muted">—</span>'}</td>
+          <td>${r ? `<button type="button" class="hk-rowlink" data-prof="${esc(r.id)}"><b>${esc(r.name)}</b></button><div class="hk-xs hk-muted">${esc(r.email)}</div>` : `<b>${esc(a?.uid || 'Unknown')}</b>`}</td>
+          <td>${r ? `${r.teamMode === 'solo' ? '<span class="hk-chip neutral">Solo</span>' : `<b>${esc(r.teamName || 'Team')}</b>`}<div class="hk-xs hk-muted">${esc(r.college || '')}</div>` : '—'}</td>
+          <td>${a ? `<div><b>${a.score}</b> / ${a.total} <span class="hk-chip ${pctCls}" style="margin-left:4px">${pct != null ? pct + '%' : 'Done'}</span></div><div class="hk-xs hk-muted">${C.fmtDT(a.submittedAtMs)}</div>` : '<span class="hk-chip warn">Not attempted</span>'}</td>
+          <td class="hk-xs">${em.sub ? `<span class="hk-chip">${em.sub.score != null ? `Score ${em.sub.score}` : 'Submitted'}</span>` : '<span class="hk-muted">—</span>'}</td>
+          <td>${r ? `<select class="hk-select sm" data-stage="${esc(r.id)}" aria-label="Round">${(rounds.length ? rounds : [{ name: 'Registered' }]).map((rd, ri) => `<option value="${ri}" ${(r.stage || 0) === ri ? 'selected' : ''}>${esc(rd.name)}</option>`).join('')}</select>` : '—'}</td>
+          <td>${r ? `<select class="hk-select sm" data-st="${esc(r.id)}" aria-label="Status">${STS.map(stVal => `<option ${stVal === r.status ? 'selected' : ''}>${stVal}</option>`).join('')}</select>` : '—'}</td>
+          <td class="act" style="text-align:right;white-space:nowrap">${r ? `<button type="button" class="hk-btn sm" data-prof="${esc(r.id)}"><i data-lucide="user-round"></i>Profile</button> ${mailBtn(r)}` : ''}</td>
+        </tr>`;
+      }).join('')}</tbody></table></div>` : empty('clipboard-check', done.length ? 'No matches for this filter' : 'No attempts yet', done.length ? 'Try switching the filter or clearing your search.' : 'Scores, accuracy, and selection rankings appear here once teams submit.')}
+      ` : ''}
+    </div>`;
+  };
 
   /* ---------- Mailer & Outreach Tab (inspired by Role Mailer) ---------- */
   function queueAddRegs(list, defaultChannel = mailer.channel){
@@ -448,9 +729,9 @@ export async function manage(cx, id){
   const redrawRows = () => {
     const b = $('#tabBody');
     if(!b) return;
-    if(tab === 'regs' || tab === 'mail'){
+    if(['regs', 'mail', 'subs', 'test'].includes(tab)){
       const k = document.activeElement?.id, pos = document.activeElement?.selectionStart;
-      b.innerHTML = tab === 'regs' ? regsTab() : mailTab();
+      b.innerHTML = tab === 'regs' ? regsTab() : tab === 'mail' ? mailTab() : tab === 'subs' ? subsTab() : testTab();
       icons();
       if(k){ const el = $('#' + k); el?.focus(); try { el.setSelectionRange(pos, pos); } catch {} }
     }
@@ -834,10 +1115,29 @@ export async function manage(cx, id){
     C.notify({ toUid: r.uid, fromUid: S.user.uid, hackathonId: h.id, type: 'status', title: label, body: patch.status ? `Your status for ${h.title} is now ${patch.status}.` : `Your team is now in ${roundName(patch.stage)}.` }).catch(() => {});
   }
 
+  async function applyBulkRegUpdate(list, patch, actionLabel){
+    if(!list.length) return toast('No matching registrations found.', 'info');
+    if(!confirm(`${actionLabel} for ${list.length} team${list.length === 1 ? '' : 's'}?${h.autoEmail === false ? '' : ' Teams will be emailed automatically.'}`)) return false;
+    try {
+      for(const r of list) await patchReg(r, patch);
+      toast(`Updated ${list.length} team${list.length === 1 ? '' : 's'}`);
+      return true;
+    } catch(err){
+      toast(err.message, 'error');
+      return false;
+    }
+  }
+
   paint();
   view.oninput = e => {
     const t = e.target;
     if(t.id === 'rq'){ q = t.value.trim().toLowerCase(); redrawRows(); }
+    if(t.id === 'sq'){ subQ = t.value; redrawRows(); }
+    if(t.id === 'tq'){ testQ = t.value; redrawRows(); }
+    if(t.id === 'topSubN'){ topSubN = Math.max(1, +t.value || 1); redrawRows(); }
+    if(t.id === 'subCut'){ subCut = Math.max(0, Math.min(100, +t.value || 0)); redrawRows(); }
+    if(t.id === 'topTestN'){ topTestN = Math.max(1, +t.value || 1); redrawRows(); }
+    if(t.id === 'testCut'){ testCut = Math.max(0, Math.min(100, +t.value || 0)); redrawRows(); }
     if(t.id === 'mtRound'){ mailer.roundName = t.value; updateMailerPreviewDom(); }
     if(t.id === 'mtSched'){ mailer.scheduleText = t.value; updateMailerPreviewDom(); }
     if(t.id === 'mtMeet'){ mailer.meetLink = t.value; updateMailerPreviewDom(); }
@@ -850,6 +1150,10 @@ export async function manage(cx, id){
     const t = e.target;
     if(t.id === 'fs'){ fs = t.value; return redrawRows(); }
     if(t.id === 'fr'){ fr = t.value; return redrawRows(); }
+    if(t.id === 'rs'){ regSort = t.value; return redrawRows(); }
+    if(t.id === 'ss'){ subSort = t.value; return redrawRows(); }
+    if(t.id === 'tf'){ testFilter = t.value; return redrawRows(); }
+    if(t.id === 'ts'){ testSort = t.value; return redrawRows(); }
     if(t.id === 'recKind'){ mailer.recKind = t.value; return redrawRows(); }
     if(t.id === 'recChan'){ mailer.recChannel = t.value; return redrawRows(); }
     if(t.id === 'mtRound'){ mailer.roundName = t.value; return updateMailerPreviewDom(); }
@@ -871,13 +1175,24 @@ export async function manage(cx, id){
     }
     if(t.id === 'selAll'){ filtered().forEach(r => t.checked ? sel.add(r.id) : sel.delete(r.id)); return redrawRows(); }
     if(t.dataset.sel){ t.checked ? sel.add(t.dataset.sel) : sel.delete(t.dataset.sel); return redrawRows(); }
-    const targets = () => regs.filter(r => sel.has(r.id));
-    if(t.id === 'bSt' || t.id === 'bRd'){
-      const v = t.value; if(v === '') return; const list = targets(); if(!list.length) return;
-      if(!confirm(`Update ${list.length} registration(s)?${h.autoEmail === false ? '' : ' Teams will be emailed automatically.'}`)){ t.value = ''; return; }
-      try { for(const r of list) await patchReg(r, t.id === 'bSt' ? { status: v } : { stage: +v }); toast('Updated'); } catch(err){ toast(err.message, 'error'); }
-      return paint();
+    if(t.dataset.subsel){ t.checked ? subSel.add(t.dataset.subsel) : subSel.delete(t.dataset.subsel); return redrawRows(); }
+    if(t.id === 'testSelAll'){
+      getFilteredTestRows().forEach(x => { if(x.r) t.checked ? testSel.add(x.r.id) : testSel.delete(x.r.id); });
+      return redrawRows();
     }
+    if(t.dataset.testsel){ t.checked ? testSel.add(t.dataset.testsel) : testSel.delete(t.dataset.testsel); return redrawRows(); }
+
+    const handleBulkSel = async (setRef, isStatus) => {
+      const v = t.value; if(v === '') return;
+      const list = regs.filter(r => setRef.has(r.id));
+      if(!list.length){ t.value = ''; return; }
+      const ok = await applyBulkRegUpdate(list, isStatus ? { status: v } : { stage: +v }, isStatus ? `Set status to "${v}"` : `Move to "${roundName(+v)}"`);
+      if(ok) paint(); else t.value = '';
+    };
+    if(t.id === 'bSt' || t.id === 'bRd') return handleBulkSel(sel, t.id === 'bSt');
+    if(t.id === 'bSubSt' || t.id === 'bSubRd') return handleBulkSel(subSel, t.id === 'bSubSt');
+    if(t.id === 'bTestSt' || t.id === 'bTestRd') return handleBulkSel(testSel, t.id === 'bTestSt');
+
     const stS = t.closest('[data-st]'), stG = t.closest('[data-stage]');
     const r = regs.find(x => x.id === (stS?.dataset.st || stG?.dataset.stage)); if(!r) return;
     const prev = stS ? r.status : (r.stage || 0);
@@ -889,9 +1204,77 @@ export async function manage(cx, id){
     const pb = t.closest('[data-prof]'); if(pb){ const r = regs.find(x => x.id === pb.dataset.prof); if(r) viewApplicantModal(r); return; }
     const tb = t.closest('[data-tab]'); if(tb) return setTab(tb.dataset.tab);
     const mb = t.closest('[data-mail]'); if(mb){ const r = regs.find(x => x.id === mb.dataset.mail); if(r) compose([r]); return; }
-    if(t.closest('[data-bulkmail]')){ const l = regs.filter(r => sel.has(r.id)); return l.length ? compose(l) : toast('Select teams first.', 'error'); }
-    if(t.closest('[data-bulkqueue]')){
-      const l = regs.filter(r => sel.has(r.id));
+    const sfBtn = t.closest('[data-subf]'); if(sfBtn){ subFilter = sfBtn.dataset.subf; return redrawRows(); }
+
+    const qstBtn = t.closest('[data-quickst]');
+    if(qstBtn){
+      const [rid, nextSt] = qstBtn.dataset.quickst.split(':');
+      const r = regs.find(x => x.id === rid);
+      if(!r || r.status === nextSt) return;
+      qstBtn.disabled = true;
+      try {
+        await patchReg(r, { status: nextSt });
+        toast(`Marked ${r.teamName || r.name} as ${nextSt === 'rejected' ? 'not selected' : nextSt}${h.autoEmail === false ? '' : ' · Team notified'}`);
+        paint();
+      } catch(err){ toast(err.message, 'error'); qstBtn.disabled = false; }
+      return;
+    }
+
+    const qs = t.closest('[data-qshort]');
+    if(qs){
+      const mode = qs.dataset.qshort;
+      if(mode === 'sub-top-shortlist' || mode === 'sub-top-select'){
+        const targetStatus = mode === 'sub-top-select' ? 'selected' : 'shortlisted';
+        const ranked = getFilteredSubs().filter(s => s.score != null && regOf(s.uid));
+        if(!ranked.length) return toast('Score submissions first (or select a filter with scored projects).', 'info');
+        const list = ranked.slice(0, Math.max(1, topSubN)).map(s => regOf(s.uid)).filter(r => r && r.status !== targetStatus);
+        if(await applyBulkRegUpdate(list, { status: targetStatus }, `Mark top ${Math.min(topSubN, ranked.length)} scored submissions as ${targetStatus}`)) paint();
+        return;
+      }
+      if(mode === 'sub-cut'){
+        const list = subs.filter(s => s.score != null && +s.score >= subCut).map(s => regOf(s.uid)).filter(r => r && !['shortlisted', 'selected'].includes(r.status));
+        if(await applyBulkRegUpdate(list, { status: 'shortlisted' }, `Shortlist teams with project score ≥ ${subCut}`)) paint();
+        return;
+      }
+      if(mode === 'test-top-shortlist' || mode === 'test-top-select'){
+        const targetStatus = mode === 'test-top-select' ? 'selected' : 'shortlisted';
+        const ranked = [...atts].filter(a => a.submittedAtMs && regOf(a.uid)).sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || (a.submittedAtMs || 0) - (b.submittedAtMs || 0));
+        if(!ranked.length) return toast('No attempted test records found.', 'info');
+        const list = ranked.slice(0, Math.max(1, topTestN)).map(a => regOf(a.uid)).filter(r => r && r.status !== targetStatus);
+        if(await applyBulkRegUpdate(list, { status: targetStatus }, `Mark top ${Math.min(topTestN, ranked.length)} test scorers as ${targetStatus}`)) paint();
+        return;
+      }
+      if(mode === 'test-cut'){
+        const list = atts.filter(a => {
+          if(!a.submittedAtMs) return false;
+          const tot = a.total ?? meta?.total ?? 0;
+          const pct = tot > 0 ? Math.round(((a.score ?? 0) / tot) * 100) : 0;
+          return pct >= testCut;
+        }).map(a => regOf(a.uid)).filter(r => r && !['shortlisted', 'selected'].includes(r.status));
+        if(await applyBulkRegUpdate(list, { status: 'shortlisted' }, `Shortlist teams with test accuracy ≥ ${testCut}%`)) paint();
+        return;
+      }
+    }
+
+    if(t.closest('[data-qload-pendingtest]')){
+      const pend = regs.filter(r => r.status !== 'rejected' && meta && !attOf(r.uid)?.submittedAtMs);
+      const added = queueAddRegs(pend);
+      mailer.kind = 'test_reminder';
+      mailer.scheduleText = defaultScheduleForKind('test_reminder', mailer.roundName);
+      toast(`${added} pending-test team${added === 1 ? '' : 's'} loaded into Mailer`);
+      return setTab('mail');
+    }
+
+    const bm = t.closest('[data-bulkmail]');
+    if(bm){
+      const src = bm.dataset.bulkmail === 'subs' ? subSel : (bm.dataset.bulkmail === 'test' ? testSel : sel);
+      const l = regs.filter(r => src.has(r.id));
+      return l.length ? compose(l) : toast('Select teams first.', 'error');
+    }
+    const bq = t.closest('[data-bulkqueue]');
+    if(bq){
+      const src = bq.dataset.bulkqueue === 'subs' ? subSel : (bq.dataset.bulkqueue === 'test' ? testSel : sel);
+      const l = regs.filter(r => src.has(r.id));
       if(!l.length) return toast('Select teams first.', 'error');
       const added = queueAddRegs(l);
       toast(`${added} team${added === 1 ? '' : 's'} loaded into Mailer queue`);
