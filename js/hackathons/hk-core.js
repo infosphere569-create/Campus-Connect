@@ -735,6 +735,9 @@ export async function saveSubmission(h, user, reg, d){
 
   try {
     if(ex.exists()){
+      if(exData?.reviewStatus === 'reviewed'){
+        throw new Error('Your project submission has already been reviewed by the organiser and is now locked.');
+      }
       const updatePatch = {
         title: cleanTitle,
         idea: cleanIdea,
@@ -744,8 +747,10 @@ export async function saveSubmission(h, user, reg, d){
         const val = String(d[k] || '').trim();
         if(val || (k in exData && exData[k] !== val)) updatePatch[k] = val;
       }
-      if(customArr.length || ('customAnswers' in exData && Array.isArray(exData.customAnswers) && exData.customAnswers.length)){
-        updatePatch.customAnswers = customArr;
+      const prevProto = Array.isArray(exData.customAnswers) ? exData.customAnswers.filter(x => x && x.id === '__proto_meta') : [];
+      const mergedCustom = [...customArr, ...prevProto];
+      if(mergedCustom.length || ('customAnswers' in exData && Array.isArray(exData.customAnswers) && exData.customAnswers.length)){
+        updatePatch.customAnswers = mergedCustom;
       }
       await FS.updateDoc(rf, updatePatch);
     } else {
@@ -792,6 +797,99 @@ export async function saveSubmission(h, user, reg, d){
     throw err;
   }
 }
+
+export function getPrototypeSubmission(sub){
+  if(!sub || !Array.isArray(sub.customAnswers)) return null;
+  const hit = sub.customAnswers.find(a => a && a.id === '__proto_meta');
+  if(!hit) return null;
+  try {
+    const data = typeof hit.value === 'string' ? JSON.parse(hit.value) : (hit.data || hit);
+    return data && data.title ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function savePrototypeSubmission(h, user, reg, d){
+  const hid = h?.id || reg?.hackathonId;
+  if(!hid || !user?.uid) throw new Error('Missing hackathon or user session.');
+  const id = `${hid}_${user.uid}`, rf = FS.doc(db, 'hkSubmissions', id);
+  const [freshH, freshReg, ex] = await Promise.all([
+    fetchOne(hid, { fresh: true }).catch(() => h),
+    getRegistration(hid, user.uid, { fresh: true }).catch(() => reg),
+    freshGetDoc(rf)
+  ]);
+  const activeH = freshH || h;
+  const activeReg = freshReg || reg;
+  if(!activeReg) throw new Error('No active registration found for this hackathon.');
+  if(activeReg.status === 'rejected') throw new Error('Prototype submission is unavailable for this registration.');
+  const protoCfg = activeH?.submission?.prototype || {};
+  if(!protoCfg.open) throw new Error('Prototype submissions are not open right now.');
+  if(protoCfg.deadlineMs > 0 && Date.now() > protoCfg.deadlineMs){
+    throw new Error(`The prototype submission deadline (${fmtDT(protoCfg.deadlineMs)}) has passed.`);
+  }
+  const cleanTitle = String(d.title || '').trim().slice(0, 140);
+  const cleanDetails = String(d.details || '').trim().slice(0, 3500);
+  const payload = {
+    title: cleanTitle,
+    details: cleanDetails,
+    repoUrl: String(d.repoUrl || '').trim(),
+    demoUrl: String(d.demoUrl || '').trim(),
+    videoUrl: String(d.videoUrl || '').trim(),
+    extraUrl: String(d.extraUrl || '').trim(),
+    customAnswers: Array.isArray(d.customAnswers) ? d.customAnswers : [],
+    submittedAtMs: Date.now()
+  };
+  const protoEntry = { id: '__proto_meta', label: 'Prototype Submission', type: 'proto', value: JSON.stringify(payload) };
+  try {
+    if(ex.exists()){
+      const exData = ex.data() || {};
+      const otherCustom = Array.isArray(exData.customAnswers) ? exData.customAnswers.filter(x => x && x.id !== '__proto_meta') : [];
+      await FS.updateDoc(rf, {
+        customAnswers: [...otherCustom, protoEntry],
+        updatedAtMs: Date.now()
+      });
+    } else {
+      await FS.setDoc(rf, {
+        title: cleanTitle,
+        idea: cleanDetails,
+        repoUrl: payload.repoUrl,
+        demoUrl: payload.demoUrl,
+        pptUrl: '',
+        videoUrl: payload.videoUrl,
+        introVideoUrl: '',
+        extraUrl: payload.extraUrl,
+        customAnswers: [protoEntry],
+        hackathonId: hid,
+        hackathonTitle: activeH?.title || activeReg.hackathonTitle || '',
+        hostUid: activeH?.hostUid || activeReg.hostUid || '',
+        uid: user.uid,
+        teamName: activeReg.teamName || '',
+        leaderName: activeReg.name || '',
+        createdAtMs: Date.now(),
+        updatedAtMs: Date.now(),
+        score: null,
+        feedback: '',
+        reviewStatus: 'submitted'
+      });
+    }
+    notify({
+      toUid: activeH?.hostUid || activeReg.hostUid || '',
+      fromUid: user.uid,
+      hackathonId: hid,
+      type: 'submission',
+      title: 'Prototype submitted',
+      body: `${activeReg.teamName || activeReg.name || 'A team'} submitted prototype “${cleanTitle}”.`
+    }).catch(() => {});
+  } catch(err){
+    const msg = String(err?.message || '');
+    if(err?.code === 'permission-denied' || /permission|insufficient/i.test(msg)){
+      throw new Error('Could not save prototype right now. Make sure the main submission deadline covers the prototype window.');
+    }
+    throw err;
+  }
+}
+
 export async function hackathonSubmissions(hid, hostUid){ return mapDocs(await FS.getDocs(FS.query(FS.collection(db, 'hkSubmissions'), FS.where('hackathonId', '==', hid), FS.where('hostUid', '==', hostUid), FS.limit(1000)))).sort((a, b) => (b.updatedAtMs || 0) - (a.updatedAtMs || 0)); }
 export const reviewSubmission = (id, patch) => FS.updateDoc(FS.doc(db, 'hkSubmissions', id), { ...patch, reviewedAtMs: Date.now() });
 export const isUrl = v => /^https?:\/\/[^\s]+\.[^\s]+$/i.test(String(v || '').trim());
@@ -803,7 +901,7 @@ export async function saveTest(h, user, meta, questions){
   const ownerUid = h.hostUid || user.uid;
   const answers = {}, qs = questions.map((q, i) => { const id = q.id || 'q' + (i + 1); answers[id] = +q.correct; return { id, text: q.text.trim(), options: q.options.map(o => o.trim()), marks: +q.marks || 1 }; });
   await FS.setDoc(FS.doc(db, 'hkTestKeys', h.id), { hostUid: ownerUid, questions: qs, answers });
-  await FS.setDoc(FS.doc(db, 'hkTests', h.id), { hostUid: ownerUid, hackathonId: h.id, title: meta.title, durationMin: +meta.durationMin || 30, startMs: meta.startMs || 0, endMs: meta.endMs || 0, count: qs.length, total: qs.reduce((s, q) => s + q.marks, 0), updatedAtMs: Date.now() });
+  await FS.setDoc(FS.doc(db, 'hkTests', h.id), { hostUid: ownerUid, hackathonId: h.id, title: meta.title, durationMin: +meta.durationMin || 30, startMs: meta.startMs || 0, endMs: meta.endMs || 0, resultRevealMs: +meta.resultRevealMs || 0, count: qs.length, total: qs.reduce((s, q) => s + q.marks, 0), updatedAtMs: Date.now() });
 }
 export async function shareCoHostInvite(h){
   if(!h?.id) return false;

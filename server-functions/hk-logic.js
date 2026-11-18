@@ -116,7 +116,7 @@ async function startTestCore({ db, now = Date.now(), auth, data }) {
   }
   const limit = (+meta.durationMin || 30) * 60 * 1000;
   const questions = keys.questions.map(q => ({ id: q.id, text: q.text, options: q.options, marks: +q.marks || 1 }));
-  return { questions, startedAtMs: att.startedAtMs, deadlineMs: Math.min(att.startedAtMs + limit, meta.endMs || Infinity), title: meta.title || "Screening test" };
+  return { questions, startedAtMs: att.startedAtMs, deadlineMs: Math.min(att.startedAtMs + limit, meta.endMs || Infinity), title: meta.title || "Screening test", resultRevealMs: +meta.resultRevealMs || 0 };
 }
 
 async function submitTestCore({ db, now = Date.now(), auth, data }) {
@@ -129,9 +129,17 @@ async function submitTestCore({ db, now = Date.now(), auth, data }) {
   const limit = (+meta.durationMin || 30) * 60 * 1000;
   if (now > att.startedAtMs + limit + 60 * 1000) throw new HkError("deadline-exceeded", "Time is up. Your attempt was not accepted.");
   const ans = (data && data.answers) || {};
-  let score = 0, total = 0;
-  for (const q of keys.questions) { const m = +q.marks || 1; total += m; if (Number.isInteger(ans[q.id]) && ans[q.id] === keys.answers[q.id]) score += m; }
-  await db.collection("hkAttempts").doc(aid).update({ answers: ans, score, total, submittedAtMs: now });
+  let score = 0, total = 0, correctCount = 0, wrongCount = 0, skippedCount = 0;
+  for (const q of keys.questions) {
+    const m = +q.marks || 1;
+    total += m;
+    if (!Number.isInteger(ans[q.id])) { skippedCount++; continue; }
+    if (ans[q.id] === keys.answers[q.id]) { score += m; correctCount++; }
+    else { wrongCount++; }
+  }
+  const tabSwitches = Math.max(0, Math.min(99, Number(data && data.tabSwitches) || 0));
+  const submitReason = clean(data && data.submitReason, 30) || "manual";
+  await db.collection("hkAttempts").doc(aid).update({ answers: ans, score, total, correctCount, wrongCount, skippedCount, tabSwitches, submitReason, submittedAtMs: now });
   return { score, total };
 }
 

@@ -245,30 +245,45 @@ export function buildHackathonEmail(kind, ctx = {}) {
       sign
     );
   } else if (kind === 'selected') {
-    subject = customSubj || `Congratulations — Selected in ${title}!`;
-    heading = 'Selected / Finalist Announcement';
+    const lg = h.submission?.logistics || {};
+    const wr = h.submission?.winnerReveal || {};
+    const winEntry = Array.isArray(wr.winners) ? wr.winners.find(w => w.uid === reg.uid || w.regId === reg.id) : null;
+    const winPlace = ctx.winnerPlace || winEntry?.place || '';
+    const winPrize = ctx.winnerPrize || winEntry?.prize || '';
+    const lgMode = lg.mode === 'online' ? 'Online (Virtual)' : lg.mode === 'offline' ? 'Offline (In-Person)' : lg.mode === 'hybrid' ? 'Hybrid (Online + In-Person)' : (h.mode || '');
+    const lgPlace = [lg.venue, lg.address, lg.mapLink].filter(Boolean).join(' · ');
+    const lgLink = meetLink || lg.meetLink || lgPlace || venue;
+    const lgSched = scheduleText || (lg.reportDateMs ? fmtLongDT(lg.reportDateMs) : '');
+    const extraNote = [note, lg.reportingNote, lg.dressOrIdNote].filter(Boolean).join('\n');
+
+    subject = customSubj || (winPlace ? `🏆 Winner (${winPlace}) — ${title}!` : `Congratulations — Selected in ${title}!`);
+    heading = winPlace ? `Winner Announcement · ${winPlace}` : 'Selected / Finalist Announcement';
     L.push(
       greet,
       '',
-      `Great news! We are thrilled to share that ${isTeam ? `your team "${reg.teamName}" has` : 'you have'} been officially SELECTED in ${title}${roundName ? ` (${roundName})` : ''}!`,
+      winPlace
+        ? `Thrilling news! Out of all participating entries in ${title}, ${isTeam ? `your team "${reg.teamName}" has` : 'you have'} been officially announced as ${winPlace}!`
+        : `Great news! We are thrilled to share that ${isTeam ? `your team "${reg.teamName}" has` : 'you have'} been officially SELECTED in ${title}${roundName ? ` (${roundName})` : ''}!`,
       '',
-      'Selection Summary',
-      '-----------------',
+      'Selection & Reporting Summary',
+      '-----------------------------',
       `Hackathon     : ${title}`,
       `Organised by  : ${orgName}`,
       `Selected Entry: ${participant} · ${teamLabel}`,
-      `Stage / Honor : ${roundName || 'Final Selection'}`
+      `Honor / Stage : ${winPlace || roundName || 'Final Selection'}`
     );
-    if (h.prizePool) L.push(`Prize Pool    : ₹${Number(h.prizePool).toLocaleString('en-IN')}`);
-    if (scheduleText) L.push(`Reporting/Date: ${scheduleText}`);
-    if (meetLink) L.push(`Venue / Link  : ${meetLink}`);
+    if (winPrize) L.push(`Prize / Honor : ${winPrize}`);
+    else if (h.prizePool) L.push(`Prize Pool    : ₹${Number(h.prizePool).toLocaleString('en-IN')}`);
+    if (lgMode) L.push(`Event Mode    : ${lgMode}`);
+    if (lgSched) L.push(`Reporting Time: ${lgSched}`);
+    if (lgLink) L.push(`Venue / Link  : ${lgLink}`);
     if (sub?.title) L.push(`Project       : ${sub.title}`);
-    if (note) L.push('', 'Message & Next Instructions', '---------------------------', note);
+    if (extraNote) L.push('', 'Message & Reporting Instructions', '--------------------------------', extraNote);
     L.push(
       '',
       'Next steps to confirm:',
-      `  1. Open your Hackathon Dashboard to view your selection status: ${portalUrl}`,
-      '  2. Keep your team details and ID cards ready for prize/certificate verification.',
+      `  1. Open your Hackathon Dashboard to view your certificate/status card & instructions: ${portalUrl}`,
+      '  2. Keep your team details and college ID card ready for verification.',
       '  3. Reply directly to this email if you need any assistance from the organising team.',
       '',
       'Congratulations once again on this achievement!',

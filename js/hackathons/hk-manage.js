@@ -11,11 +11,12 @@ export async function manage(cx, id){
   const h = await C.fetchOne(id, { fresh: true }); if(cx.stale()) return;
   if(!h || (!C.isHackHost(h, S.user) && !C.isStaff(S.site))){ view.innerHTML = `<div class="hk-view">${empty('search-x', 'Hackathon not found', 'You can only manage hackathons you host.', `<a class="hk-btn" href="${esc(cx.backHash || '#/host')}">Back to dashboard</a>`)}</div>`; return; }
   const hostUid = h.hostUid, rounds = C.roundsOf(h);
-  let [regs, subs, atts, meta, serverMailLogs] = await Promise.all([
+  let [regs, subs, atts, meta, keys, serverMailLogs] = await Promise.all([
     C.hackathonRegistrations(id, hostUid),
     C.hackathonSubmissions(id, hostUid).catch(() => []),
     C.hackathonAttempts(id, hostUid).catch(() => []),
     C.getTestMeta(id),
+    C.getTestKeys(id).catch(() => null),
     C.hackathonMailLogs(id, hostUid).catch(() => [])
   ]);
   if(cx.stale()) return;
@@ -44,11 +45,12 @@ export async function manage(cx, id){
   };
   const sel = new Set();
   const subSel = new Set(), testSel = new Set();
-  const initT = ['review', 'subs'].includes(cx.initialTab) ? 'subs' : (['regs', 'mail', 'test'].includes(cx.initialTab) ? cx.initialTab : 'regs');
+  const initT = ['review', 'subs'].includes(cx.initialTab) ? 'subs' : (['regs', 'mail', 'test', 'next'].includes(cx.initialTab) ? cx.initialTab : 'regs');
   let tab = initT, q = '', fs = '', fr = '', regSort = 'recent';
   let subsView = 'leaderboard', subRankBy = 'combined';
   let subQ = '', subFilter = 'all', subSort = 'score_desc', topSubN = 5, subCut = 75;
   let testQ = '', testFilter = 'attempted', testSort = 'score_desc', topTestN = 5, testCut = 60;
+  let winCriteria = 'combined', winTopN = 3, winMailMode = 'email';
   const ph = C.phase(h), roundName = i => rounds[i]?.name || (rounds.length ? 'Completed' : '—');
   const slug = (h.title || 'hackathon').replace(/[^\w]+/g, '-').toLowerCase();
 
@@ -223,7 +225,7 @@ export async function manage(cx, id){
     ${l.length ? `<div class="hk-tablewrap"><table class="hk-table"><thead><tr><th><input type="checkbox" id="selAll" ${l.length && l.every(r => sel.has(r.id)) ? 'checked' : ''} aria-label="Select all"></th><th>Team leader</th><th>Team</th><th>College</th><th>Round</th><th>Status</th><th>Work &amp; Rank</th><th class="act" style="text-align:right">Profile &amp; mail</th></tr></thead><tbody id="rb">${l.map((r, i) => row(r, i)).join('')}</tbody></table></div>` : empty('users', regs.length ? 'No matches' : 'No registrations yet', regs.length ? 'Try clearing the filters.' : 'Registrations appear here as soon as teams sign up. Share your hackathon link to get started.', regs.length ? '' : '<button class="hk-btn gold" data-share>Copy link</button>')}`; };
 
   const link = (u, l) => C.safeUrl(u) ? `<a class="hk-chip btn" href="${esc(C.safeUrl(u))}" target="_blank" rel="noopener noreferrer"><i data-lucide="external-link"></i>${esc(l)}</a>` : '';
-  const subCustomHtml = s => (s.customAnswers || []).filter(a => a && a.value).map(a => C.isUrl(a.value) ? link(a.value, a.label || 'Link') : `<span class="hk-chip neutral">${esc(a.label)}: ${esc(a.value)}</span>`).join('');
+  const subCustomHtml = s => (s.customAnswers || []).filter(a => a && a.value && a.id !== '__proto_meta').map(a => C.isUrl(a.value) ? link(a.value, a.label || 'Link') : `<span class="hk-chip neutral">${esc(a.label)}: ${esc(a.value)}</span>`).join('');
 
   const statusChipHtml = st => {
     const tone = st === 'selected' ? 'gold' : st === 'rejected' ? 'bad' : st === 'waitlisted' ? 'warn' : (st === 'shortlisted' ? '' : 'neutral');
@@ -439,10 +441,11 @@ export async function manage(cx, id){
               <td>
                 ${s
                   ? `<div style="font-weight:700;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(s.title)}">${esc(s.title)}</div>
-                     <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;align-items:center">
-                       ${s.score != null ? `<span class="hk-chip ${+s.score >= 80 ? 'gold' : ''}">Score ${esc(s.score)}/100</span>` : `<span class="hk-chip warn">Needs review</span>`}
-                       ${projLinks}
-                     </div>`
+                      <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;align-items:center">
+                        ${s.score != null ? `<span class="hk-chip ${+s.score >= 80 ? 'gold' : ''}">Score ${esc(s.score)}/100</span>` : `<span class="hk-chip warn">Needs review</span>`}
+                        ${C.getPrototypeSubmission(s) ? `<span class="hk-chip sky">Proto ✓</span>` : ''}
+                        ${projLinks}
+                      </div>`
                   : '<span class="hk-xs hk-muted">No project submitted</span>'}
               </td>
               <td>
@@ -553,6 +556,64 @@ export async function manage(cx, id){
     return rows;
   };
 
+  const attStats = a => {
+    if(!a?.submittedAtMs) return null;
+    if(a.correctCount != null) return { right: a.correctCount, wrong: a.wrongCount || 0, skipped: a.skippedCount || 0 };
+    if(!keys?.questions?.length || !a.answers) return null;
+    let right = 0, wrong = 0, skipped = 0;
+    keys.questions.forEach(q => {
+      const pick = a.answers[q.id];
+      if(pick === undefined || pick === null) skipped++;
+      else if(+pick === +keys.answers[q.id]) right++;
+      else wrong++;
+    });
+    return { right, wrong, skipped };
+  };
+
+  function viewAttemptModal(a, r){
+    const qs = keys?.questions || [];
+    const ans = a.answers || {};
+    const st = attStats(a);
+    const total = a.total ?? meta?.total ?? 0;
+    const pct = total > 0 ? Math.round(((a.score ?? 0) / total) * 100) : 0;
+    const who = r ? `${r.name}${r.teamName ? ' · ' + r.teamName : ''}` : a.uid;
+    modal(`Test Breakdown · ${who}`, `<div class="hk-stack">
+      <div class="hk-to">
+        <div class="av">${esc((who || 'T').slice(0, 2).toUpperCase())}</div>
+        <div style="flex:1;min-width:0">
+          <b>${esc(who)}</b>
+          <div class="hk-xs hk-muted">Submitted ${C.fmtDT(a.submittedAtMs)}${a.tabSwitches ? ` · ${a.tabSwitches} proctor alert${a.tabSwitches > 1 ? 's' : ''}` : ''}${a.submitReason && a.submitReason !== 'manual' ? ` · ${esc(a.submitReason)}` : ''}</div>
+        </div>
+        <span class="hk-chip gold">${a.score ?? 0} / ${total} (${pct}%)</span>
+      </div>
+      ${st ? `<div style="display:flex;gap:8px;flex-wrap:wrap">
+        <span class="hk-chip"><i data-lucide="check"></i>${st.right} Right</span>
+        <span class="hk-chip bad"><i data-lucide="x"></i>${st.wrong} Wrong</span>
+        <span class="hk-chip neutral">${st.skipped} Skipped</span>
+      </div>` : ''}
+      ${qs.length ? `<div class="hk-stack" style="gap:10px">${qs.map((q, qi) => {
+        const picked = ans[q.id];
+        const correctIdx = keys.answers?.[q.id];
+        const isSkipped = picked === undefined || picked === null;
+        const isRight = !isSkipped && +picked === +correctIdx;
+        return `<div class="hk-qa-item ${isRight ? 'ok' : isSkipped ? 'skip' : 'bad'}">
+          <div class="qa-head">
+            <b>Q${qi + 1}. ${esc(q.text)}</b>
+            <span class="hk-chip ${isRight ? '' : isSkipped ? 'neutral' : 'bad'}">${isRight ? `+${q.marks || 1} Right ✓` : isSkipped ? 'Skipped' : '0 Wrong ✗'}</span>
+          </div>
+          <div class="qa-opts">${q.options.map((opt, oi) => {
+            const isC = oi === +correctIdx, isP = !isSkipped && oi === +picked;
+            return `<div class="qa-opt ${isC ? 'correct' : ''} ${isP && !isC ? 'picked-bad' : ''}">
+              <span>${String.fromCharCode(65 + oi)}</span>
+              <b>${esc(opt)}</b>
+              ${isC ? '<small>Correct answer</small>' : isP ? '<small>Team picked</small>' : ''}
+            </div>`;
+          }).join('')}</div>
+        </div>`;
+      }).join('')}</div>` : '<p class="hk-sm hk-muted">Question breakdown is unavailable because test keys were not found.</p>'}
+    </div>`, { wide: true });
+  }
+
   const testTab = () => {
     const done = atts.filter(a => a.submittedAtMs);
     const totalPossible = meta?.total || done[0]?.total || 0;
@@ -563,11 +624,23 @@ export async function manage(cx, id){
     const pendCount = regs.filter(r => r.status !== 'rejected' && !done.some(a => a.uid === r.uid)).length;
     const testQualCount = done.filter(a => ['shortlisted', 'selected'].includes(regOf(a.uid)?.status)).length;
     const rows = meta ? getFilteredTestRows() : [];
+    const revMs = Number(meta?.resultRevealMs || 0);
+    const revScheduled = revMs > Date.now();
 
     return `<div class="hk-stack">
       <div class="hk-card-s" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
-        <div><b>${meta ? esc(meta.title) : 'No screening test yet'}</b><div class="hk-sm hk-muted">${meta ? `${meta.count} questions · ${meta.durationMin} min · ${meta.total} marks${meta.endMs ? ' · closes ' + C.fmtDT(meta.endMs) : ''}` : 'Create a timed MCQ test. Answers are graded automatically on the server.'}</div></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">${meta ? '<button class="hk-btn sm danger" data-rmtest>Remove</button>' : ''}<button class="hk-btn sm gold" data-test>${meta ? 'Edit test' : 'Create test'}</button></div>
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <b>${meta ? esc(meta.title) : 'No screening test yet'}</b>
+            ${meta ? (revScheduled ? `<span class="hk-chip warn">Results hidden until ${C.fmtDT(revMs)}</span>` : '<span class="hk-chip">Results Visible</span>') : ''}
+          </div>
+          <div class="hk-sm hk-muted">${meta ? `${meta.count} questions · ${meta.durationMin} min · ${meta.total} marks${meta.endMs ? ' · closes ' + C.fmtDT(meta.endMs) : ''}` : 'Create a timed MCQ test. Answers are graded automatically on the server.'}</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${revScheduled ? '<button type="button" class="hk-btn sm primary" data-revealtest><i data-lucide="eye"></i>Reveal Results Now</button>' : ''}
+          ${meta ? '<button class="hk-btn sm danger" data-rmtest>Remove</button>' : ''}
+          <button class="hk-btn sm gold" data-test>${meta ? 'Edit test' : 'Create test'}</button>
+        </div>
       </div>
 
       ${meta ? `
@@ -596,11 +669,11 @@ export async function manage(cx, id){
       </div>
 
       ${(done.length || (testFilter === 'pending' && pendCount)) ? `<div class="hk-qshortbar">
-        <div class="qs-lbl"><i data-lucide="trophy"></i><b>Top scorer shortlisting</b><span class="hk-xs hk-muted">Rank &amp; shortlist top performers safely in one click</span></div>
+        <div class="qs-lbl"><i data-lucide="trophy"></i><b>Top scorer shortlisting &amp; winner selection</b><span class="hk-xs hk-muted">Rank &amp; promote top performers in one click</span></div>
         <div class="qs-acts">
           ${done.length ? `<label class="hk-xs">Top <input class="hk-input hk-num-sm" id="topTestN" type="number" min="1" max="${done.length}" value="${topTestN}"></label>
           <button type="button" class="hk-btn sm primary" data-qshort="test-top-shortlist"><i data-lucide="sparkles"></i>Shortlist Top ${topTestN}</button>
-          <button type="button" class="hk-btn sm gold" data-qshort="test-top-select"><i data-lucide="trophy"></i>Select Top ${topTestN}</button>
+          <button type="button" class="hk-btn sm gold" data-qshort="test-top-select"><i data-lucide="trophy"></i>Select Top ${topTestN} Winners</button>
           <span class="qs-sep"></span>
           <label class="hk-xs">Accuracy ≥ <input class="hk-input hk-num-sm" id="testCut" type="number" min="0" max="100" value="${testCut}">%</label>
           <button type="button" class="hk-btn sm" data-qshort="test-cut">Shortlist ≥ ${testCut}%</button>` : ''}
@@ -615,27 +688,312 @@ export async function manage(cx, id){
         <button class="hk-btn sm" data-bulkqueue="test"><i data-lucide="list-plus"></i>Load into Mailer</button>
       </div>
 
-      ${rows.length ? `<div class="hk-tablewrap"><table class="hk-table"><thead><tr>
+      ${rows.length ? `<div class="hk-tablewrap"><table class="hk-table hk-lb-table"><thead><tr>
         <th><input type="checkbox" id="testSelAll" ${rows.some(x => x.r) && rows.filter(x => x.r).every(x => testSel.has(x.r.id)) ? 'checked' : ''} aria-label="Select all"></th>
-        <th>Rank</th><th>Team leader</th><th>Team &amp; College</th><th>Score &amp; Accuracy</th><th>Project</th><th>Round</th><th>Status</th><th class="act" style="text-align:right">Actions</th>
+        <th>Rank</th><th>Team &amp; Leader</th><th>Score &amp; Right / Wrong</th><th>Project</th><th>Round &amp; Status</th><th class="act" style="text-align:right">Inspect &amp; Select</th>
       </tr></thead><tbody>${rows.map((x, i) => {
         const r = x.r, a = x.att, em = x.em;
         const pct = em.testPct;
         const pctCls = pct == null ? 'neutral' : pct >= 75 ? 'gold' : pct >= 50 ? '' : 'warn';
         const rankCls = a && i < 3 ? `top${i + 1}` : '';
-        return `<tr class="${r && testSel.has(r.id) ? 'sel' : ''}">
+        const st = attStats(a);
+        const isWin = r?.status === 'selected';
+        return `<tr class="${r && testSel.has(r.id) ? 'sel' : ''} ${isWin ? 'hk-row-winner' : ''}">
           <td>${r ? `<input type="checkbox" data-testsel="${esc(r.id)}" ${testSel.has(r.id) ? 'checked' : ''} aria-label="Select ${esc(r.name)}">` : ''}</td>
           <td>${a ? `<span class="hk-rank ${rankCls}">#${i + 1}</span>` : '<span class="hk-muted">—</span>'}</td>
-          <td>${r ? `<button type="button" class="hk-rowlink" data-prof="${esc(r.id)}"><b>${esc(r.name)}</b></button><div class="hk-xs hk-muted">${esc(r.email)}</div>` : `<b>${esc(a?.uid || 'Unknown')}</b>`}</td>
-          <td>${r ? `${r.teamMode === 'solo' ? '<span class="hk-chip neutral">Solo</span>' : `<b>${esc(r.teamName || 'Team')}</b>`}<div class="hk-xs hk-muted">${esc(r.college || '')}</div>` : '—'}</td>
-          <td>${a ? `<div><b>${a.score}</b> / ${a.total} <span class="hk-chip ${pctCls}" style="margin-left:4px">${pct != null ? pct + '%' : 'Done'}</span></div><div class="hk-xs hk-muted">${C.fmtDT(a.submittedAtMs)}</div>` : '<span class="hk-chip warn">Not attempted</span>'}</td>
+          <td>${r ? `<button type="button" class="hk-rowlink" data-prof="${esc(r.id)}"><b>${esc(r.teamMode === 'solo' ? r.name : (r.teamName || r.name))}</b></button><div class="hk-xs hk-muted">${r.teamMode !== 'solo' ? esc(r.name) + ' · ' : ''}${esc(r.college || r.email)}</div>` : `<b>${esc(a?.uid || 'Unknown')}</b>`}</td>
+          <td>${a ? `<div><b>${a.score}</b> / ${a.total} <span class="hk-chip ${pctCls}" style="margin-left:4px">${pct != null ? pct + '%' : 'Done'}</span></div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;align-items:center">
+              ${st ? `<span class="hk-chip"><i data-lucide="check"></i>${st.right}</span><span class="hk-chip bad"><i data-lucide="x"></i>${st.wrong}</span>` : ''}
+              ${a.tabSwitches ? `<span class="hk-chip warn">${a.tabSwitches} alert</span>` : ''}
+            </div>
+            <div class="hk-xs hk-muted" style="margin-top:2px">${C.ago(a.submittedAtMs)}</div>` : '<span class="hk-chip warn">Not attempted</span>'}</td>
           <td class="hk-xs">${em.sub ? `<span class="hk-chip">${em.sub.score != null ? `Score ${em.sub.score}` : 'Submitted'}</span>` : '<span class="hk-muted">—</span>'}</td>
-          <td>${r ? `<select class="hk-select sm" data-stage="${esc(r.id)}" aria-label="Round">${(rounds.length ? rounds : [{ name: 'Registered' }]).map((rd, ri) => `<option value="${ri}" ${(r.stage || 0) === ri ? 'selected' : ''}>${esc(rd.name)}</option>`).join('')}</select>` : '—'}</td>
-          <td>${r ? `<select class="hk-select sm" data-st="${esc(r.id)}" aria-label="Status">${STS.map(stVal => `<option ${stVal === r.status ? 'selected' : ''}>${stVal}</option>`).join('')}</select>` : '—'}</td>
-          <td class="act" style="text-align:right;white-space:nowrap">${r ? `<button type="button" class="hk-btn sm" data-prof="${esc(r.id)}"><i data-lucide="user-round"></i>Profile</button> ${mailBtn(r)}` : ''}</td>
+          <td>${r ? `<div style="display:grid;gap:4px">${statusChipHtml(r.status)}${rounds.length ? `<select class="hk-select sm" data-stage="${esc(r.id)}" aria-label="Round">${rounds.map((rd, ri) => `<option value="${ri}" ${(r.stage || 0) === ri ? 'selected' : ''}>${esc(rd.name)}</option>`).join('')}</select>` : ''}</div>` : '—'}</td>
+          <td class="act" style="text-align:right;white-space:nowrap"><div style="display:inline-flex;gap:6px;align-items:center">
+            ${a ? `<button type="button" class="hk-btn sm" data-viewatt="${esc(a.uid)}" title="Inspect Right / Wrong Q&amp;A breakdown"><i data-lucide="list-checks"></i>Q&amp;A</button>` : ''}
+            ${r ? (isWin
+              ? `<button type="button" class="hk-btn sm gold" data-winunselect="${esc(r.id)}"><i data-lucide="trophy"></i>Selected ✓</button>`
+              : `<button type="button" class="hk-btn sm primary" data-winselect="${esc(r.id)}"><i data-lucide="trophy"></i>Select</button>`) : ''}
+            ${r ? mailBtn(r) : ''}
+          </div></td>
         </tr>`;
       }).join('')}</tbody></table></div>` : empty('clipboard-check', done.length ? 'No matches for this filter' : 'No attempts yet', done.length ? 'Try switching the filter or clearing your search.' : 'Scores, accuracy, and selection rankings appear here once teams submit.')}
       ` : ''}
+    </div>`;
+  };
+
+  /* ---------- Next Step & Winners Studio Tab (Prototype Round, Logistics, Auto Winner & Mailer) ---------- */
+  const nextTab = () => {
+    const subCfg = C.normalizeSubmissionConfig(h.submission);
+    const protoCfg = subCfg.prototype && typeof subCfg.prototype === 'object' ? subCfg.prototype : {};
+    const logi = subCfg.logistics && typeof subCfg.logistics === 'object' ? subCfg.logistics : {};
+    const winCfg = subCfg.winnerReveal && typeof subCfg.winnerReveal === 'object' ? subCfg.winnerReveal : {};
+    const winners = regs.filter(r => r.status === 'selected');
+    const protoSubs = subs.map(s => ({ s, r: regOf(s.uid), proto: C.getPrototypeSubmission(s) })).filter(x => !!x.proto);
+
+    const rankedCandidates = [...regs]
+      .filter(r => r.status !== 'rejected')
+      .map(r => {
+        const em = evalMetrics(r.uid);
+        let pts = 0;
+        if(winCriteria === 'project') pts = em.subScore ?? -1;
+        else if(winCriteria === 'test') pts = em.testPct ?? -1;
+        else pts = em.combined;
+        return { r, em, pts };
+      })
+      .sort((a, b) => b.pts - a.pts || (b.em.subScore ?? -1) - (a.em.subScore ?? -1) || (b.em.testPct ?? -1) - (a.em.testPct ?? -1));
+
+    const placeLabels = ['1st Prize · Champion', '2nd Prize · Runner Up', '3rd Prize · 2nd Runner Up'];
+    const defaultWinnersMailTarget = winners[0] || rankedCandidates[0]?.r || { name: 'Team Leader', email: 'team@example.com', teamName: 'Alpha Builders', status: 'selected' };
+    const winMailPreview = M.buildHackathonEmail('selected', {
+      hackathon: h, hackathonId: h.id, reg: defaultWinnersMailTarget,
+      round: rounds[rounds.length - 1]?.name || 'Grand Finale',
+      org, testMeta: meta,
+      att: defaultWinnersMailTarget?.uid ? attOf(defaultWinnersMailTarget.uid) : null,
+      sub: defaultWinnersMailTarget?.uid ? subOf(defaultWinnersMailTarget.uid) : null
+    });
+
+    return `<div class="hk-stack">
+      <div class="hk-card-s hk-rev-banner">
+        <div>
+          <span class="hk-eyebrow" style="color:var(--hk-p)">Next Step &amp; Finale Orchestrator</span>
+          <h2 style="font-size:1.25rem;margin-top:2px">Prototype Round, Event Logistics &amp; Official Winners</h2>
+          <p class="hk-sm hk-muted" style="margin-top:2px">Send prototype submission fields to teams, configure Online/Offline venue details, auto-select top winners by points, and dispatch winner announcements in one place.</p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <span class="hk-chip ${protoCfg.open ? '' : 'neutral'}">Prototype: ${protoCfg.open ? 'Open' : 'Off'}</span>
+          <span class="hk-chip ${logi.mode ? 'sky' : 'neutral'}">Mode: ${logi.mode ? esc(logi.mode) : 'Unset'}</span>
+          <span class="hk-chip ${winCfg.announced ? 'gold' : 'neutral'}">Winners: ${winners.length} Selected</span>
+        </div>
+      </div>
+
+      <!-- 1. Prototype Round Builder -->
+      <section class="hk-card-s hk-stack">
+        <div class="hk-sub-head">
+          <div class="dh" style="margin-bottom:0">
+            <i data-lucide="rocket"></i>
+            <div>
+              <h3>1. Prototype / Next Round Submission Form</h3>
+              <div class="hk-xs hk-muted">Choose fields &amp; deadline — sent directly to participants' dashboard card.</div>
+            </div>
+          </div>
+          <span class="hk-chip">${protoSubs.length} Prototype${protoSubs.length === 1 ? '' : 's'} Received</span>
+        </div>
+        <form id="protoCfgForm" class="hk-form">
+          <div class="hk-grid3">
+            <div class="hk-field"><label>Prototype Round Status</label>
+              <select class="hk-select" name="open">
+                <option value="1" ${protoCfg.open ? 'selected' : ''}>Open (Active for Teams)</option>
+                <option value="0" ${!protoCfg.open ? 'selected' : ''}>Closed / Hidden</option>
+              </select>
+            </div>
+            <div class="hk-field"><label>Who Can Submit?</label>
+              <select class="hk-select" name="audience">
+                <option value="shortlisted" ${protoCfg.audience !== 'all' ? 'selected' : ''}>Shortlisted &amp; Selected Only</option>
+                <option value="all" ${protoCfg.audience === 'all' ? 'selected' : ''}>All Non-Rejected Teams</option>
+              </select>
+            </div>
+            <div class="hk-field"><label>Prototype Deadline</label>
+              <input class="hk-input" type="datetime-local" name="deadline" value="${C.toLocalInput(protoCfg.deadlineMs)}">
+            </div>
+          </div>
+          <div class="hk-grid2">
+            <div class="hk-field"><label>Round / Form Title</label>
+              <input class="hk-input" name="title" maxlength="90" value="${esc(protoCfg.title || 'Prototype & Final Build Round')}" placeholder="e.g. Round 2 · Working Prototype">
+            </div>
+            <div class="hk-field"><label>Fields Requested from Participants</label>
+              <div style="display:flex;gap:12px;flex-wrap:wrap;padding:8px 12px;border-radius:12px;border:1.5px solid var(--hk-line);background:var(--hk-surface2)">
+                <label class="hk-check"><input type="checkbox" name="askRepo" ${protoCfg.askRepo !== false ? 'checked' : ''}><span>GitHub Repo</span></label>
+                <label class="hk-check"><input type="checkbox" name="askDemo" ${protoCfg.askDemo !== false ? 'checked' : ''}><span>Prototype Link</span></label>
+                <label class="hk-check"><input type="checkbox" name="askVideo" ${protoCfg.askVideo ? 'checked' : ''}><span>Demo Video</span></label>
+                <label class="hk-check"><input type="checkbox" name="askExtra" ${protoCfg.askExtra ? 'checked' : ''}><span>Extra Doc</span></label>
+              </div>
+            </div>
+          </div>
+          <div class="hk-field"><label>Instructions / Build Requirements</label>
+            <textarea class="hk-textarea" name="instructions" style="min-height:76px" maxlength="800" placeholder="e.g. Deploy your working prototype link, push full code to GitHub, and record a 2-minute walkthrough video.">${esc(protoCfg.instructions || '')}</textarea>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap">
+            <button type="submit" class="hk-btn primary"><i data-lucide="save"></i>Save &amp; Push Form to Participants</button>
+          </div>
+        </form>
+
+        ${protoSubs.length ? `<div class="hk-stack" style="margin-top:8px;padding-top:14px;border-top:1px dashed var(--hk-line)">
+          <b class="hk-sm">Submitted Prototypes (${protoSubs.length})</b>
+          <div class="hk-stack" style="gap:10px">${protoSubs.map(({ s, r, proto }) => {
+            const tName = r ? (r.teamMode === 'solo' ? r.name : (r.teamName || r.name)) : (s.teamName || s.leaderName);
+            const isWin = r?.status === 'selected';
+            return `<div class="hk-lrow" style="align-items:flex-start">
+              <div class="info">
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                  <b>${esc(proto.title)}</b>
+                  <span class="hk-chip neutral">${esc(tName)}</span>
+                  ${s.score != null ? `<span class="hk-chip gold">Score ${esc(s.score)}/100</span>` : ''}
+                  ${isWin ? `<span class="hk-chip gold">Winner ✓</span>` : ''}
+                </div>
+                <p class="hk-sm hk-muted" style="margin:4px 0">${esc(proto.details)}</p>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+                  ${link(proto.repoUrl, 'GitHub Repo')}
+                  ${link(proto.demoUrl, 'Prototype Link')}
+                  ${link(proto.videoUrl, 'Demo Video')}
+                  ${link(proto.extraUrl, 'Extra Link')}
+                </div>
+              </div>
+              <div class="acts">
+                <button type="button" class="hk-btn sm" data-openreview="${esc(s.id)}"><i data-lucide="clipboard-pen"></i>Score</button>
+                ${r ? (isWin
+                  ? `<button type="button" class="hk-btn sm gold" data-winunselect="${esc(r.id)}"><i data-lucide="trophy"></i>Selected ✓</button>`
+                  : `<button type="button" class="hk-btn sm primary" data-winselect="${esc(r.id)}"><i data-lucide="trophy"></i>Select</button>`) : ''}
+              </div>
+            </div>`;
+          }).join('')}</div>
+        </div>` : ''}
+      </section>
+
+      <!-- 2. Online / Offline Selected Venue & Logistics -->
+      <section class="hk-card-s hk-stack">
+        <div class="hk-sub-head">
+          <div class="dh" style="margin-bottom:0">
+            <i data-lucide="map-pin"></i>
+            <div>
+              <h3>2. Official Online / Offline Logistics for Selected Teams</h3>
+              <div class="hk-xs hk-muted">Shown directly on participants' dashboards &amp; auto-filled into Winner/Selected emails.</div>
+            </div>
+          </div>
+        </div>
+        <form id="logiForm" class="hk-form">
+          <div class="hk-grid3">
+            <div class="hk-field"><label>Final Round Mode</label>
+              <select class="hk-select" name="mode">
+                <option value="offline" ${logi.mode === 'offline' ? 'selected' : ''}>Offline (In-Person Campus/Venue)</option>
+                <option value="online" ${logi.mode === 'online' ? 'selected' : ''}>Online (Virtual Google Meet)</option>
+                <option value="hybrid" ${logi.mode === 'hybrid' ? 'selected' : ''}>Hybrid (Online + Venue)</option>
+              </select>
+            </div>
+            <div class="hk-field"><label>Visible To</label>
+              <select class="hk-select" name="visibleTo">
+                <option value="selected" ${logi.visibleTo !== 'all' ? 'selected' : ''}>Shortlisted &amp; Selected Teams</option>
+                <option value="all" ${logi.visibleTo === 'all' ? 'selected' : ''}>All Registered Teams</option>
+              </select>
+            </div>
+            <div class="hk-field"><label>Reporting Date &amp; Time</label>
+              <input class="hk-input" type="datetime-local" name="reportingTime" value="${C.toLocalInput(logi.reportingTime)}">
+            </div>
+          </div>
+          <div class="hk-grid2">
+            <div class="hk-field"><label>Venue / Auditorium / Room</label>
+              <input class="hk-input" name="venueName" value="${esc(logi.venueName || h.venue || '')}" placeholder="e.g. Main Auditorium, Block C">
+            </div>
+            <div class="hk-field"><label>Full Address</label>
+              <input class="hk-input" name="address" value="${esc(logi.address || [h.college, h.city].filter(Boolean).join(', '))}" placeholder="Campus address &amp; city">
+            </div>
+          </div>
+          <div class="hk-grid2">
+            <div class="hk-field"><label>Google Meet / Video Call Link <small>for online/hybrid</small></label>
+              <input class="hk-input" type="url" name="meetLink" value="${esc(logi.meetLink || '')}" placeholder="https://meet.google.com/...">
+            </div>
+            <div class="hk-field"><label>Google Maps Link &amp; Helpdesk <small>optional</small></label>
+              <input class="hk-input" name="mapUrl" type="url" value="${esc(logi.mapUrl || '')}" placeholder="https://maps.google.com/...">
+            </div>
+          </div>
+          <div class="hk-grid2">
+            <div class="hk-field"><label>Helpdesk / Coordinator Contact</label>
+              <input class="hk-input" name="deskContact" value="${esc(logi.deskContact || org.phone || org.email || '')}" placeholder="Phone or email at reporting desk">
+            </div>
+            <div class="hk-field"><label>Special Reporting Notes</label>
+              <input class="hk-input" name="instructions" value="${esc(logi.instructions || '')}" placeholder="e.g. Carry College ID &amp; laptop charger. Check-in starts 9:30 AM.">
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end">
+            <button type="submit" class="hk-btn primary"><i data-lucide="check"></i>Save Event Logistics</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- 3. Auto Winner Selection by Points + Official Winners Podium + Built-in Emailer -->
+      <section class="hk-card-s hk-stack hk-win-studio" id="winSection">
+        <div class="hk-sub-head">
+          <div class="dh" style="margin-bottom:0">
+            <i data-lucide="trophy" style="color:var(--hk-gold)"></i>
+            <div>
+              <h3>3. Auto Winner Selection &amp; Official Announcement</h3>
+              <div class="hk-xs hk-muted">Auto-pick top scorers by points, schedule or reveal immediately, and send auto-filled Winner Emails / WhatsApp.</div>
+            </div>
+          </div>
+          ${winCfg.announced ? `<button type="button" class="hk-btn sm danger" data-unannouncewin>Hide Public Podium</button>` : ''}
+        </div>
+
+        <form id="autoWinForm" class="hk-form">
+          <div class="hk-grid3">
+            <div class="hk-field"><label>Rank &amp; Pick Criteria</label>
+              <select class="hk-select" id="winCritSel" name="criteria">
+                <option value="combined" ${winCriteria === 'combined' ? 'selected' : ''}>Combined (Test + Project)</option>
+                <option value="project" ${winCriteria === 'project' ? 'selected' : ''}>Project Review Score</option>
+                <option value="test" ${winCriteria === 'test' ? 'selected' : ''}>Screening Test Score</option>
+              </select>
+            </div>
+            <div class="hk-field"><label>How Many Top Winners?</label>
+              <input class="hk-input" id="winTopNIn" type="number" min="1" max="${Math.max(1, rankedCandidates.length)}" name="topN" value="${Math.min(winTopN, Math.max(1, rankedCandidates.length))}">
+            </div>
+            <div class="hk-field"><label>Winner Reveal Time <small>leave blank = Reveal Now</small></label>
+              <input class="hk-input" type="datetime-local" name="revealAt" value="${C.toLocalInput(winCfg.revealAtMs)}">
+            </div>
+          </div>
+
+          ${rankedCandidates.length ? `<div class="hk-stack" style="gap:8px">
+            <small class="hk-eyebrow">Preview Auto-Selected Top ${Math.min(winTopN, rankedCandidates.length)} Teams &amp; Assign Prizes</small>
+            ${rankedCandidates.slice(0, Math.min(winTopN, rankedCandidates.length)).map((c, idx) => {
+              const tName = c.r.teamMode === 'solo' ? c.r.name : (c.r.teamName || c.r.name);
+              const existingW = (winCfg.winners || []).find(w => w.uid === c.r.uid);
+              return `<div class="hk-win-pick-row">
+                <span class="hk-rank top${Math.min(idx + 1, 3)}">#${idx + 1}</span>
+                <div style="flex:1;min-width:160px">
+                  <b>${esc(tName)}</b>
+                  <div class="hk-xs hk-muted">${esc(c.r.name)} · ${c.pts >= 0 ? `Score: <b>${c.pts}%</b>` : 'Not scored yet'}${c.em.sub ? ` · ${esc(c.em.sub.title)}` : ''}</div>
+                </div>
+                <input class="hk-input" style="max-width:190px;min-height:40px" data-wplace="${esc(c.r.uid)}" value="${esc(existingW?.place || placeLabels[idx] || `${idx + 1}th Place`)}" placeholder="Place label">
+                <input class="hk-input" style="max-width:210px;min-height:40px" data-wprize="${esc(c.r.uid)}" value="${esc(existingW?.prize || '')}" placeholder="Prize (e.g. ₹25,000 + Trophy)">
+              </div>`;
+            }).join('')}
+          </div>` : '<p class="hk-sm hk-muted">No active participants yet.</p>'}
+
+          <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap">
+            <button type="submit" class="hk-btn gold lg" ${rankedCandidates.length ? '' : 'disabled'}><i data-lucide="trophy"></i>Auto-Select Winners &amp; Publish Podium</button>
+          </div>
+        </form>
+
+        ${winners.length ? `<div class="hk-winners-box" style="margin-top:8px">
+          <div class="wb-head">
+            <div style="display:flex;align-items:center;gap:8px"><span class="hk-win-ic"><i data-lucide="trophy"></i></span><div><b>Selected &amp; Announced Winners (${winners.length})</b><div class="hk-xs hk-muted">${winCfg.revealAtMs && winCfg.revealAtMs > Date.now() ? `Countdown live · reveals ${C.fmtDT(winCfg.revealAtMs)}` : 'Live on participants\' dashboards & My Hackathons cards'}</div></div></div>
+            <button type="button" class="hk-btn sm gold" data-mailwinners><i data-lucide="send"></i>Open Auto-Emailer for All ${winners.length} Winners</button>
+          </div>
+          <div class="hk-winners-grid">${winners.map((w, wi) => {
+            const wMeta = (winCfg.winners || []).find(x => x.uid === w.uid);
+            const tName = w.teamMode === 'solo' ? w.name : (w.teamName || w.name);
+            return `<div class="hk-winner-card">
+              <div class="wc-top"><span class="hk-rank top${Math.min(wi + 1, 3)}">${esc(wMeta?.place || `Winner #${wi + 1}`)}</span>${wMeta?.prize ? `<span class="hk-chip gold">${esc(wMeta.prize)}</span>` : ''}</div>
+              <button type="button" class="hk-rowlink" data-prof="${esc(w.id)}"><b>${esc(tName)}</b></button>
+              <div class="hk-xs hk-muted">${esc(w.name)} · ${esc(w.email)}</div>
+              <div class="wc-acts">
+                <button type="button" class="hk-btn sm primary" data-winchan="${esc(w.id)}:platform"><i data-lucide="sparkles"></i>Auto Email</button>
+                <button type="button" class="hk-btn sm" data-winchan="${esc(w.id)}:gmail"><i data-lucide="mail"></i>Gmail</button>
+                ${w.phone ? `<button type="button" class="hk-btn sm" data-winchan="${esc(w.id)}:whatsapp"><i data-lucide="message-circle"></i>WhatsApp</button>` : ''}
+              </div>
+            </div>`;
+          }).join('')}</div>
+
+          <div class="hk-mailprev" style="margin-top:4px">
+            <div class="mh" style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+              <div><small style="opacity:.8;letter-spacing:.1em;text-transform:uppercase;display:block;font-size:.66rem">Live Auto-Filled Winner Message Preview (Includes Online/Offline Logistics &amp; Prize)</small><span>${esc(winMailPreview.subject)}</span></div>
+              <div style="display:flex;gap:6px">
+                <button type="button" class="hk-btn sm" style="background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.35);color:#fff" data-wprevtoggle>${winMailMode === 'whatsapp' ? 'View Email Format' : 'View WhatsApp Format'}</button>
+              </div>
+            </div>
+            <pre class="mb hk-mailpre">${esc(winMailMode === 'whatsapp' ? winMailPreview.whatsappText : winMailPreview.body)}</pre>
+          </div>
+        </div>` : ''}
+      </section>
     </div>`;
   };
 
@@ -881,17 +1239,19 @@ export async function manage(cx, id){
         <div class="hk-kpi c"><div class="ki"><i data-lucide="lightbulb"></i></div><strong>${subs.length}</strong><span>Submissions</span></div>
         <div class="hk-kpi s"><div class="ki"><i data-lucide="mail-check"></i></div><strong>${mailed}</strong><span>Teams emailed</span></div></div>
       <div class="hk-card-s" style="margin:14px 0;display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:space-between"><div><b>Registration is ${closed ? 'closed' : 'open'}</b><div class="hk-sm hk-muted">${h.regDeadlineMs ? 'Deadline ' + C.fmtDT(h.regDeadlineMs) + '. ' : ''}Automatic emails are <b>${h.autoEmail === false ? 'off' : 'on'}</b>.</div></div><button class="hk-btn sm ${closed ? 'primary' : ''}" data-toggle>${closed ? 'Reopen registration' : 'End registration now'}</button></div>
-      <div class="hk-tabs" role="tablist">${[['regs', 'users', `Registrations (${regs.length})`], ['subs', 'trophy', `Review Submissions (${subs.length})`], ['test', 'clipboard-check', 'Test'], ['mail', 'mail', `Mailer & Outreach`]].map(([k, ic, l]) => `<button class="${tab === k ? 'on' : ''}" data-tab="${k}" role="tab"><i data-lucide="${ic}"></i>${l}</button>`).join('')}</div>
-      <div id="tabBody">${tab === 'regs' ? regsTab() : tab === 'mail' ? mailTab() : tab === 'subs' ? subsTab() : testTab()}</div></div>`;
+      <div class="hk-tabs" role="tablist">${[['regs', 'users', `Registrations (${regs.length})`], ['subs', 'trophy', `Review Submissions (${subs.length})`], ['test', 'clipboard-check', 'Test'], ['next', 'rocket', 'Next Step & Winners'], ['mail', 'mail', `Mailer & Outreach`]].map(([k, ic, l]) => `<button class="${tab === k ? 'on' : ''}" data-tab="${k}" role="tab"><i data-lucide="${ic}"></i>${l}</button>`).join('')}</div>
+      <div id="tabBody">${tab === 'regs' ? regsTab() : tab === 'mail' ? mailTab() : tab === 'subs' ? subsTab() : tab === 'next' ? nextTab() : testTab()}</div></div>`;
     icons();
+    bindNextTabForms();
   };
   const redrawRows = () => {
     const b = $('#tabBody');
     if(!b) return;
-    if(['regs', 'mail', 'subs', 'test'].includes(tab)){
+    if(['regs', 'mail', 'subs', 'test', 'next'].includes(tab)){
       const k = document.activeElement?.id, pos = document.activeElement?.selectionStart;
-      b.innerHTML = tab === 'regs' ? regsTab() : tab === 'mail' ? mailTab() : tab === 'subs' ? subsTab() : testTab();
+      b.innerHTML = tab === 'regs' ? regsTab() : tab === 'mail' ? mailTab() : tab === 'subs' ? subsTab() : tab === 'next' ? nextTab() : testTab();
       icons();
+      bindNextTabForms();
       if(k){ const el = $('#' + k); el?.focus(); try { el.setSelectionRange(pos, pos); } catch {} }
     }
   };
@@ -1288,13 +1648,14 @@ export async function manage(cx, id){
 
   /* ---------- test builder ---------- */
   async function testBuilder(){
-    const keys = await C.getTestKeys(id);
+    const liveKeys = await C.getTestKeys(id).catch(() => null);
+    if(liveKeys) keys = liveKeys;
     const qs = keys ? keys.questions.map(x => ({ ...x, correct: keys.answers[x.id] })) : [{ text: '', options: ['', '', '', ''], correct: 0, marks: 1 }];
-    const m = meta || { title: 'Screening test', durationMin: 30, startMs: 0, endMs: 0 };
+    const m = meta || { title: 'Screening test', durationMin: 30, startMs: 0, endMs: 0, resultRevealMs: 0 };
     const qRow = (q, i) => `<div class="hk-card-s" data-q="${i}"><div style="display:flex;justify-content:space-between"><b>Question ${i + 1}</b><button type="button" class="hk-btn icon ghost" data-qdel="${i}" aria-label="Remove question"><i data-lucide="trash-2"></i></button></div>
       <input class="hk-input" data-f="text" placeholder="Question" value="${esc(q.text)}" style="margin:8px 0">${q.options.map((o, k) => `<label class="hk-optrow"><input type="radio" name="c${i}" data-f="correct" value="${k}" ${+q.correct === k ? 'checked' : ''} aria-label="Correct answer ${k + 1}"><input class="hk-input" data-f="opt" data-k="${k}" placeholder="Option ${String.fromCharCode(65 + k)}" value="${esc(o)}"></label>`).join('')}
       <div style="margin-top:8px"><label class="hk-sm">Marks <input class="hk-input" type="number" min="1" data-f="marks" value="${q.marks || 1}" style="width:80px;display:inline-block"></label></div></div>`;
-    modal(meta ? 'Edit screening test' : 'Create screening test', `<form class="hk-form" id="tf"><div class="hk-field"><label>Title</label><input class="hk-input" name="title" value="${esc(m.title)}" maxlength="80"></div>
+    modal(meta ? 'Edit screening test' : 'Create screening test', `<form class="hk-form" id="tf"><div class="hk-grid2"><div class="hk-field"><label>Title</label><input class="hk-input" name="title" value="${esc(m.title)}" maxlength="80"></div><div class="hk-field"><label>Result Reveal Time <small>blank = instant points</small></label><input class="hk-input" type="datetime-local" name="rev" value="${C.toLocalInput(m.resultRevealMs)}"></div></div>
       <div class="hk-grid3"><div class="hk-field"><label>Duration (min)</label><input class="hk-input" type="number" min="5" name="dur" value="${m.durationMin}"></div><div class="hk-field"><label>Opens</label><input class="hk-input" type="datetime-local" name="st" value="${C.toLocalInput(m.startMs)}"></div><div class="hk-field"><label>Closes</label><input class="hk-input" type="datetime-local" name="en" value="${C.toLocalInput(m.endMs)}"></div></div>
       <div id="qs" class="hk-stack">${qs.map(qRow).join('')}</div><button type="button" class="hk-btn sm" id="addQ"><i data-lucide="plus"></i>Add question</button>
       <div id="tErr" class="hk-msg err hk-hidden"></div><button class="hk-btn gold lg block" type="submit">Save test</button></form>`, { wide: true, onMount(b, close){
@@ -1305,11 +1666,12 @@ export async function manage(cx, id){
       $('#tf', b).onsubmit = async ev => {
         ev.preventDefault(); const f = new FormData(ev.target), l = read(), er = $('#tErr', b), fail = x => { er.classList.remove('hk-hidden'); er.innerHTML = `<i data-lucide="circle-alert"></i><span>${esc(x)}</span>`; icons(); };
         if(l.some(x => x.text.trim().length < 3 || x.options.some(o => !o.trim()))) return fail('Every question needs text and four options.');
-        const stM = C.fromLocalInput(f.get('st')), enM = C.fromLocalInput(f.get('en')); if(stM && enM && enM <= stM) return fail('Closing time must be after opening time.');
+        const stM = C.fromLocalInput(f.get('st')), enM = C.fromLocalInput(f.get('en')), revM = C.fromLocalInput(f.get('rev'));
+        if(stM && enM && enM <= stM) return fail('Closing time must be after opening time.');
         try {
           const hadMeta = !!meta;
-          await C.saveTest(h, S.user, { title: f.get('title').trim() || 'Screening test', durationMin: +f.get('dur') || 30, startMs: stM, endMs: enM }, l);
-          meta = await C.getTestMeta(id);
+          await C.saveTest(h, S.user, { title: f.get('title').trim() || 'Screening test', durationMin: +f.get('dur') || 30, startMs: stM, endMs: enM, resultRevealMs: revM }, l);
+          [meta, keys] = await Promise.all([C.getTestMeta(id), C.getTestKeys(id).catch(() => null)]);
           if(!hadMeta && regs.length){
             for(let i = 0; i < regs.length; i += 400){
               const wb = FS.writeBatch(C.db);
@@ -1322,6 +1684,137 @@ export async function manage(cx, id){
         catch(e){ fail(e.message); }
       };
     } });
+  }
+
+  /* ---------- Next Step & Winners Tab Form Bindings ---------- */
+  function bindNextTabForms(){
+    if(tab !== 'next') return;
+    const pForm = $('#protoCfgForm');
+    if(pForm){
+      pForm.onsubmit = async ev => {
+        ev.preventDefault();
+        const fd = new FormData(pForm);
+        const curSub = C.normalizeSubmissionConfig(h.submission);
+        const protoDl = C.fromLocalInput(fd.get('deadline'));
+        const protoCfg = {
+          open: fd.get('open') === '1',
+          audience: fd.get('audience') === 'all' ? 'all' : 'shortlisted',
+          title: String(fd.get('title') || 'Prototype Round').trim(),
+          deadlineMs: protoDl,
+          instructions: String(fd.get('instructions') || '').trim(),
+          askRepo: !!fd.get('askRepo'),
+          askDemo: !!fd.get('askDemo'),
+          askVideo: !!fd.get('askVideo'),
+          askExtra: !!fd.get('askExtra')
+        };
+        const ideaDl = +(curSub.ideaDeadlineMs || curSub.deadlineMs || 0);
+        const nextDeadlineMs = (protoCfg.open && protoDl > (curSub.deadlineMs || 0)) ? protoDl : (curSub.deadlineMs || 0);
+        const nextSub = {
+          ...curSub,
+          open: true,
+          ideaDeadlineMs: ideaDl,
+          deadlineMs: nextDeadlineMs,
+          prototype: protoCfg
+        };
+        const btn = $('button[type=submit]', pForm);
+        btn.disabled = true; btn.innerHTML = '<span class="hk-spin"></span> Saving…';
+        try {
+          await FS.updateDoc(FS.doc(C.db, 'hkHackathons', h.id), { submission: nextSub, updatedAtMs: Date.now(), updatedAt: FS.serverTimestamp() });
+          h.submission = nextSub;
+          toast('Prototype form pushed to participants! 🚀');
+          paint();
+        } catch(err){ toast(err.message, 'error'); btn.disabled = false; btn.innerHTML = '<i data-lucide="save"></i>Save &amp; Push Form'; icons(); }
+      };
+    }
+
+    const lForm = $('#logiForm');
+    if(lForm){
+      lForm.onsubmit = async ev => {
+        ev.preventDefault();
+        const fd = new FormData(lForm);
+        const curSub = C.normalizeSubmissionConfig(h.submission);
+        const logistics = {
+          mode: String(fd.get('mode') || 'offline'),
+          visibleTo: String(fd.get('visibleTo') || 'selected'),
+          reportingTime: C.fromLocalInput(fd.get('reportingTime')),
+          venueName: String(fd.get('venueName') || '').trim(),
+          address: String(fd.get('address') || '').trim(),
+          meetLink: String(fd.get('meetLink') || '').trim(),
+          mapUrl: String(fd.get('mapUrl') || '').trim(),
+          deskContact: String(fd.get('deskContact') || '').trim(),
+          instructions: String(fd.get('instructions') || '').trim()
+        };
+        const nextSub = { ...curSub, logistics };
+        const btn = $('button[type=submit]', lForm);
+        btn.disabled = true; btn.innerHTML = '<span class="hk-spin"></span> Saving…';
+        try {
+          await FS.updateDoc(FS.doc(C.db, 'hkHackathons', h.id), { submission: nextSub, updatedAtMs: Date.now(), updatedAt: FS.serverTimestamp() });
+          h.submission = nextSub;
+          toast('Event logistics saved and synced to participants!');
+          paint();
+        } catch(err){ toast(err.message, 'error'); btn.disabled = false; btn.innerHTML = '<i data-lucide="check"></i>Save Event Logistics'; icons(); }
+      };
+    }
+
+    const wForm = $('#autoWinForm');
+    if(wForm){
+      wForm.onsubmit = async ev => {
+        ev.preventDefault();
+        const fd = new FormData(wForm);
+        const crit = String(fd.get('criteria') || 'combined');
+        const count = Math.max(1, Math.min(20, +fd.get('topN') || 3));
+        const revMs = C.fromLocalInput(fd.get('revealAt'));
+        const candidates = [...regs].filter(r => r.status !== 'rejected').map(r => {
+          const em = evalMetrics(r.uid);
+          const pts = crit === 'project' ? (em.subScore ?? -1) : crit === 'test' ? (em.testPct ?? -1) : em.combined;
+          return { r, em, pts };
+        }).sort((a, b) => b.pts - a.pts || (b.em.subScore ?? -1) - (a.em.subScore ?? -1) || (b.em.testPct ?? -1) - (a.em.testPct ?? -1));
+
+        const chosen = candidates.slice(0, count);
+        if(!chosen.length) return toast('No teams available to select.', 'error');
+        if(!confirm(`Auto-select top ${chosen.length} team(s) as Winners and ${revMs && revMs > Date.now() ? 'schedule reveal for ' + C.fmtDT(revMs) : 'reveal Winners immediately'}?`)) return;
+
+        const btn = $('button[type=submit]', wForm);
+        btn.disabled = true; btn.innerHTML = '<span class="hk-spin"></span> Publishing winners…';
+        try {
+          const winnersList = [];
+          for(let idx = 0; idx < chosen.length; idx++){
+            const { r, em, pts } = chosen[idx];
+            if(r.status !== 'selected') await patchReg(r, { status: 'selected' });
+            const place = $(`[data-wplace="${r.uid}"]`, wForm)?.value?.trim() || `${idx + 1} Prize`;
+            const prize = $(`[data-wprize="${r.uid}"]`, wForm)?.value?.trim() || '';
+            winnersList.push({
+              uid: r.uid,
+              regId: r.id,
+              teamName: r.teamMode === 'solo' ? r.name : (r.teamName || r.name),
+              leaderName: r.name || '',
+              college: r.college || '',
+              projectTitle: em.sub?.title || '',
+              place,
+              prize,
+              scoreLabel: pts >= 0 ? `${pts}%` : ''
+            });
+          }
+          const curSub = C.normalizeSubmissionConfig(h.submission);
+          const nextSub = {
+            ...curSub,
+            winnerReveal: {
+              announced: true,
+              revealAtMs: revMs || 0,
+              announcedAtMs: Date.now(),
+              winners: winnersList
+            }
+          };
+          await FS.updateDoc(FS.doc(C.db, 'hkHackathons', h.id), { submission: nextSub, updatedAtMs: Date.now(), updatedAt: FS.serverTimestamp() });
+          h.submission = nextSub;
+          toast(`🏆 ${winnersList.length} Winner(s) selected & podium published!`);
+          paint();
+        } catch(err){
+          toast(err.message, 'error');
+          btn.disabled = false; btn.innerHTML = '<i data-lucide="trophy"></i>Auto-Select Winners &amp; Publish Podium'; icons();
+        }
+      };
+    }
   }
 
   /* ---------- status / round changes ---------- */
@@ -1371,6 +1864,8 @@ export async function manage(cx, id){
     if(t.id === 'subWeight'){ subWeight = t.value; return redrawRows(); }
     if(t.id === 'tf'){ testFilter = t.value; return redrawRows(); }
     if(t.id === 'ts'){ testSort = t.value; return redrawRows(); }
+    if(t.id === 'winCritSel'){ winCriteria = t.value; return redrawRows(); }
+    if(t.id === 'winTopNIn'){ winTopN = Math.max(1, +t.value || 1); return redrawRows(); }
     if(t.id === 'recKind'){ mailer.recKind = t.value; return redrawRows(); }
     if(t.id === 'recChan'){ mailer.recChannel = t.value; return redrawRows(); }
     if(t.id === 'mtRound'){ mailer.roundName = t.value; return updateMailerPreviewDom(); }
@@ -1659,7 +2154,48 @@ export async function manage(cx, id){
     if(t.closest('[data-pdf]')) return pdf();
     if(t.closest('[data-share]')){ try { await navigator.clipboard.writeText(C.publicShareUrl(h.id)); toast('Public link copied'); } catch { toast('Copy failed', 'error'); } return; }
     if(t.closest('[data-test]')) return testBuilder();
-    if(t.closest('[data-rmtest]')){ if(confirm('Remove the test and all questions?')){ try { await C.removeTest(id); meta = null; paint(); toast('Test removed', 'info'); } catch(err){ toast(err.message, 'error'); } } return; }
+    if(t.closest('[data-rmtest]')){ if(confirm('Remove the test and all questions?')){ try { await C.removeTest(id); meta = null; keys = null; paint(); toast('Test removed', 'info'); } catch(err){ toast(err.message, 'error'); } } return; }
+    if(t.closest('[data-revealtest]')){
+      try {
+        await FS.updateDoc(FS.doc(C.db, 'hkTests', id), { resultRevealMs: Date.now(), updatedAtMs: Date.now() });
+        if(meta) meta.resultRevealMs = Date.now();
+        toast('Test results revealed to all participants!');
+        paint();
+      } catch(err){ toast(err.message, 'error'); }
+      return;
+    }
+    const va = t.closest('[data-viewatt]');
+    if(va){
+      const a = atts.find(x => x.uid === va.dataset.viewatt);
+      if(a) viewAttemptModal(a, regOf(a.uid));
+      return;
+    }
+    const wch = t.closest('[data-winchan]');
+    if(wch){
+      const [rid, ch] = wch.dataset.winchan.split(':');
+      const r = regs.find(x => x.id === rid);
+      if(!r) return;
+      wch.disabled = true;
+      try {
+        await sendOne(r, { kind: 'selected', note: '', roundVal: rounds[rounds.length - 1]?.name || 'Grand Finale', scheduleText: h.submission?.logistics?.reportingTime ? C.fmtDT(h.submission.logistics.reportingTime) : '', meetLink: h.submission?.logistics?.meetLink || M.hackathonVenueText(h), customSubject: '', channel: ch });
+        toast(`Winner update sent via ${ch} to ${r.name}!`);
+        paint();
+      } catch(err){ toast(err.message, 'error'); wch.disabled = false; }
+      return;
+    }
+    if(t.closest('[data-wprevtoggle]')){ winMailMode = winMailMode === 'whatsapp' ? 'email' : 'whatsapp'; return redrawRows(); }
+    if(t.closest('[data-unannouncewin]')){
+      if(!confirm('Hide the public Winner Podium? Team statuses remain untouched.')) return;
+      try {
+        const curSub = C.normalizeSubmissionConfig(h.submission);
+        const nextSub = { ...curSub, winnerReveal: { ...(curSub.winnerReveal || {}), announced: false } };
+        await FS.updateDoc(FS.doc(C.db, 'hkHackathons', h.id), { submission: nextSub, updatedAtMs: Date.now(), updatedAt: FS.serverTimestamp() });
+        h.submission = nextSub;
+        toast('Winner podium hidden.', 'info');
+        paint();
+      } catch(err){ toast(err.message, 'error'); }
+      return;
+    }
     const rv = t.closest('[data-review]');
     if(rv){
       const card = rv.closest('[data-sub]'), s = subs.find(x => x.id === rv.dataset.review), sc = $('[data-score]', card).value, fb = $('[data-fb]', card).value.trim();

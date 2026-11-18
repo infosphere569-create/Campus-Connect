@@ -1423,3 +1423,114 @@ i[data-lucide]>svg{width:100%;height:100%;display:block}
   .hk-winners-grid{grid-template-columns:1fr}
   .hk-winners-box .wb-head .hk-btn{width:100%}
 }
+
+/* ---------- Compact Profile-Style Project / Prototype / Logistics Cards ---------- */
+.hk-sub-compact-head{align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.hk-sub-badge{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;background:color-mix(in srgb,var(--hk-p) 14%,var(--hk-surface2));color:var(--hk-p);border:1px solid color-mix(in srgb,var(--hk-p) 28%,var(--hk-line));flex:none}
+.hk-sub-badge.gold{background:linear-gradient(135deg,color-mix(in srgb,var(--hk-gold2) 26%,var(--hk-surface2)),color-mix(in srgb,var(--hk-gold) 14%,var(--hk-surface2)));color:var(--hk-gold);border-color:color-mix(in srgb,var(--hk-gold) 36%,var(--hk-line))}
+.hk-sub-badge i{width:20px;height:20px}
+.hk-sub-compact-idea{padding:11px 13px;border-radius:13px;background:var(--hk-surface2);border:1px solid var(--hk-line)}
+.hk-linkbtn{appearance:none;background:none;border:0;padding:4px 0 0;margin-top:2px;font-size:.78rem;font-weight:700;color:var(--hk-p);cursor:pointer;display:inline-flex;align-items:center;gap:4px}
+.hk-linkbtn:hover{text-decoration:underline}
+
+@keyframes hkCelebPop{
+  0%{transform:scale(.98);box-shadow:0 0 0 0 rgba(16,185,129,.38)}
+  50%{transform:scale(1.005);box-shadow:0 0 0 10px rgba(16,185,129,0)}
+  100%{transform:scale(1);box-shadow:var(--hk-shadow-sm)}
+}
+.hk-submit-celeb{animation:hkCelebPop .75s var(--hk-ease);border-color:color-mix(in srgb,var(--hk-p) 55%,var(--hk-line))}
+.hk-celeb-strip{display:flex;align-items:center;gap:8px;padding:9px 12px;margin-bottom:12px;border-radius:11px;background:linear-gradient(90deg,color-mix(in srgb,var(--hk-p) 16%,var(--hk-surface2)),color-mix(in srgb,var(--hk-gold2) 12%,var(--hk-surface2)));border:1px solid color-mix(in srgb,var(--hk-p) 35%,var(--hk-line));font-size:.82rem;font-weight:700;color:var(--hk-ink)}
+.hk-celeb-strip i{width:16px;height:16px;color:var(--hk-p);flex:none}
+
+.hk-proto-card{border-color:color-mix(in srgb,var(--hk-gold) 34%,var(--hk-line))}
+.hk-logi-card{border-color:color-mix(in srgb,var(--hk-sky) 36%,var(--hk-line));background:linear-gradient(155deg,color-mix(in srgb,var(--hk-sky) 7%,var(--hk-surface)),var(--hk-surface))}
+
+/* ---------- Clean Start Test Card & Zero-Lag Proctored Test Player ---------- */
+.hk-test-card-clean .hk-test-rules{margin:0;padding:0;list-style:none;display:grid;gap:7px}
+.hk-test-card-clean .hk-test-rules li{display:flex;align-items:flex-start;gap:8px;font-size:.81rem;color:var(--hk-muted);line-height:1.4;padding:8px 10px;border-radius:11px;background:var(--hk-surface2);border:1px solid var(--hk-line)}
+.hk-test-card-clean .hk-test-rules li i{width:15px;height:15px;color:var(--hk-p);margin-top:2px;flex:none}
+
+.hk-test-done{display:grid;gap:12px}
+.hk-test-done .td-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.hk-test-scorebox{padding:14px 16px;border-radius:14px;background:linear-gradient(135deg,color-mix(in srgb,var(--hk-p) 12%,var(--hk-surface2)),var(--hk-surface));border:1.5px solid color-mix(in srgb,var(--hk-p) 34%,var(--hk-line));display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.hk-test-scorebox .ts-main{display:grid;gap:2px}
+.hk-test-scorebox .ts-main b{font-family:var(--hk-head-font);font-size:1.45rem;line-height:1.1;color:var(--hk-ink)}
+.hk-test-scorebox .ts-main b small{font-size:.86rem;font-weight:600;color:var(--hk-muted)}
+.hk-test-scorebox .ts-pills{display:flex;gap:6px;flex-wrap:wrap}
+
+.hk-test-hd{position:sticky;top:8px;z-index:18;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:11px 14px;border-radius:16px;background:color-mix(in srgb,var(--hk-surface) 92%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--hk-line);box-shadow:var(--hk-shadow-sm);margin-bottom:10px}
+.hk-test-hd .th-left{display:grid;gap:2px;min-width:0}
+.hk-test-hd .th-sub{font-size:.86rem;color:var(--hk-ink)}
+.hk-test-hd .th-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+.hk-qpal{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 12px}
+.hk-qdot{min-width:34px;height:34px;padding:0 8px;border-radius:10px;border:1.5px solid var(--hk-line);background:var(--hk-surface);color:var(--hk-muted);font-family:var(--hk-mono);font-size:.78rem;font-weight:700;cursor:pointer;transition:border-color .12s,background .12s,color .12s}
+.hk-qdot:hover{border-color:var(--hk-p);color:var(--hk-ink)}
+.hk-qdot.ans{background:color-mix(in srgb,var(--hk-p) 15%,var(--hk-surface));border-color:color-mix(in srgb,var(--hk-p) 45%,var(--hk-line));color:var(--hk-p)}
+.hk-qdot.cur{background:var(--hk-p);border-color:var(--hk-p);color:var(--hk-on-p);box-shadow:0 4px 10px -4px color-mix(in srgb,var(--hk-p) 70%,transparent)}
+
+.hk-test-qbox .q-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.hk-test-qbox .q-title{font-size:1.05rem;line-height:1.45;margin:0 0 14px;color:var(--hk-ink)}
+
+/* ---------- Host Q&A Breakdown Modal ---------- */
+.hk-qa-item{padding:12px 14px;border-radius:14px;border:1.5px solid var(--hk-line);background:var(--hk-surface2);display:grid;gap:9px}
+.hk-qa-item.ok{border-color:color-mix(in srgb,var(--hk-p) 38%,var(--hk-line))}
+.hk-qa-item.bad{border-color:color-mix(in srgb,var(--hk-bad) 38%,var(--hk-line))}
+.hk-qa-item .qa-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.hk-qa-item .qa-head b{font-size:.9rem;line-height:1.38;flex:1;min-width:200px}
+.hk-qa-item .qa-opts{display:grid;gap:6px}
+.hk-qa-item .qa-opt{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:10px;border:1px solid var(--hk-line);background:var(--hk-surface);font-size:.82rem}
+.hk-qa-item .qa-opt>span{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;font-family:var(--hk-mono);font-size:.72rem;font-weight:800;background:var(--hk-surface2);flex:none}
+.hk-qa-item .qa-opt>b{flex:1;font-weight:500}
+.hk-qa-item .qa-opt>small{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.hk-qa-item .qa-opt.correct{border-color:color-mix(in srgb,var(--hk-p) 55%,var(--hk-line));background:color-mix(in srgb,var(--hk-p) 12%,var(--hk-surface))}
+.hk-qa-item .qa-opt.correct>span{background:var(--hk-p);color:var(--hk-on-p)}
+.hk-qa-item .qa-opt.correct>small{color:var(--hk-p)}
+.hk-qa-item .qa-opt.picked-bad{border-color:color-mix(in srgb,var(--hk-bad) 55%,var(--hk-line));background:color-mix(in srgb,var(--hk-bad) 10%,var(--hk-surface))}
+.hk-qa-item .qa-opt.picked-bad>span{background:var(--hk-bad);color:#fff}
+.hk-qa-item .qa-opt.picked-bad>small{color:var(--hk-bad)}
+
+/* ---------- Winner Studio, Public Podium, Confetti & My Hackathons Ribbon ---------- */
+.hk-win-studio{border-color:color-mix(in srgb,var(--hk-gold) 36%,var(--hk-line))}
+.hk-win-pick-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border-radius:13px;background:var(--hk-surface2);border:1px solid var(--hk-line)}
+
+.hk-winners-public{border-color:color-mix(in srgb,var(--hk-gold) 44%,var(--hk-line));background:linear-gradient(155deg,color-mix(in srgb,var(--hk-gold2) 10%,var(--hk-surface)),var(--hk-surface))}
+.hk-win-hero{position:relative;overflow:hidden;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:16px 18px;border-radius:16px;margin-bottom:14px;background:linear-gradient(135deg,color-mix(in srgb,var(--hk-gold2) 26%,var(--hk-surface)),color-mix(in srgb,var(--hk-p) 12%,var(--hk-surface)));border:1.5px solid color-mix(in srgb,var(--hk-gold) 50%,var(--hk-line))}
+.hk-win-hero .wh-ic{width:48px;height:48px;border-radius:15px;display:grid;place-items:center;background:linear-gradient(135deg,var(--hk-gold),var(--hk-gold2));color:#2a1c00;flex:none;box-shadow:0 8px 18px -8px rgba(201,138,16,.75);position:relative;z-index:1}
+.hk-win-hero .wh-ic i{width:24px;height:24px}
+.hk-win-hero .wh-body{flex:1;min-width:200px;position:relative;z-index:1}
+.hk-win-hero .wh-body h3{margin:6px 0 3px;font-size:1.15rem}
+.hk-win-hero .wh-body p{margin:0;font-size:.86rem;color:var(--hk-muted)}
+
+.hk-confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:0}
+@keyframes hkConfettiFall{
+  0%{transform:translateY(-14px) rotate(0deg);opacity:0}
+  15%{opacity:.95}
+  100%{transform:translateY(130px) rotate(260deg);opacity:0}
+}
+.hk-confetti i{position:absolute;top:-10px;left:calc((var(--i) * 5.7%) + 2%);width:7px;height:11px;border-radius:2px;background:var(--hk-gold);opacity:0;animation:hkConfettiFall 2.8s linear infinite;animation-delay:calc(var(--i) * .14s)}
+.hk-confetti i:nth-child(3n){background:var(--hk-p)}
+.hk-confetti i:nth-child(3n+1){background:var(--hk-sky)}
+
+.hk-podium-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.hk-podium-card{padding:12px 14px;border-radius:14px;background:var(--hk-surface);border:1.5px solid var(--hk-line);display:grid;gap:3px}
+.hk-podium-card.me{border-color:color-mix(in srgb,var(--hk-gold) 65%,var(--hk-line));background:linear-gradient(180deg,color-mix(in srgb,var(--hk-gold2) 14%,var(--hk-surface)),var(--hk-surface));box-shadow:0 6px 16px -10px rgba(201,138,16,.55)}
+.hk-podium-card .pc-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px}
+
+@keyframes hkShimmer{
+  0%{background-position:-120% 0}
+  100%{background-position:220% 0}
+}
+.hk-my-card.is-winner{border-color:color-mix(in srgb,var(--hk-gold) 55%,var(--hk-line));box-shadow:0 10px 24px -14px rgba(201,138,16,.5)}
+.hk-my-winribbon{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:11px;background:linear-gradient(110deg,color-mix(in srgb,var(--hk-gold2) 24%,var(--hk-surface2)),color-mix(in srgb,var(--hk-gold) 36%,var(--hk-surface2)),color-mix(in srgb,var(--hk-gold2) 24%,var(--hk-surface2)));background-size:200% 100%;animation:hkShimmer 3.2s linear infinite;border:1px solid color-mix(in srgb,var(--hk-gold) 48%,var(--hk-line));font-size:.8rem;font-weight:800;color:var(--hk-ink)}
+.hk-my-winribbon i{width:15px;height:15px;color:var(--hk-gold);flex:none}
+.hk-my-logi{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+@media (max-width:640px){
+  .hk-test-hd{top:4px;padding:10px 12px}
+  .hk-test-hd .th-right{width:100%;justify-content:space-between}
+  .hk-win-pick-row .hk-input{max-width:none!important;width:100%}
+  .hk-podium-grid{grid-template-columns:1fr}
+  .hk-test-scorebox{flex-direction:column;align-items:flex-start}
+}
+

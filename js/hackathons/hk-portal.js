@@ -465,6 +465,7 @@ async function myHacks(t){
       if(stale(t) || curPath() !== '/my') return;
     }
 
+    const now = Date.now();
     const cardsHtml = regs.map(r => {
       const h = hMap.get(r.hackathonId) || { id: r.hackathonId, title: r.hackathonTitle || 'Hackathon' };
       const st = ST_MAP[r.status] || ST_MAP.registered;
@@ -475,12 +476,30 @@ async function myHacks(t){
         ? `<div class="hk-sm hk-muted">Process: <b>${esc(curRound || 'Completed')}</b> (Step ${Math.min(curIdx + 1, rounds.length)} of ${rounds.length})</div>`
         : '';
       const cd = countdownHtml(h, r, r.status === 'selected');
-      return `<article class="hk-my-card">
+
+      const winRev = h.submission?.winnerReveal || {};
+      const isRevealed = !!(winRev.announced && (!winRev.revealAtMs || now >= winRev.revealAtMs));
+      const myWin = isRevealed && Array.isArray(winRev.winners) ? winRev.winners.find(w => w.uid === S.user.uid) : null;
+      const isWinnerCard = !!(myWin || (isRevealed && r.status === 'selected'));
+      const winRibbon = isWinnerCard
+        ? `<div class="hk-my-winribbon"><i data-lucide="trophy"></i><span>Winner · ${esc(myWin?.place || 'Selected')}${myWin?.prize ? ' · ' + esc(myWin.prize) : ''}</span></div>`
+        : (winRev.revealAtMs && now < winRev.revealAtMs
+            ? `<div class="hk-countdown gold"><i data-lucide="trophy"></i><span>Winners reveal ${C.fmtDT(winRev.revealAtMs)}</span><span class="tval" data-cd="${winRev.revealAtMs}">${C.countdownText(winRev.revealAtMs, now)}</span></div>`
+            : '');
+
+      const logi = h.submission?.logistics;
+      const showLogiChip = !!(logi && logi.mode && (['selected', 'shortlisted'].includes(r.status) || logi.visibleTo === 'all'));
+      const logiLine = showLogiChip
+        ? `<div class="hk-my-logi"><span class="hk-chip ${logi.mode === 'online' ? 'sky' : 'gold'}"><i data-lucide="${logi.mode === 'online' ? 'video' : 'map-pin'}"></i>${esc(logi.mode.toUpperCase())}</span>${logi.venueName || logi.reportingTime ? `<span class="hk-xs hk-muted">${esc(logi.venueName || '')}${logi.venueName && logi.reportingTime ? ' · ' : ''}${logi.reportingTime ? esc(C.fmtDT(logi.reportingTime) !== '—' ? C.fmtDT(logi.reportingTime) : logi.reportingTime) : ''}</span>` : ''}</div>`
+        : '';
+
+      return `<article class="hk-my-card ${isWinnerCard ? 'is-winner' : ''}">
         <div class="hk-my-banner ${st.cls}">
           <span style="display:inline-flex;align-items:center;gap:6px"><i data-lucide="${st.ic}"></i>${st.label}</span>
           <span>${curRound ? esc(curRound) : esc(r.teamMode === 'solo' ? 'Solo' : 'Team ' + (r.teamName || ''))}</span>
         </div>
         <div class="hk-my-body">
+          ${winRibbon}
           <div class="hk-my-top">
             <div class="th" style="${mediaStyle(h)}"></div>
             <div class="info">
@@ -489,6 +508,7 @@ async function myHacks(t){
               ${roundLine}
             </div>
           </div>
+          ${logiLine}
           ${r.hostNote ? `<div class="hk-msg ok" style="padding:8px 12px"><i data-lucide="message-square-text"></i><span><b>Organiser note:</b> ${esc(r.hostNote)}</span></div>` : ''}
           ${cd || ''}
           <div class="hk-my-acts">
