@@ -3,6 +3,16 @@ import * as C from './hk-core.js';
 import { empty, countdownHtml, startCountdowns } from './hk-ui.js';
 
 const { $, $$, esc, icons, toast, FS } = C;
+const extractProto = sub => {
+  if(typeof C.getPrototypeSubmission === 'function') return C.getPrototypeSubmission(sub);
+  if(!sub || !Array.isArray(sub.customAnswers)) return null;
+  const hit = sub.customAnswers.find(a => a && a.id === '__proto_meta');
+  if(!hit) return null;
+  try {
+    const d = typeof hit.value === 'string' ? JSON.parse(hit.value) : (hit.data || hit);
+    return d && d.title ? d : null;
+  } catch { return null; }
+};
 const STATUS_TXT = {
   registered: ['Registered', '', 'ticket-check'],
   shortlisted: ['Shortlisted', '', 'sparkles'],
@@ -192,7 +202,7 @@ export async function dash(cx, hid){
     const winnersRevealed = !!(winCfg.announced && (!winCfg.revealAtMs || now >= winCfg.revealAtMs));
     const myWin = winnersRevealed ? winnersList.find(w => w.uid === S.user.uid) : null;
 
-    const protoSub = C.getPrototypeSubmission(sub);
+    const protoSub = extractProto(sub);
     const isSubReviewed = !!(sub && (sub.reviewStatus === 'reviewed' || sub.score != null || (sub.feedback || '').trim()));
     const subOpen = subCfg.open !== false && (!ideaDl || now <= ideaDl) && reg.status !== 'rejected';
     const canEditSub = subOpen && !isSubReviewed;

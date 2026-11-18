@@ -251,10 +251,11 @@ export function buildHackathonEmail(kind, ctx = {}) {
     const winPlace = ctx.winnerPlace || winEntry?.place || '';
     const winPrize = ctx.winnerPrize || winEntry?.prize || '';
     const lgMode = lg.mode === 'online' ? 'Online (Virtual)' : lg.mode === 'offline' ? 'Offline (In-Person)' : lg.mode === 'hybrid' ? 'Hybrid (Online + In-Person)' : (h.mode || '');
-    const lgPlace = [lg.venue, lg.address, lg.mapLink].filter(Boolean).join(' · ');
+    const lgPlace = [lg.venueName || lg.venue, lg.address, lg.mapUrl || lg.mapLink].filter(Boolean).join(' · ');
     const lgLink = meetLink || lg.meetLink || lgPlace || venue;
-    const lgSched = scheduleText || (lg.reportDateMs ? fmtLongDT(lg.reportDateMs) : '');
-    const extraNote = [note, lg.reportingNote, lg.dressOrIdNote].filter(Boolean).join('\n');
+    const lgRepTs = lg.reportingTime || lg.reportDateMs;
+    const lgSched = scheduleText || (lgRepTs ? (fmtLongDT(lgRepTs) !== '—' ? fmtLongDT(lgRepTs) : String(lgRepTs)) : '');
+    const extraNote = [note, lg.instructions || lg.reportingNote, lg.deskContact ? `Reporting Desk: ${lg.deskContact}` : '', lg.dressOrIdNote].filter(Boolean).join('\n');
 
     subject = customSubj || (winPlace ? `🏆 Winner (${winPlace}) — ${title}!` : `Congratulations — Selected in ${title}!`);
     heading = winPlace ? `Winner Announcement · ${winPlace}` : 'Selected / Finalist Announcement';

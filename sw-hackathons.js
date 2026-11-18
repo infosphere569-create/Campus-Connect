@@ -1,5 +1,5 @@
-// Campus Connect One Hackathons Service Worker v7
-const CACHE_VERSION = 'hk-pwa-v7';
+// Campus Connect One Hackathons Service Worker v8
+const CACHE_VERSION = 'hk-pwa-v8';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -134,8 +134,26 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Same-origin static assets: stale-while-revalidate
+  // Same-origin code/style assets: Network-First so ES module graphs never mix stale & new files
   if (url.startsWith(self.location.origin)) {
+    let isCodeOrStyle = false;
+    try { isCodeOrStyle = /\.(js|mjs|css|json)$/i.test(new URL(url).pathname); } catch {}
+    if (isCodeOrStyle) {
+      event.respondWith(
+        fetch(req, { cache: 'no-cache' })
+          .then((res) => {
+            if (res && res.status === 200) {
+              const copy = res.clone();
+              caches.open(RUNTIME_CACHE).then((c) => c.put(req, copy)).catch(() => {});
+            }
+            return res;
+          })
+          .catch(() => caches.match(req, { ignoreSearch: true }))
+      );
+      return;
+    }
+
+    // Images, icons, fonts: stale-while-revalidate
     event.respondWith(
       caches.match(req, { ignoreSearch: true }).then((cached) => {
         const network = fetch(req)
@@ -150,6 +168,5 @@ self.addEventListener('fetch', (event) => {
         return cached || network;
       })
     );
-    return;
   }
 });

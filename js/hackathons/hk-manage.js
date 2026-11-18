@@ -5,6 +5,16 @@ import { empty, statusBadge } from './hk-ui.js';
 
 const { $, $$, esc, icons, toast, modal, FS } = C;
 const STS = C.REG_STATUS;
+const extractProto = sub => {
+  if(typeof C.getPrototypeSubmission === 'function') return C.getPrototypeSubmission(sub);
+  if(!sub || !Array.isArray(sub.customAnswers)) return null;
+  const hit = sub.customAnswers.find(a => a && a.id === '__proto_meta');
+  if(!hit) return null;
+  try {
+    const d = typeof hit.value === 'string' ? JSON.parse(hit.value) : (hit.data || hit);
+    return d && d.title ? d : null;
+  } catch { return null; }
+};
 
 export async function manage(cx, id){
   const { S, view } = cx;
@@ -443,7 +453,7 @@ export async function manage(cx, id){
                   ? `<div style="font-weight:700;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(s.title)}">${esc(s.title)}</div>
                       <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;align-items:center">
                         ${s.score != null ? `<span class="hk-chip ${+s.score >= 80 ? 'gold' : ''}">Score ${esc(s.score)}/100</span>` : `<span class="hk-chip warn">Needs review</span>`}
-                        ${C.getPrototypeSubmission(s) ? `<span class="hk-chip sky">Proto ✓</span>` : ''}
+                        ${extractProto(s) ? `<span class="hk-chip sky">Proto ✓</span>` : ''}
                         ${projLinks}
                       </div>`
                   : '<span class="hk-xs hk-muted">No project submitted</span>'}
@@ -730,7 +740,7 @@ export async function manage(cx, id){
     const logi = subCfg.logistics && typeof subCfg.logistics === 'object' ? subCfg.logistics : {};
     const winCfg = subCfg.winnerReveal && typeof subCfg.winnerReveal === 'object' ? subCfg.winnerReveal : {};
     const winners = regs.filter(r => r.status === 'selected');
-    const protoSubs = subs.map(s => ({ s, r: regOf(s.uid), proto: C.getPrototypeSubmission(s) })).filter(x => !!x.proto);
+    const protoSubs = subs.map(s => ({ s, r: regOf(s.uid), proto: extractProto(s) })).filter(x => !!x.proto);
 
     const rankedCandidates = [...regs]
       .filter(r => r.status !== 'rejected')

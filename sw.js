@@ -1,5 +1,5 @@
-// Campus Connect One Service Worker v43
-const CACHE_VERSION = 'cc-v43';
+// Campus Connect One Service Worker v44
+const CACHE_VERSION = 'cc-v44';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -103,8 +103,24 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Same-origin static assets: stale-while-revalidate
+  // Same-origin static assets: Network-First for code/style, stale-while-revalidate for media
   if (url.startsWith(self.location.origin)) {
+    let isCodeOrStyle = false;
+    try { isCodeOrStyle = /\.(js|mjs|css|json)$/i.test(new URL(url).pathname); } catch {}
+    if (isCodeOrStyle) {
+      event.respondWith(
+        fetch(req, { cache: 'no-cache' })
+          .then((res) => {
+            if (res && res.status === 200) {
+              const copy = res.clone();
+              caches.open(RUNTIME_CACHE).then((c) => c.put(req, copy));
+            }
+            return res;
+          })
+          .catch(() => caches.match(req, { ignoreSearch: true }))
+      );
+      return;
+    }
     event.respondWith(
       caches.match(req).then((cached) => {
         const network = fetch(req).then((res) => {
