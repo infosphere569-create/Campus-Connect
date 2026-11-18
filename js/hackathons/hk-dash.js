@@ -481,7 +481,7 @@ export async function dash(cx, hid){
           </div>
           <p class="hk-sm hk-muted" style="margin-top:8px">Fill in your idea and links. Editable until the organiser reviews your submission${ideaDl ? ` (or deadline <b>${C.fmtDT(ideaDl)}</b>)` : ''}. ${subCfg.instructions ? esc(subCfg.instructions) : ''}</p>
           <form id="subForm" class="hk-form" novalidate style="margin-top:12px">
-            <div class="hk-field"><label>Project / idea title</label><input class="hk-input" name="title" maxlength="140" required placeholder="e.g. JeevikaAI — Multilingual Job Assistant" value="${f('title')}" ${subOpen ? '' : 'disabled'}></div>
+            <div class="hk-field"><label>Project / idea title</label><input class="hk-input" name="title" maxlength="140" required placeholder="e.g. Smart Campus Utility App" value="${f('title')}" ${subOpen ? '' : 'disabled'}></div>
             <div class="hk-field"><label>Idea &amp; approach <small>problem, solution, tech used</small></label><textarea class="hk-textarea" name="idea" maxlength="4000" required placeholder="Describe the problem you solve, approach, and tech stack (min 30 characters)…" style="min-height:110px" ${subOpen ? '' : 'disabled'}>${f('idea')}</textarea></div>
             ${stdInputsHtml ? `<div class="hk-grid2">${stdInputsHtml}</div>` : ''}
             ${customInputsHtml}
@@ -549,7 +549,7 @@ export async function dash(cx, hid){
           ${protoCfg.instructions ? `<div class="hk-msg ok" style="margin-top:10px"><i data-lucide="clipboard-list"></i><span>${esc(protoCfg.instructions)}</span></div>` : ''}
           ${protoDl && now < protoDl ? `<div class="hk-countdown" style="margin-top:10px"><i data-lucide="timer"></i><span>Prototype window closes in</span><span class="tval" data-cd="${protoDl}">${C.countdownText(protoDl, now)}</span></div>` : ''}
           <form id="protoForm" class="hk-form" novalidate style="margin-top:12px">
-            <div class="hk-field"><label>Prototype / Build Name</label><input class="hk-input" name="title" maxlength="140" required placeholder="e.g. JeevikaAI Working MVP v1" value="${esc(protoSub?.title || sub?.title || '')}" ${protoOpenNow ? '' : 'disabled'}></div>
+            <div class="hk-field"><label>Prototype / Build Name</label><input class="hk-input" name="title" maxlength="140" required placeholder="e.g. Working Prototype v1" value="${esc(protoSub?.title || sub?.title || '')}" ${protoOpenNow ? '' : 'disabled'}></div>
             <div class="hk-field"><label>What did you build? <small>features, working flow, tech stack</small></label><textarea class="hk-textarea" name="details" maxlength="3500" required placeholder="Describe what works in your prototype, architecture, and any test credentials…" style="min-height:96px" ${protoOpenNow ? '' : 'disabled'}>${esc(protoSub?.details || '')}</textarea></div>
             <div class="hk-grid2">
               ${askRepo ? `<div class="hk-field"><label>GitHub Repository Link <small>${protoCfg.reqRepo ? 'required' : 'optional'}</small></label><input class="hk-input" name="repoUrl" type="url" placeholder="https://github.com/..." value="${esc(protoSub?.repoUrl || sub?.repoUrl || '')}" ${protoCfg.reqRepo ? 'required' : ''} ${protoOpenNow ? '' : 'disabled'}></div>` : ''}

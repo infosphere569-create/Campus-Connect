@@ -1,5 +1,5 @@
-// Campus Connect One Service Worker v45
-const CACHE_VERSION = 'cc-v45';
+// Campus Connect One Service Worker v46
+const CACHE_VERSION = 'cc-v46';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -109,7 +109,7 @@ self.addEventListener('fetch', (event) => {
     try { isCodeOrStyle = /\.(js|mjs|css|json)$/i.test(new URL(url).pathname); } catch {}
     if (isCodeOrStyle) {
       event.respondWith(
-        fetch(req, { cache: 'no-cache' })
+        fetch(req, { cache: 'no-store' })
           .then((res) => {
             if (res && res.status === 200) {
               const copy = res.clone();

@@ -1,5 +1,5 @@
-// Campus Connect One Hackathons Service Worker v9
-const CACHE_VERSION = 'hk-pwa-v9';
+// Campus Connect One Hackathons Service Worker v10
+const CACHE_VERSION = 'hk-pwa-v10';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -35,7 +35,7 @@ self.addEventListener('install', (event) => {
       .then((cache) => {
         return Promise.allSettled(
           SHELL_ASSETS.map((url) =>
-            fetch(url, { cache: 'reload' })
+            fetch(url, { cache: 'no-store' })
               .then((res) => {
                 if (res && (res.status === 200 || res.type === 'opaque')) {
                   return cache.put(url, res);
@@ -76,7 +76,7 @@ self.addEventListener('fetch', (event) => {
   // Navigation requests: Network-First with safe redirect handling
   if (req.mode === 'navigate') {
     event.respondWith(
-      fetch(req)
+      fetch(req, { cache: 'no-cache' })
         .then((res) => {
           if (!res) {
             return caches.match(req, { ignoreSearch: true });
@@ -140,7 +140,7 @@ self.addEventListener('fetch', (event) => {
     try { isCodeOrStyle = /\.(js|mjs|css|json)$/i.test(new URL(url).pathname); } catch {}
     if (isCodeOrStyle) {
       event.respondWith(
-        fetch(req, { cache: 'no-cache' })
+        fetch(req, { cache: 'no-store' })
           .then((res) => {
             if (res && res.status === 200) {
               const copy = res.clone();

@@ -105,8 +105,11 @@ export function autoSuggestMailKind(reg, { hasTest = false, att = null, sub = nu
 }
 
 function fmtLongDT(ms) {
-  if (!ms) return 'To be announced';
+  const n = typeof C.toMs === 'function' ? C.toMs(ms) : Number(ms);
+  if (!n || !Number.isFinite(n) || n <= 0) return 'To be announced';
   try {
+    const d = new Date(n);
+    if (Number.isNaN(d.getTime())) return 'To be announced';
     return new Intl.DateTimeFormat('en-IN', {
       weekday: 'short',
       day: '2-digit',
@@ -114,9 +117,9 @@ function fmtLongDT(ms) {
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
-    }).format(new Date(ms)) + ' IST';
+    }).format(d) + ' IST';
   } catch {
-    return C.fmtDT(ms);
+    return 'To be announced';
   }
 }
 

@@ -1248,30 +1248,47 @@ export async function manage(cx, id){
     if(bEl) bEl.textContent = mailer.previewMode === 'whatsapp' ? prev.whatsappText : prev.body;
   };
 
-  const setTab = t => { tab = t; paint(); };
+  const renderActiveTab = () => {
+    try {
+      return tab === 'regs' ? regsTab()
+        : tab === 'mail' ? mailTab()
+        : tab === 'subs' ? subsTab()
+        : tab === 'next' ? nextTab()
+        : testTab();
+    } catch(err){
+      console.error('[HK Manage] Tab render error:', tab, err);
+      return `<div class="hk-card-s" style="border-color:color-mix(in srgb,var(--hk-bad) 40%,var(--hk-line))">
+        <b>Could not render this section</b>
+        <p class="hk-sm hk-muted" style="margin:6px 0 12px">${esc(err?.message || 'Unexpected rendering error')}</p>
+        <button type="button" class="hk-btn sm primary" data-tab="regs">Return to Registrations</button>
+      </div>`;
+    }
+  };
+
+  const setTab = t => { if(!t) return; tab = t; paint(); };
   const paint = () => {
     const closed = h.registrationClosed, mailed = regs.filter(r => M.isMailSent(r, null, localMail)).length;
     view.innerHTML = `<div class="hk-view"><a class="hk-btn ghost sm" href="${esc(cx.backHash || '#/host')}" style="margin-bottom:10px"><i data-lucide="arrow-left"></i>${cx.backLabel || 'Dashboard'}</a>
       <div class="hk-page-h"><div><span class="hk-eyebrow" style="color:var(--hk-gold)">Manage</span><h1>${esc(h.title)}</h1><p>${statusBadge(h.status)} <span class="hk-chip ${ph.tone}">${ph.label}</span></p></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">${cx.viewHref ? `<a class="hk-btn" href="${esc(cx.viewHref)}"><i data-lucide="eye"></i>View page</a>` : `<a class="hk-btn" href="#/h/${h.id}"><i data-lucide="eye"></i>View page</a>`}<button class="hk-btn" data-announce><i data-lucide="megaphone"></i>Announce</button><button class="hk-btn" data-csv><i data-lucide="file-spreadsheet"></i>CSV</button><button class="hk-btn primary" data-pdf><i data-lucide="file-down"></i>PDF</button></div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">${cx.viewHref ? `<a class="hk-btn" href="${esc(cx.viewHref)}"><i data-lucide="eye"></i>View page</a>` : `<a class="hk-btn" href="#/h/${h.id}"><i data-lucide="eye"></i>View page</a>`}<button type="button" class="hk-btn" data-announce><i data-lucide="megaphone"></i>Announce</button><button type="button" class="hk-btn" data-csv><i data-lucide="file-spreadsheet"></i>CSV</button><button type="button" class="hk-btn primary" data-pdf><i data-lucide="file-down"></i>PDF</button></div></div>
       <div class="hk-kpis"><div class="hk-kpi"><div class="ki"><i data-lucide="users"></i></div><strong>${regs.length}</strong><span>Registrations${h.maxParticipants ? ` / ${h.maxParticipants}` : ''}</span></div>
         <div class="hk-kpi g"><div class="ki"><i data-lucide="user-check"></i></div><strong>${regs.filter(r => ['shortlisted', 'selected'].includes(r.status)).length}</strong><span>Shortlisted / selected</span></div>
         <div class="hk-kpi c"><div class="ki"><i data-lucide="lightbulb"></i></div><strong>${subs.length}</strong><span>Submissions</span></div>
         <div class="hk-kpi s"><div class="ki"><i data-lucide="mail-check"></i></div><strong>${mailed}</strong><span>Teams emailed</span></div></div>
-      <div class="hk-card-s" style="margin:14px 0;display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:space-between"><div><b>Registration is ${closed ? 'closed' : 'open'}</b><div class="hk-sm hk-muted">${h.regDeadlineMs ? 'Deadline ' + C.fmtDT(h.regDeadlineMs) + '. ' : ''}Automatic emails are <b>${h.autoEmail === false ? 'off' : 'on'}</b>.</div></div><button class="hk-btn sm ${closed ? 'primary' : ''}" data-toggle>${closed ? 'Reopen registration' : 'End registration now'}</button></div>
-      <div class="hk-tabs" role="tablist">${[['regs', 'users', `Registrations (${regs.length})`], ['subs', 'trophy', `Review Submissions (${subs.length})`], ['test', 'clipboard-check', 'Test'], ['next', 'rocket', 'Next Step & Winners'], ['mail', 'mail', `Mailer & Outreach`]].map(([k, ic, l]) => `<button class="${tab === k ? 'on' : ''}" data-tab="${k}" role="tab"><i data-lucide="${ic}"></i>${l}</button>`).join('')}</div>
-      <div id="tabBody">${tab === 'regs' ? regsTab() : tab === 'mail' ? mailTab() : tab === 'subs' ? subsTab() : tab === 'next' ? nextTab() : testTab()}</div></div>`;
+      <div class="hk-card-s" style="margin:14px 0;display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:space-between"><div><b>Registration is ${closed ? 'closed' : 'open'}</b><div class="hk-sm hk-muted">${h.regDeadlineMs ? 'Deadline ' + C.fmtDT(h.regDeadlineMs) + '. ' : ''}Automatic emails are <b>${h.autoEmail === false ? 'off' : 'on'}</b>.</div></div><button type="button" class="hk-btn sm ${closed ? 'primary' : ''}" data-toggle>${closed ? 'Reopen registration' : 'End registration now'}</button></div>
+      <div class="hk-tabs" role="tablist">${[['regs', 'users', `Registrations (${regs.length})`], ['subs', 'trophy', `Review Submissions (${subs.length})`], ['test', 'clipboard-check', 'Test'], ['next', 'rocket', 'Next Step & Winners'], ['mail', 'mail', `Mailer & Outreach`]].map(([k, ic, l]) => `<button type="button" class="${tab === k ? 'on' : ''}" data-tab="${k}" role="tab" aria-selected="${tab === k ? 'true' : 'false'}"><i data-lucide="${ic}"></i>${l}</button>`).join('')}</div>
+      <div id="tabBody">${renderActiveTab()}</div></div>`;
     icons();
-    bindNextTabForms();
+    try { bindNextTabForms(); } catch(err){ console.error('[HK Manage] Form bind error:', err); }
   };
   const redrawRows = () => {
     const b = $('#tabBody');
     if(!b) return;
     if(['regs', 'mail', 'subs', 'test', 'next'].includes(tab)){
       const k = document.activeElement?.id, pos = document.activeElement?.selectionStart;
-      b.innerHTML = tab === 'regs' ? regsTab() : tab === 'mail' ? mailTab() : tab === 'subs' ? subsTab() : tab === 'next' ? nextTab() : testTab();
+      b.innerHTML = renderActiveTab();
       icons();
-      bindNextTabForms();
+      try { bindNextTabForms(); } catch(err){ console.error('[HK Manage] Form bind error:', err); }
       if(k){ const el = $('#' + k); el?.focus(); try { el.setSelectionRange(pos, pos); } catch {} }
     }
   };
@@ -1626,10 +1643,10 @@ export async function manage(cx, id){
       <div class="hk-field">
         <label>Review Status <small>Finalized disables student editing &amp; shows "Marked as Reviewed"</small></label>
         <div class="hk-chseg" id="rmRevMode" role="group" aria-label="Review status mode">
-          <button type="button" class="${s.reviewStatus !== 'reviewed' ? '' : ''}" data-rmst="reviewing"><i data-lucide="hourglass"></i>Reviewing (Keep Editable)</button>
-          <button type="button" class="on" data-rmst="reviewed"><i data-lucide="lock"></i>Finalized (Marked as Reviewed)</button>
+          <button type="button" class="${s.reviewStatus !== 'reviewed' ? 'on' : ''}" data-rmst="reviewing"><i data-lucide="hourglass"></i>Reviewing (Keep Editable)</button>
+          <button type="button" class="${s.reviewStatus === 'reviewed' ? 'on' : ''}" data-rmst="reviewed"><i data-lucide="lock"></i>Finalized (Marked as Reviewed)</button>
         </div>
-        <input type="hidden" id="rmRevVal" value="reviewed">
+        <input type="hidden" id="rmRevVal" value="${s.reviewStatus === 'reviewed' ? 'reviewed' : 'reviewing'}">
       </div>
 
       <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
@@ -1952,9 +1969,11 @@ export async function manage(cx, id){
     catch(err){ toast(err.message, 'error'); t.value = prev; }
   };
   view.onclick = async e => {
-    const t = e.target;
-    const pb = t.closest('[data-prof]'); if(pb){ const r = regs.find(x => x.id === pb.dataset.prof); if(r) viewApplicantModal(r); return; }
-    const tb = t.closest('[data-tab]'); if(tb) return setTab(tb.dataset.tab);
+    try {
+      const t = e.target;
+      if(!t || typeof t.closest !== 'function') return;
+      const pb = t.closest('[data-prof]'); if(pb){ const r = regs.find(x => x.id === pb.dataset.prof); if(r) viewApplicantModal(r); return; }
+      const tb = t.closest('[data-tab]'); if(tb) return setTab(tb.dataset.tab);
     const mb = t.closest('[data-mail]'); if(mb){ const r = regs.find(x => x.id === mb.dataset.mail); if(r) compose([r]); return; }
     const sv = t.closest('[data-subview]'); if(sv){ subsView = sv.dataset.subview; return redrawRows(); }
     const sfBtn = t.closest('[data-subf]'); if(sfBtn){ subFilter = sfBtn.dataset.subf; return redrawRows(); }
@@ -2294,6 +2313,10 @@ export async function manage(cx, id){
           } catch(err){ toast(err.message, 'error'); bt.disabled = false; bt.innerHTML = 'Send update'; }
         };
       } });
+      }
+    } catch(err){
+      console.error('[HK Manage] Click error:', err);
+      toast(err?.message || 'Could not complete action', 'error');
     }
   };
   cx.S.cleanup = () => { view.oninput = view.onchange = view.onclick = null; };

@@ -3,7 +3,9 @@ let hkDeferredPrompt = null;
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw-hackathons.js').catch(err => console.warn('[HK PWA] SW Error:', err));
+    navigator.serviceWorker.register('sw-hackathons.js', { updateViaCache: 'none' })
+      .then(reg => { try { reg.update?.(); } catch {} })
+      .catch(err => console.warn('[HK PWA] SW Error:', err));
   });
 }
 
@@ -16,6 +18,17 @@ async function checkHkInstalled() {
     return true;
   }
   return localStorage.getItem('hk-install-done') === '1';
+}
+
+function showHkInstallHint() {
+  if (document.querySelector('[data-hk-install-hint]')) return;
+  const tip = document.createElement('div');
+  tip.setAttribute('data-hk-install-hint', '');
+  tip.style.cssText = 'position:fixed;left:14px;right:14px;bottom:calc(max(14px,env(safe-area-inset-bottom,14px)) + 20px);z-index:110001;max-width:540px;margin:0 auto;padding:12px 16px;border-radius:16px;background:#0b1410;border:1px solid #178a54;color:#fff;font-size:.86rem;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 18px 50px rgba(0,0,0,.55)';
+  tip.innerHTML = '<span>Tap your browser menu and select <b>Add to Home Screen</b> or <b>Install App</b>.</span><button type="button" style="background:#178a54;color:#fff;border:0;border-radius:9px;padding:6px 12px;font-weight:700;cursor:pointer">OK</button>';
+  tip.querySelector('button')?.addEventListener('click', () => tip.remove());
+  document.body.appendChild(tip);
+  setTimeout(() => tip.remove(), 6500);
 }
 
 function buildHkInstallBanner() {
@@ -32,8 +45,8 @@ function buildHkInstallBanner() {
       <strong style="display:block;font-size:.92rem;color:#fff">Install Hackathons App</strong>
       <span style="font-size:.8rem;color:#98a0b3">Launch campus hackathons instantly from your home screen.</span>
     </div>
-    <button data-hk-dismiss style="background:transparent;border:0;color:#98a0b3;font-weight:700;padding:8px;cursor:pointer">Later</button>
-    <button data-hk-install style="background:#178a54;color:#fff;border:0;font-weight:800;padding:9px 15px;border-radius:11px;cursor:pointer;white-space:nowrap">Install</button>
+    <button type="button" data-hk-dismiss style="background:transparent;border:0;color:#98a0b3;font-weight:700;padding:8px;cursor:pointer">Later</button>
+    <button type="button" data-hk-install style="background:#178a54;color:#fff;border:0;font-weight:800;padding:9px 15px;border-radius:11px;cursor:pointer;white-space:nowrap">Install</button>
   `;
   document.body.appendChild(bar);
 
@@ -55,15 +68,15 @@ function buildHkInstallBanner() {
       }
       hkDeferredPrompt = null;
     } else {
-      alert('To install, tap your browser menu (⋮ or ⋯) and select "Add to Home Screen" or "Install App".');
+      showHkInstallHint();
     }
   });
 }
 
-window.addEventListener('beforeinstallprompt', (e) => {
+window.addEventListener('beforeinstallprompt', async (e) => {
   e.preventDefault();
   hkDeferredPrompt = e;
-  if (!checkHkInstalled()) {
+  if (!(await checkHkInstalled())) {
     buildHkInstallBanner();
   }
 });

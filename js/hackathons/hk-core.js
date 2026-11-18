@@ -32,21 +32,54 @@ export function safeUrl(u = ''){
   return /^(https?:\/\/|data:image\/(png|jpe?g|webp|gif);base64,)/i.test(s) ? s : '';
 }
 export const money = n => '₹' + Number(n || 0).toLocaleString('en-IN');
-export const fmtDate = ms => ms ? new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(ms)) : '—';
-export const fmtDT = ms => ms ? new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(ms)) : '—';
+export function toMs(v){
+  if(!v) return 0;
+  if(typeof v === 'number') return Number.isFinite(v) && v > 0 ? v : 0;
+  if(typeof v === 'object'){
+    if(typeof v.toMillis === 'function'){
+      const n = v.toMillis();
+      return Number.isFinite(n) && n > 0 ? n : 0;
+    }
+    if(typeof v.seconds === 'number'){
+      const n = v.seconds * 1000 + Math.round((v.nanoseconds || 0) / 1e6);
+      return Number.isFinite(n) && n > 0 ? n : 0;
+    }
+    if(v instanceof Date){
+      const n = v.getTime();
+      return Number.isFinite(n) && n > 0 ? n : 0;
+    }
+  }
+  if(typeof v === 'string'){
+    const num = Number(v);
+    if(Number.isFinite(num) && num > 0) return num;
+    const p = Date.parse(v);
+    return Number.isFinite(p) && p > 0 ? p : 0;
+  }
+  return 0;
+}
+export const fmtDate = ms => { const n = toMs(ms); if(!n) return '—'; try { return new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(n)); } catch { return '—'; } };
+export const fmtDT = ms => { const n = toMs(ms); if(!n) return '—'; try { return new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(n)); } catch { return '—'; } };
 export function dateRange(a, b){
-  if(!a) return 'Dates TBA';
-  const f = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short' });
-  return !b || f.format(new Date(a)) === f.format(new Date(b)) ? f.format(new Date(a)) : `${f.format(new Date(a))} – ${f.format(new Date(b))}`;
+  const ma = toMs(a), mb = toMs(b);
+  if(!ma) return 'Dates TBA';
+  try {
+    const f = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short' });
+    const sa = f.format(new Date(ma));
+    if(!mb) return sa;
+    const sb = f.format(new Date(mb));
+    return sa === sb ? sa : `${sa} – ${sb}`;
+  } catch { return 'Dates TBA'; }
 }
 export function ago(ms){
-  const s = Math.floor((Date.now() - ms) / 1000);
+  const n = toMs(ms);
+  if(!n) return 'just now';
+  const s = Math.floor((Date.now() - n) / 1000);
   if(!Number.isFinite(s) || s < 0) return 'just now';
   if(s < 60) return 'just now'; if(s < 3600) return `${Math.floor(s / 60)}m ago`;
   if(s < 86400) return `${Math.floor(s / 3600)}h ago`; if(s < 604800) return `${Math.floor(s / 86400)}d ago`;
-  return fmtDate(ms);
+  return fmtDate(n);
 }
-export const toLocalInput = ms => { const n = Number(ms); if(!Number.isFinite(n) || n <= 0) return ''; const d = new Date(n); if(Number.isNaN(d.getTime())) return ''; const p = x => String(x).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
+export const toLocalInput = ms => { const n = toMs(ms); if(!n) return ''; const d = new Date(n); if(Number.isNaN(d.getTime())) return ''; const p = x => String(x).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
 export const fromLocalInput = v => { if(!v) return 0; const ms = new Date(v).getTime(); return Number.isFinite(ms) && ms > 0 ? Math.round(ms) : 0; };
 export function normalizeSubmissionConfig(sub){
   if(!sub || typeof sub !== 'object') return { open: true, deadlineMs: 0, instructions: '', customFields: [] };
