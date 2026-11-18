@@ -765,7 +765,7 @@ export async function manage(cx, id){
       .sort((a, b) => b.pts - a.pts || (b.em.subScore ?? -1) - (a.em.subScore ?? -1) || (b.em.testPct ?? -1) - (a.em.testPct ?? -1));
 
     const placeLabels = ['1st Prize · Champion', '2nd Prize · Runner Up', '3rd Prize · 2nd Runner Up'];
-    const defaultWinnersMailTarget = winners[0] || rankedCandidates[0]?.r || { name: 'Team Leader', email: 'team@example.com', teamName: 'Alpha Builders', status: 'selected' };
+    const defaultWinnersMailTarget = winners[0] || rankedCandidates[0]?.r || { name: 'Team Leader', email: 'team@example.com', teamName: 'Sample Team', status: 'selected' };
     const winMailPreview = M.buildHackathonEmail('selected', {
       hackathon: h, hackathonId: h.id, reg: defaultWinnersMailTarget,
       round: rounds[rounds.length - 1]?.name || 'Grand Finale',
@@ -1058,7 +1058,7 @@ export async function manage(cx, id){
   }
 
   function getMailerPreviewData(){
-    const first = mailer.queue.find(x => !x.sent) || mailer.queue[0] || regs[0] || { name: 'Team Leader', email: 'team@example.com', teamMode: 'team', teamName: 'Alpha Builders' };
+    const first = mailer.queue.find(x => !x.sent) || mailer.queue[0] || regs[0] || { name: 'Team Leader', email: 'team@example.com', teamMode: 'team', teamName: 'Sample Team' };
     const regObj = first.reg || (first.regId ? regs.find(r => r.id === first.regId) : first) || first;
     return M.buildHackathonEmail(mailer.kind, {
       hackathon: h,
