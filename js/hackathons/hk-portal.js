@@ -2,7 +2,7 @@
 // Host views (dashboard, create wizard, manage) live in hk-host.js.
 import { initBg } from './hk-bg.js';
 import * as C from './hk-core.js';
-import { card, spot, empty, skeletonCards, detailHeader, detailBody, factsCard, bindTabs, statusBadge, countdownHtml, startCountdowns, mediaStyle } from './hk-ui.js';
+import { card, spot, empty, skeletonCards, detailHeader, detailBody, factsCard, bindTabs, statusBadge, countdownHtml, startCountdowns, mediaStyle, applicationStepperHtml } from './hk-ui.js';
 import { hostDash, wizard } from './hk-host.js';
 import { manage } from './hk-manage.js';
 import { dash } from './hk-dash.js';
@@ -465,6 +465,11 @@ async function myHacks(t){
       if(stale(t) || curPath() !== '/my') return;
     }
 
+    const subDocs = await Promise.all(regs.map(r => r.hackathonId ? C.getSubmission(r.hackathonId, S.user.uid).catch(() => null) : null));
+    if(stale(t) || curPath() !== '/my') return;
+    const subMap = new Map();
+    regs.forEach((r, idx) => { if(r.hackathonId && subDocs[idx]) subMap.set(r.hackathonId, subDocs[idx]); });
+
     const now = Date.now();
     const cardsHtml = regs.map(r => {
       const h = hMap.get(r.hackathonId) || { id: r.hackathonId, title: r.hackathonTitle || 'Hackathon' };
@@ -481,6 +486,15 @@ async function myHacks(t){
       const isRevealed = !!(winRev.announced && (!winRev.revealAtMs || now >= winRev.revealAtMs));
       const myWin = isRevealed ? winArr.find(w => w.uid === S.user.uid) : null;
       const isWinnerCard = !!(myWin || (isRevealed && !winArr.length && r.status === 'selected'));
+      const mySub = subMap.get(r.hackathonId) || null;
+      const stepperHtml = applicationStepperHtml({
+        reg: r,
+        sub: mySub,
+        hasSubmission: h.submission?.open !== false,
+        isWinner: isWinnerCard,
+        winPlace: myWin?.place || '',
+        compact: true
+      });
       const cd = countdownHtml(h, r, isWinnerCard);
       const winRibbon = isWinnerCard
         ? `<div class="hk-my-winribbon"><i data-lucide="trophy"></i><span>Winner · ${esc(myWin?.place || 'Official Winner')}${myWin?.prize ? ' · ' + esc(myWin.prize) : ''}</span></div>`
@@ -509,6 +523,7 @@ async function myHacks(t){
               ${roundLine}
             </div>
           </div>
+          ${stepperHtml}
           ${logiLine}
           ${r.hostNote ? `<div class="hk-msg ok" style="padding:8px 12px"><i data-lucide="message-square-text"></i><span><b>Organiser note:</b> ${esc(r.hostNote)}</span></div>` : ''}
           ${cd || ''}

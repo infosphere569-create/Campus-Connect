@@ -1,7 +1,7 @@
 // Organiser workspace for one hackathon: registrations, smart Mailer & Outreach, submissions, test, exports.
 import * as C from './hk-core.js';
 import * as M from './hk-mailer.js';
-import { empty, statusBadge } from './hk-ui.js';
+import { empty, statusBadge, applicationStepperHtml } from './hk-ui.js';
 
 const { $, $$, esc, icons, toast, modal, FS } = C;
 const STS = C.REG_STATUS;
@@ -1631,6 +1631,19 @@ export async function manage(cx, id){
   function openReviewModal(s){
     const r = regOf(s.uid), em = evalMetrics(s.uid);
     const teamTitle = r ? (r.teamMode === 'solo' ? r.name : (r.teamName || r.name)) : (s.teamName || s.leaderName);
+    const winCfg = h.submission?.winnerReveal;
+    const winEntry = winCfg?.announced && Array.isArray(winCfg.winners)
+      ? winCfg.winners.find(w => (r?.uid && w.uid === r.uid) || (r?.id && w.regId === r.id) || (s?.uid && w.uid === s.uid))
+      : null;
+    const reviewStepper = applicationStepperHtml({
+      reg: r || { status: 'registered' },
+      sub: s,
+      hasSubmission: true,
+      att: em.att,
+      isWinner: !!winEntry,
+      winPlace: winEntry?.place || '',
+      compact: true
+    });
     modal(`Review Submission · ${s.title}`, `<form id="revModForm" class="hk-form">
       <div class="hk-to">
         <div class="av">${esc((teamTitle || 'T').slice(0, 2).toUpperCase())}</div>
@@ -1641,6 +1654,8 @@ export async function manage(cx, id){
         ${em.testScore != null ? `<span class="hk-chip sky">Test ${em.testScore}/${em.testTotal} (${em.testPct}%)</span>` : ''}
         ${r ? statusChipHtml(r.status) : ''}
       </div>
+
+      ${reviewStepper}
 
       <div class="hk-card-s" style="padding:12px 14px">
         <small class="hk-eyebrow" style="display:block;margin-bottom:4px">Project Idea &amp; Approach</small>

@@ -1546,5 +1546,68 @@ i[data-lucide]>svg{width:100%;height:100%;display:block}
 .hk-revtoggle .rt-btn.reviewing.on{background:color-mix(in srgb,var(--hk-sky) 16%,var(--hk-surface));color:var(--hk-sky);box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .hk-revtoggle .rt-btn.finalized.on{background:linear-gradient(135deg,var(--hk-gold),var(--hk-gold2));color:#2a1c00;box-shadow:0 2px 6px -2px rgba(201,138,16,.55)}
 
+/* ---------- Application Progress Stepper (Submitted -> Reviewing -> Shortlisted -> Finalist -> Winner) ---------- */
+.hk-app-progress{margin-bottom:14px;display:grid;gap:16px}
+.hk-app-progress .ap-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid var(--hk-line)}
+.hk-app-progress .ap-title{min-width:0;display:grid;gap:4px}
+.hk-app-progress .ap-title h3{font-size:1.05rem;margin:0;line-height:1.25}
+.hk-app-progress .ap-sub{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:.8rem;color:var(--hk-muted);font-variant-numeric:tabular-nums}
+.hk-app-progress .ap-sep{opacity:.55}
+.hk-app-progress .ap-status{display:inline-flex;align-items:center;gap:7px;font-size:.82rem;font-weight:700;color:var(--hk-p);white-space:nowrap}
+.hk-app-progress .ap-status i{width:16px;height:16px;flex:none}
+.hk-app-progress .ap-status.is-pending{color:var(--hk-ink)}
+.hk-app-progress .ap-status.is-gold{color:var(--hk-gold)}
+.hk-app-progress .ap-status.is-warn{color:var(--hk-warn)}
+.hk-app-progress .ap-status.is-bad{color:var(--hk-bad)}
+.hk-app-progress .ap-note{display:flex;align-items:flex-start;gap:9px;padding-top:12px;border-top:1px solid var(--hk-line);font-size:.84rem;color:var(--hk-ink);line-height:1.45}
+.hk-app-progress .ap-note i{width:16px;height:16px;color:var(--hk-p);margin-top:2px;flex:none}
 
+.hk-app-stepper-compact{padding:10px 12px;border-radius:14px;background:var(--hk-surface2);border:1px solid var(--hk-line)}
 
+.hk-app-steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;list-style:none;padding:2px 0 0;margin:0;position:relative}
+.hk-app-steps.compact{padding:0}
+.hk-app-step{position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;padding:0 6px;min-width:0}
+.hk-app-steps.compact .hk-app-step{padding:0 3px}
+.hk-app-step::before{content:"";position:absolute;top:17px;right:50%;width:100%;height:2px;background:var(--hk-line);z-index:0;transition:background .2s var(--hk-ease)}
+.hk-app-steps.compact .hk-app-step::before{top:13px}
+.hk-app-step:first-child::before{display:none}
+.hk-app-step.is-done::before,.hk-app-step.is-cur::before,.hk-app-step.is-pending::before{background:var(--hk-p)}
+.hk-app-step.is-gold::before{background:linear-gradient(90deg,var(--hk-p),var(--hk-gold))}
+.hk-app-step.is-warn::before{background:linear-gradient(90deg,var(--hk-p),var(--hk-warn))}
+.hk-app-step.is-bad::before{background:linear-gradient(90deg,var(--hk-p),var(--hk-bad))}
+
+.hk-app-step .as-node{position:relative;z-index:1;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--hk-surface2);border:2px solid var(--hk-line);color:var(--hk-muted);transition:border-color .18s var(--hk-ease),background .18s var(--hk-ease),color .18s var(--hk-ease),box-shadow .18s var(--hk-ease)}
+.hk-app-step .as-node i{width:16px;height:16px}
+.hk-app-steps.compact .hk-app-step .as-node{width:28px;height:28px}
+.hk-app-steps.compact .hk-app-step .as-node i{width:13px;height:13px}
+
+.hk-app-step.is-done .as-node{background:var(--hk-p);border-color:var(--hk-p);color:var(--hk-on-p)}
+.hk-app-step.is-cur .as-node{background:color-mix(in srgb,var(--hk-p) 14%,var(--hk-surface));border-color:var(--hk-p);color:var(--hk-p);box-shadow:0 0 0 4px color-mix(in srgb,var(--hk-p) 16%,transparent)}
+.hk-app-step.is-pending .as-node{background:var(--hk-surface);border-color:var(--hk-p);border-style:dashed;color:var(--hk-p);box-shadow:0 0 0 4px color-mix(in srgb,var(--hk-p) 11%,transparent)}
+.hk-app-step.is-gold .as-node{background:linear-gradient(135deg,var(--hk-gold),var(--hk-gold2));border-color:transparent;color:#2a1c00;box-shadow:0 0 0 4px color-mix(in srgb,var(--hk-gold) 22%,transparent)}
+.hk-app-step.is-warn .as-node{background:color-mix(in srgb,var(--hk-warn) 16%,var(--hk-surface));border-color:var(--hk-warn);color:var(--hk-warn);box-shadow:0 0 0 4px color-mix(in srgb,var(--hk-warn) 16%,transparent)}
+.hk-app-step.is-bad .as-node{background:color-mix(in srgb,var(--hk-bad) 14%,var(--hk-surface));border-color:var(--hk-bad);color:var(--hk-bad);box-shadow:0 0 0 4px color-mix(in srgb,var(--hk-bad) 14%,transparent)}
+.hk-app-step.is-skipped .as-node{border-style:dashed;opacity:.75}
+
+.hk-app-step .as-meta{display:grid;gap:2px;margin-top:8px;min-width:0;max-width:100%}
+.hk-app-steps.compact .hk-app-step .as-meta{margin-top:5px}
+.hk-app-step .as-title{font-size:.82rem;font-weight:700;color:var(--hk-muted);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.hk-app-steps.compact .hk-app-step .as-title{font-size:.72rem}
+.hk-app-step.is-done .as-title,.hk-app-step.is-pending .as-title{color:var(--hk-ink)}
+.hk-app-step.is-cur .as-title{color:var(--hk-p)}
+.hk-app-step.is-gold .as-title{color:var(--hk-gold)}
+.hk-app-step.is-warn .as-title{color:var(--hk-warn)}
+.hk-app-step.is-bad .as-title{color:var(--hk-bad)}
+.hk-app-step .as-note{font-size:.71rem;color:var(--hk-muted);line-height:1.25;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+
+@media (max-width:620px){
+  .hk-app-steps:not(.compact){grid-template-columns:1fr;padding-top:0}
+  .hk-app-steps:not(.compact) .hk-app-step{flex-direction:row;align-items:center;text-align:left;gap:12px;padding:8px 0}
+  .hk-app-steps:not(.compact) .hk-app-step::before{top:calc(-50% + 1px);left:15px;right:auto;width:2px;height:100%}
+  .hk-app-steps:not(.compact) .hk-app-step .as-node{width:32px;height:32px;flex:none}
+  .hk-app-steps:not(.compact) .hk-app-step .as-meta{margin-top:0;display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex:1}
+  .hk-app-steps:not(.compact) .hk-app-step .as-note{flex:none}
+  .hk-app-steps.compact .hk-app-step .as-title{font-size:.64rem;letter-spacing:-.01em}
+  .hk-app-steps.compact .hk-app-step .as-node{width:24px;height:24px}
+  .hk-app-steps.compact .hk-app-step::before{top:11px}
+}

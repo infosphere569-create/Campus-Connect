@@ -213,4 +213,197 @@ export function countUp(el, to, ms = 1100){
   const start = performance.now(), f = t => { const p = Math.min(1, (t - start) / ms), e = 1 - Math.pow(1 - p, 3); el.textContent = Math.round(to * e).toLocaleString('en-IN'); if(p < 1) requestAnimationFrame(f); };
   requestAnimationFrame(f);
 }
+export function computeApplicationProgress({ reg, sub = null, hasSubmission = true, att = null, isWinner = false, winPlace = '' } = {}){
+  const status = reg?.status || 'registered';
+  const submittedProject = !!sub;
+  const hasAttempt = !!(att && att.submittedAtMs);
+  const submittedWork = submittedProject || (!hasSubmission && hasAttempt);
+  const isReviewed = !!(sub && sub.reviewStatus === 'reviewed');
+  const isReviewing = !!(sub && (sub.reviewStatus === 'reviewing' || sub.score != null));
+
+  let activeIndex = 0;
+  let mode = 'active'; // 'active' | 'pending_submit' | 'waitlisted' | 'rejected' | 'winner'
+
+  if(isWinner){
+    activeIndex = 4;
+    mode = 'winner';
+  } else if(status === 'selected'){
+    activeIndex = 3;
+    mode = 'active';
+  } else if(status === 'shortlisted'){
+    activeIndex = 2;
+    mode = 'active';
+  } else if(status === 'waitlisted'){
+    activeIndex = 2;
+    mode = 'waitlisted';
+  } else if(status === 'rejected'){
+    activeIndex = 2;
+    mode = 'rejected';
+  } else if(isReviewed || isReviewing || (!hasSubmission && hasAttempt)){
+    activeIndex = 1;
+    mode = 'active';
+  } else if(submittedWork){
+    activeIndex = 0;
+    mode = 'active';
+  } else {
+    activeIndex = 0;
+    mode = 'pending_submit';
+  }
+
+  const defs = [
+    {
+      key: 'submitted',
+      label: 'Submitted',
+      icon: 'file-text',
+      note: () => {
+        if(mode === 'pending_submit') return hasSubmission ? 'Action needed' : 'Registered';
+        if(!submittedWork && (mode === 'rejected' || mode === 'waitlisted')) return 'Not submitted';
+        return submittedProject && sub?.updatedAtMs ? ago(sub.updatedAtMs) : 'Work received';
+      }
+    },
+    {
+      key: 'reviewing',
+      label: 'Reviewing',
+      icon: 'eye',
+      note: () => {
+        if(activeIndex > 1) return isReviewed ? 'Reviewed' : 'Evaluated';
+        if(activeIndex === 1) return isReviewed ? 'Finalized' : 'In progress';
+        return 'Next';
+      }
+    },
+    {
+      key: 'shortlisted',
+      label: 'Shortlisted',
+      icon: 'sparkles',
+      note: () => {
+        if(mode === 'waitlisted') return 'Waitlisted';
+        if(mode === 'rejected') return 'Not selected';
+        if(activeIndex > 2) return 'Cleared';
+        if(activeIndex === 2) return 'Next round';
+        return 'Upcoming';
+      }
+    },
+    {
+      key: 'finalist',
+      label: 'Finalist',
+      icon: 'award',
+      note: () => {
+        if(activeIndex > 3) return 'Confirmed';
+        if(activeIndex === 3) return 'Final stage';
+        return 'Upcoming';
+      }
+    },
+    {
+      key: 'winner',
+      label: 'Winner',
+      icon: 'trophy',
+      note: () => (mode === 'winner' ? (winPlace || 'Official winner') : 'Finale')
+    }
+  ];
+
+  const steps = defs.map((d, idx) => {
+    let state = 'todo';
+    let icon = d.icon;
+    let label = d.label;
+
+    if(idx < activeIndex){
+      if(idx === 0 && !submittedWork && (mode === 'rejected' || mode === 'waitlisted')){
+        state = 'skipped';
+      } else {
+        state = 'done';
+        icon = 'check';
+      }
+    } else if(idx === activeIndex){
+      if(mode === 'waitlisted'){
+        state = 'warn';
+        icon = 'hourglass';
+        label = 'Waitlisted';
+      } else if(mode === 'rejected'){
+        state = 'bad';
+        icon = 'circle-x';
+        label = 'Not Selected';
+      } else if(mode === 'winner'){
+        state = 'gold';
+        icon = 'trophy';
+      } else if(mode === 'pending_submit'){
+        state = 'pending';
+      } else {
+        state = idx >= 3 ? 'gold' : 'cur';
+      }
+    }
+
+    return {
+      key: d.key,
+      label,
+      icon,
+      state,
+      note: d.note(),
+      isCurrent: idx === activeIndex
+    };
+  });
+
+  const cur = steps[activeIndex];
+  const summaryLabel = mode === 'pending_submit'
+    ? (hasSubmission ? 'Awaiting Submission' : 'Registered')
+    : mode === 'winner'
+      ? (winPlace ? `Winner · ${winPlace}` : 'Official Winner')
+      : cur.label;
+
+  return {
+    steps,
+    activeIndex,
+    mode,
+    summaryLabel,
+    stepRatio: `Step ${activeIndex + 1} of ${steps.length}`
+  };
+}
+
+export function applicationStepperHtml({
+  reg,
+  sub = null,
+  hasSubmission = true,
+  att = null,
+  isWinner = false,
+  winPlace = '',
+  compact = false,
+  teamLabel = '',
+  roundName = '',
+  hostNote = ''
+} = {}){
+  const prog = computeApplicationProgress({ reg, sub, hasSubmission, att, isWinner, winPlace });
+  const listHtml = `<ol class="hk-app-steps ${compact ? 'compact' : ''}" aria-label="Application progress">${prog.steps.map(s => `
+    <li class="hk-app-step is-${s.state}" ${s.isCurrent ? 'aria-current="step"' : ''}>
+      <span class="as-node"><i data-lucide="${s.icon}"></i></span>
+      <span class="as-meta">
+        <b class="as-title">${esc(s.label)}</b>
+        ${compact ? '' : `<small class="as-note">${esc(s.note)}</small>`}
+      </span>
+    </li>`).join('')}</ol>`;
+
+  if(compact){
+    return `<div class="hk-app-stepper-compact" aria-label="Application status: ${esc(prog.summaryLabel)}">${listHtml}</div>`;
+  }
+
+  const metaParts = [
+    teamLabel,
+    roundName,
+    prog.stepRatio
+  ].filter(Boolean);
+
+  return `<section class="hk-card-s hk-app-progress" id="appProgressCard" aria-label="Application progress">
+    <div class="ap-head">
+      <div class="ap-title">
+        <h3>Application Progress</h3>
+        ${metaParts.length ? `<div class="ap-sub">${metaParts.map(p => `<span>${esc(p)}</span>`).join('<span class="ap-sep" aria-hidden="true">·</span>')}</div>` : ''}
+      </div>
+      <div class="ap-status is-${prog.steps[prog.activeIndex].state}">
+        <i data-lucide="${prog.steps[prog.activeIndex].icon}"></i>
+        <span>${esc(prog.summaryLabel)}</span>
+      </div>
+    </div>
+    ${listHtml}
+    ${hostNote ? `<div class="ap-note"><i data-lucide="info"></i><span><b>Organiser note:</b> ${esc(hostNote)}</span></div>` : ''}
+  </section>`;
+}
+
 export { ago };

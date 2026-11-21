@@ -1,6 +1,6 @@
 // Participant dashboard for one hackathon: round tracker, proctored test, compact submission, prototype round, logistics & winners podium.
 import * as C from './hk-core.js';
-import { empty, countdownHtml, startCountdowns } from './hk-ui.js';
+import { empty, countdownHtml, startCountdowns, applicationStepperHtml } from './hk-ui.js';
 
 const { $, $$, esc, icons, toast, FS } = C;
 const extractProto = sub => {
@@ -578,10 +578,17 @@ export async function dash(cx, hid){
     const cd = countdownHtml(h, reg, !!effectiveMyWin);
     const curRound = rounds[reg.stage || 0]?.name || '';
 
-    const statusBanner = `<div class="hk-my-card" style="margin-bottom:14px">
-      <div class="hk-my-banner ${esc(reg.status || 'registered')}"><span style="display:inline-flex;align-items:center;gap:6px"><i data-lucide="${st[2]}"></i>Status: ${st[0]}</span>${curRound ? `<span class="hk-xs">${esc(curRound)}</span>` : ''}</div>
-      ${reg.hostNote ? `<div class="hk-my-body" style="padding:12px 16px"><div class="hk-sm"><b>Note from organiser:</b> ${esc(reg.hostNote)}</div></div>` : ''}
-    </div>`;
+    const appProgressSection = applicationStepperHtml({
+      reg,
+      sub,
+      hasSubmission: subCfg.open !== false,
+      att,
+      isWinner: !!effectiveMyWin,
+      winPlace: effectiveMyWin?.place || '',
+      teamLabel: reg.teamMode === 'solo' ? `Solo · ${reg.name}` : `Team ${reg.teamName || reg.name}`,
+      roundName: curRound || '',
+      hostNote: reg.hostNote || ''
+    });
 
     const nextStepCard = `<div class="hk-next-step ${esc(nextStep.tone)}">
       <div class="ns-ic"><i data-lucide="${nextStep.icon}"></i></div>
@@ -594,7 +601,7 @@ export async function dash(cx, hid){
 
     view.innerHTML = `<div class="hk-view"><a class="hk-btn ghost sm" href="#/my" style="margin-bottom:12px"><i data-lucide="arrow-left"></i>My hackathons</a>
       <div class="hk-page-h"><div><span class="hk-eyebrow">My dashboard</span><h1>${esc(h.title)}</h1><p>Hosted by ${esc(org.name || h.hostName || 'the organiser')}${org.org ? ' · ' + esc(org.org) : ''}</p></div><span class="hk-chip ${st[1]}">${st[0]}</span></div>
-      ${statusBanner}
+      ${appProgressSection}
       ${winnersSection}
       ${nextStepCard}
       ${cd ? `<div style="margin-bottom:14px">${cd}</div>` : ''}
