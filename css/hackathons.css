@@ -1611,3 +1611,153 @@ i[data-lucide]>svg{width:100%;height:100%;display:block}
   .hk-app-steps.compact .hk-app-step .as-node{width:24px;height:24px}
   .hk-app-steps.compact .hk-app-step::before{top:11px}
 }
+
+/* ==========================================================================
+   HACKATHON CERTIFICATES STUDIO, VIEWER & CANVA-STYLE WHITE SHEET (1123x794)
+   Strictly solid colors (no background-clip:text) for crisp 2x html2canvas export
+   ========================================================================== */
+
+.hkc-host{width:100%}
+.hkc-stage-wrap{background:var(--hk-surface2);border:1px solid var(--hk-line);border-radius:16px;padding:12px}
+.hkc-stage{position:relative;width:100%;overflow:hidden;border-radius:12px;border:1px solid var(--hk-line);box-shadow:var(--hk-shadow-sm);background:#ffffff}
+.hkc-scaler{width:1123px;height:794px;transform-origin:0 0}
+.hkc-stage.is-locked .hkc-scaler{filter:blur(6px) grayscale(.35)}
+.hkc-lock-ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(15,23,42,.42);color:#fff;font-weight:800;font-size:15px}
+.hkc-lock-ov i{width:28px;height:28px}
+
+/* Printable Area */
+#hkCertPrintArea{display:none}
+@media print{
+  body>*:not(#hkCertPrintArea){display:none!important}
+  #hkCertPrintArea{display:block!important;position:fixed;inset:0;background:#fff}
+  #hkCertPrintArea img{width:100%;height:100%;object-fit:contain}
+  @page{size:A4 landscape;margin:0}
+}
+
+/* Crisp Editorial White Certificate Sheet (1123 x 794) */
+.hkc-sheet{position:relative;width:1123px;height:794px;overflow:hidden;background:#FFFFFF;color:#0F172A;font-family:'Inter','Space Grotesk',sans-serif;box-sizing:border-box}
+.hkc-sheet *{box-sizing:border-box}
+.hkc-accent-rail{position:absolute;left:0;top:0;bottom:0;width:16px;background:#0C5535;z-index:2}
+.hkc-sheet.is-winner .hkc-accent-rail{background:#0C5535;border-right:4px solid #D97706}
+.hkc-sheet.is-participant .hkc-accent-rail{background:#178A54;border-right:3px solid #0C5535}
+
+.hkc-geo-tl{position:absolute;left:16px;top:0;width:190px;height:190px;pointer-events:none;z-index:1}
+.hkc-geo-br{position:absolute;right:0;bottom:0;width:210px;height:210px;pointer-events:none;z-index:1}
+
+.hkc-frame-outer{position:absolute;left:30px;right:20px;top:18px;bottom:18px;border:1.5px solid #CBD5E1;border-radius:10px;pointer-events:none;z-index:2}
+.hkc-sheet.is-winner .hkc-frame-outer{border:2px solid #D97706}
+.hkc-sheet.is-participant .hkc-frame-outer{border:1.75px solid #178A54}
+.hkc-frame-inner{position:absolute;left:38px;right:28px;top:26px;bottom:26px;border:1px solid #E2E8F0;border-radius:6px;pointer-events:none;z-index:2}
+
+.hkc-canvas-in{position:absolute;left:64px;right:56px;top:44px;bottom:38px;display:flex;flex-direction:column;justify-content:space-between;z-index:3}
+
+/* Header Left + Right Co-branding */
+.hkc-top-row{display:flex;align-items:center;justify-content:space-between;gap:24px;padding-bottom:14px;border-bottom:1px solid #E2E8F0}
+.hkc-brand-left{display:flex;align-items:center;gap:12px}
+.hkc-brand-logo{width:46px;height:46px;border-radius:11px;object-fit:cover;border:1px solid #E2E8F0;background:#F8FAFC;flex:none}
+.hkc-brand-copy{text-align:left}
+.hkc-brand-main{font-family:'Space Grotesk','Inter',sans-serif;font-weight:800;font-size:17px;letter-spacing:.12em;color:#0C5535;line-height:1.15}
+.hkc-brand-sub{font-size:10px;font-weight:700;letter-spacing:.16em;color:#64748B;margin-top:2px}
+.hkc-brand-right{text-align:right;max-width:460px}
+.hkc-event-org{font-family:'Space Grotesk','Inter',sans-serif;font-size:15px;font-weight:800;color:#0F172A;line-height:1.2}
+.hkc-event-meta{font-size:11.5px;font-weight:600;color:#475569;margin-top:3px}
+
+/* Centerpiece */
+.hkc-center{display:flex;flex-direction:column;align-items:center;text-align:center;margin:8px 0 4px}
+.hkc-kicker{font-size:11.5px;font-weight:800;letter-spacing:.34em;color:#178A54;text-transform:uppercase;margin-bottom:6px}
+.hkc-sheet.is-winner .hkc-kicker{color:#B45309}
+.hkc-serif-title{font-family:'Playfair Display',Georgia,serif;font-weight:800;font-size:44px;line-height:1.1;color:#0F172A;letter-spacing:.01em;margin:0}
+
+.hkc-rank-banner{display:inline-flex;align-items:center;gap:8px;margin-top:12px;padding:6px 18px;border-radius:6px;background:#FEF3C7;border:1.5px solid #F59E0B;color:#78350F;font-size:14px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+.hkc-rule-ornament{display:flex;align-items:center;gap:10px;margin:13px 0 2px}
+.hkc-rule-ornament span{width:54px;height:1.5px;background:#CBD5E1;display:block}
+.hkc-rule-ornament i{width:7px;height:7px;transform:rotate(45deg);background:#178A54;display:block}
+
+.hkc-present-lbl{font-size:11px;font-weight:700;letter-spacing:.22em;color:#64748B;text-transform:uppercase;margin-top:16px}
+.hkc-recipient{font-family:'Playfair Display',Georgia,serif;font-weight:700;font-size:46px;line-height:1.18;color:#0F172A;margin-top:4px;padding:0 36px 6px;border-bottom:2px solid #0C5535;max-width:860px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hkc-sheet.is-winner .hkc-recipient{border-bottom-color:#D97706}
+.hkc-team-line{font-size:13.5px;color:#334155;margin-top:8px;font-weight:500}
+.hkc-team-line b{color:#0F172A;font-weight:700}
+.hkc-team-spacer{height:12px}
+.hkc-statement{font-size:14.5px;line-height:1.62;color:#334155;max-width:760px;margin:10px auto 0}
+.hkc-statement b{color:#0F172A;font-weight:700}
+
+.hkc-facts-row{display:flex;justify-content:center;gap:14px;margin-top:16px;flex-wrap:nowrap}
+.hkc-fact-cell{min-width:190px;max-width:270px;padding:8px 16px;border-radius:8px;background:#F8FAFC;border:1px solid #E2E8F0;text-align:center}
+.hkc-sheet.is-winner .hkc-fact-cell{background:#FFFBEB;border-color:#FDE68A}
+.hkc-fact-cell small{display:block;font-size:9px;font-weight:800;letter-spacing:.14em;color:#64748B;text-transform:uppercase}
+.hkc-sheet.is-winner .hkc-fact-cell small{color:#92400E}
+.hkc-fact-cell b{display:block;font-size:12.5px;font-weight:700;color:#0F172A;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Footer: Left QR, Mid Seal, Right Digital Signature */
+.hkc-foot-row{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;padding-top:10px}
+.hkc-qr-block{display:flex;align-items:center;gap:11px;text-align:left;min-width:270px}
+.hkc-qr-img{width:88px;height:88px;border-radius:8px;padding:4px;background:#FFFFFF;border:1.5px solid #CBD5E1;object-fit:contain;flex:none}
+.hkc-sheet.is-winner .hkc-qr-img{border-color:#F59E0B}
+.hkc-qr-txt{font-size:10px;line-height:1.45;color:#475569}
+.hkc-qr-txt b{display:block;font-size:10.5px;letter-spacing:.08em;color:#0F172A;margin-bottom:2px}
+
+.hkc-seal-mid{display:flex;align-items:center;justify-content:center;padding-bottom:4px;flex:none}
+
+.hkc-sig-block{width:310px;display:flex;flex-direction:column;align-items:center;text-align:center}
+.hkc-sig-art{width:255px;height:54px;margin-bottom:1px}
+.hkc-sig-line{width:100%;height:1.5px;background:#0C5535;margin:2px 0 5px}
+.hkc-sheet.is-winner .hkc-sig-line{background:#D97706}
+.hkc-sig-name{font-size:13.5px;font-weight:800;color:#0F172A}
+.hkc-sig-role{font-size:10.5px;font-weight:600;color:#64748B;margin-top:1px}
+.hkc-ds-box{display:flex;align-items:center;gap:8px;width:100%;margin-top:7px;padding:6px 9px;border-radius:8px;background:#ECFDF5;border:1px solid #A7F3D0;color:#065F46;font-size:9.2px;line-height:1.35;text-align:left}
+.hkc-ds-box svg{flex:none}
+
+/* Action Bars & Participant Tracking */
+.hkc-verify-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;background:var(--hk-surface2);border:1px solid var(--hk-line);flex-wrap:wrap}
+.hkc-verify-bar .vb-copy{flex:1;min-width:190px;display:grid;gap:2px}
+.hkc-verify-bar .vb-copy small{font-size:.66rem;font-weight:800;letter-spacing:.08em;color:var(--hk-p)}
+.hkc-verify-bar .vb-copy span{font-family:var(--hk-mono);font-size:.76rem;color:var(--hk-muted);word-break:break-all}
+.hkc-act-bar{display:flex;gap:8px;flex-wrap:wrap}
+.hkc-act-bar .hk-btn{flex:1;min-width:140px}
+.hk-btn.hkc-li-btn{background:#0A66C2;border-color:#0A66C2;color:#FFFFFF}
+.hk-btn.hkc-li-btn:hover{filter:brightness(1.08)}
+.hkc-track-strip{display:flex;gap:8px;flex-wrap:wrap}
+.hk-chip.hkc-green{background:rgba(22,163,74,.14);color:#16a34a;border-color:rgba(22,163,74,.38)}
+
+/* Host Certificate Studio & Symmetrical Dashboard */
+.hkc-sig-banner{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:14px 16px;border-radius:16px;background:linear-gradient(135deg,color-mix(in srgb,var(--hk-p) 10%,var(--hk-surface)),var(--hk-surface));border:1.5px solid color-mix(in srgb,var(--hk-p) 32%,var(--hk-line))}
+.hkc-sig-preview{width:170px;height:42px;padding:2px 8px;border-radius:10px;background:#fff;border:1px solid var(--hk-line);flex:none}
+.hkc-check-list{display:grid;gap:8px;max-height:340px;overflow-y:auto;padding-right:2px}
+.hkc-check-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border-radius:12px;background:var(--hk-surface2);border:1px solid var(--hk-line);transition:border-color .15s}
+.hkc-check-row:hover{border-color:color-mix(in srgb,var(--hk-p) 45%,var(--hk-line))}
+
+.hkc-host-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:12px;align-items:stretch}
+.hkc-host-card{display:flex;flex-direction:column;justify-content:space-between;gap:10px;padding:14px 16px;border-radius:16px;background:var(--hk-surface);border:1.5px solid var(--hk-line);box-shadow:var(--hk-shadow-sm)}
+.hkc-host-card.is-win{border-color:color-mix(in srgb,var(--hk-gold) 42%,var(--hk-line))}
+.hkc-host-card.is-revoked{opacity:.72;border-style:dashed}
+.hkc-hc-top{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.hkc-hc-id{font-family:var(--hk-mono);font-size:.72rem;color:var(--hk-muted);font-weight:700}
+.hkc-hc-meta{display:grid;gap:4px}
+.hkc-hc-meta b{font-size:.98rem;line-height:1.25}
+.hkc-hc-track{display:flex;gap:6px;flex-wrap:wrap}
+.hkc-hc-track .hk-chip{font-size:.7rem;padding:3px 8px}
+.hkc-hc-url{display:flex;align-items:center;gap:6px;padding:6px 9px;border-radius:9px;background:var(--hk-surface2);border:1px solid var(--hk-line);font-family:var(--hk-mono);font-size:.7rem;color:var(--hk-muted)}
+.hkc-hc-url span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hkc-hc-acts{display:flex;gap:6px;flex-wrap:wrap;padding-top:8px;border-top:1px dashed var(--hk-line)}
+.hkc-hc-acts .hk-btn{flex:1;min-width:86px;justify-content:center}
+
+/* Public QR Verify Shield */
+.hkc-v-seal{width:88px;height:88px;margin:0 auto 10px;position:relative;display:flex;align-items:center;justify-content:center}
+.hkc-v-scan{position:absolute;inset:0;border-radius:50%;border:4px solid var(--hk-line);border-top-color:var(--hk-p);animation:hkSpin .8s linear infinite}
+.hkc-shield{width:88px;height:88px;filter:drop-shadow(0 8px 16px rgba(22,163,74,.28))}
+.hkc-shield .sh{fill:#16a34a}
+.hkc-shield .ck{fill:none;stroke:#fff;stroke-width:7;stroke-linecap:round;stroke-linejoin:round}
+.hkc-shield.is-bad .sh{fill:var(--hk-bad)}
+.hkc-v-pulse{position:absolute;inset:6px;border-radius:50%;border:3px solid rgba(22,163,74,.38);animation:hkSpin 2.2s linear infinite}
+.hkc-v-grid{text-align:left;margin-top:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
+.hkc-v-grid div{background:var(--hk-surface2);border:1px solid var(--hk-line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.hkc-v-grid b{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;color:var(--hk-muted);font-weight:800}
+.hkc-v-grid span{font-size:.86rem;font-weight:700;color:var(--hk-ink);word-break:break-word}
+
+@media (max-width:640px){
+  .hkc-stage-wrap{padding:6px}
+  .hkc-host-grid{grid-template-columns:1fr}
+  .hkc-act-bar .hk-btn{min-width:100%}
+}
+

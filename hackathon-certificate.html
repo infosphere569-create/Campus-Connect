@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>(function(){try{var v=localStorage.getItem("cc-theme")||"system";document.documentElement.dataset.theme=v==="system"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):v;}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Hackathon Certificate &amp; Verification — Campus Connect One</title>
+<meta name="description" content="Verify official hackathon winner and participation certificates issued via Campus Connect One Hackathons.">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#178a54">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Campus Connect One Hackathons">
+<meta property="og:title" content="Official Hackathon Certificate — Campus Connect One">
+<meta property="og:description" content="Scan or verify official digitally signed hackathon winner and participation credentials on Campus Connect One.">
+<meta property="og:image" content="https://campusconnectone.online/icon.png">
+<link rel="icon" type="image/png" href="icon/icon-hackathons.png"><link rel="apple-touch-icon" href="icon/icon-hackathons-192.png"><link rel="manifest" href="manifest-hackathons.json">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Great+Vibes&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Playfair+Display:wght@600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/hackathons.css?v=13">
+</head>
+<body class="hk-body" data-page="hk-cert">
+<canvas class="hk-bg" id="hkBg" aria-hidden="true"></canvas>
+<div class="hk-layer">
+  <header class="hk-nav stuck" id="nav">
+    <div class="hk-wrap hk-nav-in">
+      <a class="hk-brand" href="hackthons-portal.html#/my" aria-label="Campus Connect One Hackathons"><img src="icon.png" alt="Campus Connect One logo" width="38" height="38"><span>Campus Connect One<small>Hackathon Credential</small></span></a>
+      <nav class="hk-links" aria-label="Navigation">
+        <a href="hackthons-portal.html#/home">Discover</a>
+        <a href="hackthons-portal.html#/my">My Hackathons</a>
+      </nav>
+      <span class="hk-chip" id="topVerifyBadge" style="display:none"><i data-lucide="shield-check"></i>Official Credential</span>
+      <button class="hk-btn icon ghost" id="themeBtn" aria-label="Toggle theme"><i data-lucide="sun-moon"></i></button>
+    </div>
+  </header>
+
+  <main class="hk-pub-main" style="padding-bottom:64px">
+    <div class="hk-wrap" style="max-width:1040px" id="certPageView">
+      <div class="hk-card-s hkc-v-card" style="text-align:center;padding:40px 20px">
+        <div class="hkc-v-seal"><div class="hkc-v-scan"></div></div>
+        <h2 style="margin:8px 0 4px">Loading Credential…</h2>
+        <p class="hk-sm hk-muted">Checking Campus Connect One Hackathon records</p>
+      </div>
+    </div>
+  </main>
+</div>
+<script src="js/hackathons/hk-icons.js?v=13"></script>
+<script type="module" src="js/hackathons/hk-cert-page.js?v=13"></script>
+</body>
+</html>

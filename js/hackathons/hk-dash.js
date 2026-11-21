@@ -1,5 +1,6 @@
-// Participant dashboard for one hackathon: round tracker, proctored test, compact submission, prototype round, logistics & winners podium.
+// Participant dashboard for one hackathon: round tracker, proctored test, compact submission, prototype round, logistics, winners podium & official certificates.
 import * as C from './hk-core.js';
+import * as HC from './hk-cert.js';
 import { empty, countdownHtml, startCountdowns, applicationStepperHtml } from './hk-ui.js';
 
 const { $, $$, esc, icons, toast, FS } = C;
@@ -25,8 +26,13 @@ export async function dash(cx, hid){
   const { S, view } = cx;
   let editingSub = false, showFullIdea = false, justSubmittedSub = false;
   let editingProto = false, justSubmittedProto = false;
-  let h = null, reg = null, sub = null, meta = null, att = null;
-  let stopTimer = null, unsubReg = null, unsubHack = null, unsubSub = null, revealReloadTimer = 0;
+  let h = null, reg = null, sub = null, meta = null, att = null, myCerts = [], selectedCertIdx = 0;
+  let stopTimer = null, unsubReg = null, unsubHack = null, unsubSub = null, unsubCerts = null, revealReloadTimer = 0;
+  const viewedCertIds = new Set();
+
+  const sortCerts = list => [...(list || [])]
+    .filter(c => c && c.hackathonId === hid && c.status !== 'revoked')
+    .sort((a, b) => (a.category === 'winner' ? -1 : 1) - (b.category === 'winner' ? -1 : 1) || (b.issuedAtMs || 0) - (a.issuedAtMs || 0));
 
   async function loadAll(){
     [h, reg] = await Promise.all([C.fetchOne(hid, { fresh: true }), C.getRegistration(hid, S.user.uid, { fresh: true })]);
@@ -35,11 +41,15 @@ export async function dash(cx, hid){
       view.innerHTML = `<div class="hk-view">${empty('ticket', 'No registration found', 'Register for this hackathon first, then your dashboard appears here.', `<a class="hk-btn primary" href="#/h/${esc(hid)}">View hackathon</a>`)}</div>`;
       return false;
     }
-    [sub, meta, att] = await Promise.all([
+    const [subRes, metaRes, attRes, allMyCerts] = await Promise.all([
       C.getSubmission(hid, S.user.uid, { fresh: true }).catch(() => null),
       C.getTestMeta(hid),
-      C.myAttempt(hid, S.user.uid)
+      C.myAttempt(hid, S.user.uid),
+      HC.fetchMyHackathonCerts(S.user.uid).catch(() => [])
     ]);
+    sub = subRes; meta = metaRes; att = attRes;
+    myCerts = sortCerts(allMyCerts);
+    if(selectedCertIdx >= myCerts.length) selectedCertIdx = 0;
     if(cx.stale()) return false;
     return true;
   }
@@ -180,6 +190,18 @@ export async function dash(cx, hid){
       };
     }
 
+    if(myCerts.length){
+      const topC = myCerts[0];
+      return {
+        tone: topC.category === 'winner' ? 'gold' : 'ok',
+        icon: 'award',
+        badge: topC.category === 'winner' ? (topC.rankTitle || 'Winner Certificate') : 'Official Certificate',
+        title: `Your official ${topC.category === 'winner' ? `${topC.rankTitle} ` : ''}certificate is ready!`,
+        desc: 'Download high-resolution PNG/PDF, share with image preview, or add directly to your LinkedIn profile.',
+        cta: `<button type="button" class="hk-btn sm ${topC.category === 'winner' ? 'gold' : 'primary'}" data-jump="#certSection"><i data-lucide="award"></i>View Certificate</button>`
+      };
+    }
+
     return {
       tone: 'p', icon: 'calendar-check', badge: 'Active',
       title: h.startMs > now ? `Hackathon starts ${C.fmtDT(h.startMs)}` : 'Hackathon is underway',
@@ -256,6 +278,55 @@ export async function dash(cx, hid){
         <span>Official Winners Reveal (${C.fmtDT(winCfg.revealAtMs)})</span>
         <span class="tval" data-cd="${winCfg.revealAtMs}">${C.countdownText(winCfg.revealAtMs, now)}</span>
       </div>`;
+    }
+
+    /* ---------- 1B. Official Hackathon Certificates (Winner & Participant) ---------- */
+    const activeCert = myCerts.length ? (myCerts[selectedCertIdx] || myCerts[0]) : null;
+    let certSection = '';
+    if(activeCert){
+      const isWinCert = activeCert.category === 'winner';
+      const certVerify = HC.certVerifyUrl(activeCert.id);
+      const certCd = HC.certCode(activeCert.id);
+      const switcher = myCerts.length > 1
+        ? `<div class="hk-chseg" role="group" aria-label="Choose certificate">${myCerts.map((c, idx) => `<button type="button" class="${idx === selectedCertIdx ? 'on' : ''}" data-pickcert="${idx}"><i data-lucide="${c.category === 'winner' ? 'trophy' : 'award'}"></i>${esc(c.category === 'winner' ? (c.rankTitle || 'Winner') : 'Participation')}</button>`).join('')}</div>`
+        : '';
+      certSection = `<section class="hk-card-s hk-dcard" id="certSection" style="margin-bottom:16px">
+        <div class="hk-sub-head">
+          <div class="dh" style="margin-bottom:0;flex:1">
+            <i data-lucide="${isWinCert ? 'trophy' : 'award'}" style="color:${isWinCert ? 'var(--hk-gold)' : 'var(--hk-p)'}"></i>
+            <div>
+              <h3>Official Hackathon Certificate${myCerts.length > 1 ? 's' : ''}</h3>
+              <div class="hk-xs hk-muted">Campus Connect One &middot; Digitally signed by <b>${esc(activeCert.signatoryName)}</b> &middot; Event Date: <b>${esc(activeCert.eventDateLabel)}</b></div>
+            </div>
+          </div>
+          ${switcher}
+          <span class="hk-chip ${isWinCert ? 'gold' : ''}"><i data-lucide="shield-check"></i>${esc(certCd)}</span>
+        </div>
+
+        <div id="dashCertPreview" style="margin-top:12px"></div>
+
+        <div class="hkc-verify-bar" style="margin-top:12px">
+          <div class="vb-copy">
+            <small>PUBLIC VERIFY URL &middot; ${esc(certCd)}</small>
+            <span>${esc(certVerify)}</span>
+          </div>
+          <button type="button" class="hk-btn sm" id="dashCertCopy"><i data-lucide="copy"></i>Copy Link</button>
+          <a class="hk-btn sm" href="${esc(certVerify)}" target="_blank" rel="noopener noreferrer"><i data-lucide="external-link"></i>Verify Page</a>
+        </div>
+
+        <div class="hkc-act-bar" style="margin-top:10px">
+          <button type="button" class="hk-btn primary" id="dashCertPng"><i data-lucide="image"></i>Download Image (PNG)</button>
+          <button type="button" class="hk-btn" id="dashCertPdf"><i data-lucide="file-down"></i>Download PDF</button>
+          <button type="button" class="hk-btn" id="dashCertShare"><i data-lucide="share-2"></i>Share Certificate</button>
+          <button type="button" class="hk-btn hkc-li-btn" id="dashCertLi"><i data-lucide="linkedin"></i>Add to LinkedIn</button>
+        </div>
+
+        <div class="hkc-track-strip" id="dashCertTrack" style="margin-top:10px">
+          <span class="hk-chip ${activeCert.certDownloadAtMs ? 'hkc-green' : 'neutral'}"><i data-lucide="${activeCert.certDownloadAtMs ? 'check-circle-2' : 'download'}"></i>${activeCert.certDownloadAtMs ? 'Downloaded ✓' : 'Download'}</span>
+          <span class="hk-chip ${activeCert.certShareAtMs ? 'hkc-green' : 'neutral'}"><i data-lucide="${activeCert.certShareAtMs ? 'check-circle-2' : 'share-2'}"></i>${activeCert.certShareAtMs ? 'Shared ✓' : 'Share'}</span>
+          <span class="hk-chip ${activeCert.certLinkedInAtMs ? 'hkc-green' : 'neutral'}"><i data-lucide="${activeCert.certLinkedInAtMs ? 'check-circle-2' : 'linkedin'}"></i>${activeCert.certLinkedInAtMs ? 'Added to LinkedIn ✓' : 'Add to LinkedIn'}</span>
+        </div>
+      </section>`;
     }
 
     /* ---------- 2. Selected / Shortlisted Event Logistics Card (Online / Offline / Hybrid) ---------- */
@@ -603,6 +674,7 @@ export async function dash(cx, hid){
       <div class="hk-page-h"><div><span class="hk-eyebrow">My dashboard</span><h1>${esc(h.title)}</h1><p>Hosted by ${esc(org.name || h.hostName || 'the organiser')}${org.org ? ' · ' + esc(org.org) : ''}</p></div><span class="hk-chip ${st[1]}">${st[0]}</span></div>
       ${appProgressSection}
       ${winnersSection}
+      ${certSection}
       ${nextStepCard}
       ${cd ? `<div style="margin-bottom:14px">${cd}</div>` : ''}
       <section class="hk-card-s hk-dcard"><div class="dh"><i data-lucide="list-ordered"></i><h3>Process &amp; round timeline</h3></div>${tracker}</section>
@@ -615,6 +687,33 @@ export async function dash(cx, hid){
       </div></div>`;
 
     stopTimer = startCountdowns(view);
+
+    if(activeCert){
+      const stageHost = $('#dashCertPreview', view);
+      if(stageHost) HC.mountCertPreview(stageHost, activeCert);
+      if(!viewedCertIds.has(activeCert.id)){
+        viewedCertIds.add(activeCert.id);
+        HC.markCertActivity(activeCert, 'certViewedAtMs');
+      }
+      const refreshDashTrack = () => {
+        const strip = $('#dashCertTrack', view);
+        if(!strip) return;
+        strip.innerHTML = `
+          <span class="hk-chip ${activeCert.certDownloadAtMs ? 'hkc-green' : 'neutral'}"><i data-lucide="${activeCert.certDownloadAtMs ? 'check-circle-2' : 'download'}"></i>${activeCert.certDownloadAtMs ? 'Downloaded ✓' : 'Download'}</span>
+          <span class="hk-chip ${activeCert.certShareAtMs ? 'hkc-green' : 'neutral'}"><i data-lucide="${activeCert.certShareAtMs ? 'check-circle-2' : 'share-2'}"></i>${activeCert.certShareAtMs ? 'Shared ✓' : 'Share'}</span>
+          <span class="hk-chip ${activeCert.certLinkedInAtMs ? 'hkc-green' : 'neutral'}"><i data-lucide="${activeCert.certLinkedInAtMs ? 'check-circle-2' : 'linkedin'}"></i>${activeCert.certLinkedInAtMs ? 'Added to LinkedIn ✓' : 'Add to LinkedIn'}</span>`;
+        icons(strip);
+      };
+      const verifyLink = HC.certVerifyUrl(activeCert.id);
+      $('#dashCertCopy', view)?.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(verifyLink); toast('Verification link copied!'); }
+        catch { toast(verifyLink, 'info'); }
+      });
+      $('#dashCertPng', view)?.addEventListener('click', ev => HC.downloadCertPng(activeCert, ev.currentTarget, refreshDashTrack));
+      $('#dashCertPdf', view)?.addEventListener('click', ev => HC.downloadCertPdf(activeCert, ev.currentTarget, refreshDashTrack));
+      $('#dashCertShare', view)?.addEventListener('click', ev => HC.shareCertImage(activeCert, ev.currentTarget, refreshDashTrack));
+      $('#dashCertLi', view)?.addEventListener('click', () => HC.openLinkedInAdd(activeCert, refreshDashTrack));
+    }
 
     const sf = $('#subForm');
     if(sf && subOpen) sf.onsubmit = async e => {
@@ -750,6 +849,12 @@ export async function dash(cx, hid){
       render();
       return;
     }
+    const pickC = e.target.closest('[data-pickcert]');
+    if(pickC){
+      selectedCertIdx = Math.max(0, Math.min(myCerts.length - 1, +pickC.dataset.pickcert || 0));
+      render();
+      return;
+    }
     const jp = e.target.closest('[data-jump]');
     if(jp){
       const el = $(jp.dataset.jump);
@@ -805,12 +910,29 @@ export async function dash(cx, hid){
     }
   }, () => {});
 
+  unsubCerts = FS.onSnapshot(FS.query(FS.collection(C.db, 'hkCertificates'), FS.where('uid', '==', S.user.uid)), snap => {
+    if(cx.stale()) return;
+    const nextList = sortCerts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    const keyOf = arr => JSON.stringify(arr.map(c => [c.id, c.status, c.updatedAtMs, c.rankTitle, c.eventDateLabel, c.certDownloadAtMs, c.certShareAtMs, c.certLinkedInAtMs]));
+    if(keyOf(nextList) !== keyOf(myCerts)){
+      const gotNew = nextList.length > myCerts.length;
+      myCerts = nextList;
+      if(selectedCertIdx >= myCerts.length) selectedCertIdx = 0;
+      if(gotNew) toast('Your official Hackathon Certificate is ready!', 'success');
+      const activeTag = document.activeElement?.tagName;
+      if(!editingSub && !editingProto && !['INPUT', 'TEXTAREA'].includes(activeTag)){
+        render();
+      }
+    }
+  }, () => {});
+
   cx.S.cleanup = () => {
     stopTimer?.();
     clearTimeout(revealReloadTimer);
     unsubReg?.();
     unsubHack?.();
     unsubSub?.();
+    unsubCerts?.();
     view.onclick = null;
   };
   render();

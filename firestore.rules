@@ -740,6 +740,41 @@ service cloud.firestore {
       allow delete: if signedIn() && resource.data.toUid == request.auth.uid;
     }
 
+    // Official hackathon certificates: public single-doc get for QR verification; privacy-safe fields only.
+    // Hosts/co-hosts/staff create, update, or revoke; recipients update download/share/LinkedIn activity timestamps.
+    match /hkCertificates/{cid} {
+      allow get: if true;
+      allow list: if signedIn()
+        && (resource.data.uid == request.auth.uid
+            || resource.data.hostUid == request.auth.uid
+            || isHkHost(hkHack(resource.data.hackathonId))
+            || staff()
+            || isHkSubAdmin());
+
+      allow create: if signedIn()
+        && request.resource.data.hackathonId is string
+        && request.resource.data.uid is string
+        && (request.resource.data.hostUid == request.auth.uid
+            || isHkHost(hkHack(request.resource.data.hackathonId))
+            || staff());
+
+      allow update: if signedIn()
+        && (
+          (resource.data.hostUid == request.auth.uid
+              || isHkHost(hkHack(resource.data.hackathonId))
+              || staff())
+          ||
+          (resource.data.uid == request.auth.uid
+              && request.resource.data.diff(resource.data).affectedKeys()
+                   .hasOnly(['certViewedAtMs', 'certDownloadAtMs', 'certPrintAtMs', 'certShareAtMs', 'certLinkedInAtMs']))
+        );
+
+      allow delete: if signedIn()
+        && (resource.data.hostUid == request.auth.uid
+            || isHkHost(hkHack(resource.data.hackathonId))
+            || staff());
+    }
+
 
     // =========================================================
     // DEFAULT DENY

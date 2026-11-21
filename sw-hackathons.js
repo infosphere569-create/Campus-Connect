@@ -1,5 +1,5 @@
-// Campus Connect One Hackathons Service Worker v12
-const CACHE_VERSION = 'hk-pwa-v12';
+// Campus Connect One Hackathons Service Worker v13
+const CACHE_VERSION = 'hk-pwa-v13';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -11,6 +11,8 @@ const SHELL_ASSETS = [
   'hackthons-portal.html',
   'login-hackthons',
   'login-hackthons.html',
+  'hackathon-certificate',
+  'hackathon-certificate.html',
   'css/hackathons.css',
   'js/hackathons/hk-portal.js',
   'js/hackathons/hk-core.js',
@@ -19,6 +21,9 @@ const SHELL_ASSETS = [
   'js/hackathons/hk-host.js',
   'js/hackathons/hk-manage.js',
   'js/hackathons/hk-mailer.js',
+  'js/hackathons/hk-cert-core.js',
+  'js/hackathons/hk-cert.js',
+  'js/hackathons/hk-cert-page.js',
   'js/hackathons/hk-login.js',
   'js/hackathons/hk-icons.js',
   'js/hackathons/hk-pwa.js',

@@ -1,5 +1,5 @@
-// Campus Connect One Service Worker v48
-const CACHE_VERSION = 'cc-v48';
+// Campus Connect One Service Worker v49
+const CACHE_VERSION = 'cc-v49';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -25,9 +25,12 @@ const SHELL_ASSETS = [
   'login-hackthons.html',
   'hackthons-portal.html',
   'hackthons-admin.html',
+  'hackathon-certificate.html',
   'css/hackathons.css',
   'js/hackathons/hk-public.js',
   'js/hackathons/hk-mailer.js',
+  'js/hackathons/hk-cert-core.js',
+  'js/hackathons/hk-cert.js',
   'js/email-templates.js',
   'onboarding.html',
   'report.html',

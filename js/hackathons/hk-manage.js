@@ -1,6 +1,7 @@
 // Organiser workspace for one hackathon: registrations, smart Mailer & Outreach, submissions, test, exports.
 import * as C from './hk-core.js';
 import * as M from './hk-mailer.js';
+import * as HC from './hk-cert.js';
 import { empty, statusBadge, applicationStepperHtml } from './hk-ui.js';
 
 const { $, $$, esc, icons, toast, modal, FS } = C;
@@ -21,13 +22,14 @@ export async function manage(cx, id){
   const h = await C.fetchOne(id, { fresh: true }); if(cx.stale()) return;
   if(!h || (!C.isHackHost(h, S.user) && !C.isStaff(S.site))){ view.innerHTML = `<div class="hk-view">${empty('search-x', 'Hackathon not found', 'You can only manage hackathons you host.', `<a class="hk-btn" href="${esc(cx.backHash || '#/host')}">Back to dashboard</a>`)}</div>`; return; }
   const hostUid = h.hostUid, rounds = C.roundsOf(h);
-  let [regs, subs, atts, meta, keys, serverMailLogs] = await Promise.all([
+  let [regs, subs, atts, meta, keys, serverMailLogs, certs] = await Promise.all([
     C.hackathonRegistrations(id, hostUid),
     C.hackathonSubmissions(id, hostUid).catch(() => []),
     C.hackathonAttempts(id, hostUid).catch(() => []),
     C.getTestMeta(id),
     C.getTestKeys(id).catch(() => null),
-    C.hackathonMailLogs(id, hostUid).catch(() => [])
+    C.hackathonMailLogs(id, hostUid).catch(() => []),
+    HC.fetchHackathonCerts(id).catch(() => [])
   ]);
   if(cx.stale()) return;
 
@@ -55,12 +57,16 @@ export async function manage(cx, id){
   };
   const sel = new Set();
   const subSel = new Set(), testSel = new Set();
-  const initT = ['review', 'subs'].includes(cx.initialTab) ? 'subs' : (['regs', 'mail', 'test', 'next'].includes(cx.initialTab) ? cx.initialTab : 'regs');
+  const initT = ['review', 'subs'].includes(cx.initialTab) ? 'subs' : (['regs', 'mail', 'test', 'next', 'certs'].includes(cx.initialTab) ? cx.initialTab : 'regs');
   let tab = initT, q = '', fs = '', fr = '', regSort = 'recent';
   let subsView = 'leaderboard', subRankBy = 'combined';
   let subQ = '', subFilter = 'all', subSort = 'score_desc', topSubN = 5, subCut = 75;
   let testQ = '', testFilter = 'attempted', testSort = 'score_desc', topTestN = 5, testCut = 60;
   let winCriteria = 'combined', winPool = 'qualified', winTopN = 3, winMailMode = 'email';
+  let certMode = 'winners', certPartScope = 'all', certDateLabel = HC.defaultEventDateLabel(h);
+  let certFilter = 'all', certSearch = '', certPartQ = '', editingSig = false;
+  const certWinSel = new Set(), certPartSel = new Set(), certRankOverrides = new Map();
+  let certWinInit = false;
   const ph = C.phase(h), roundName = i => rounds[i]?.name || (rounds.length ? 'Completed' : '—');
   const slug = (h.title || 'hackathon').replace(/[^\w]+/g, '-').toLowerCase();
 
@@ -999,7 +1005,10 @@ export async function manage(cx, id){
         ${announcedWinners.length ? `<div class="hk-winners-box" style="margin-top:8px">
           <div class="wb-head">
             <div style="display:flex;align-items:center;gap:8px"><span class="hk-win-ic"><i data-lucide="trophy"></i></span><div><b>Official Announced Winners (${announcedWinners.length})</b><div class="hk-xs hk-muted">${winCfg.revealAtMs && winCfg.revealAtMs > Date.now() ? `Countdown live · reveals ${C.fmtDT(winCfg.revealAtMs)}` : 'Live on participants\' dashboards & My Hackathons cards'}</div></div></div>
-            <button type="button" class="hk-btn sm gold" data-mailwinners><i data-lucide="send"></i>Open Auto-Emailer for Winners</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button type="button" class="hk-btn sm primary" data-tab="certs"><i data-lucide="award"></i>Generate Winner Certificates</button>
+              <button type="button" class="hk-btn sm gold" data-mailwinners><i data-lucide="send"></i>Open Auto-Emailer for Winners</button>
+            </div>
           </div>
           <div class="hk-winners-grid">${announcedWinners.map((wMeta, wi) => {
             const w = regs.find(x => x.uid === wMeta.uid) || { id: wMeta.regId || '', uid: wMeta.uid, name: wMeta.leaderName || 'Winner', teamName: wMeta.teamName || '', email: '', phone: '' };
@@ -1254,6 +1263,270 @@ export async function manage(cx, id){
     </div>`;
   }
 
+  const certOf = (uid, category) => certs.find(c => c.uid === uid && c.category === category);
+  const getSavedSignatory = () => ({
+    name: (S.hk?.digitalSignatoryName || h.organiser?.signatoryName || '').trim(),
+    title: (S.hk?.digitalSignatoryTitle || h.organiser?.signatoryTitle || org.designation || (org.org ? `Organiser, ${org.org}` : 'Hackathon Organiser')).trim()
+  });
+  const getWinnerCandidates = () => {
+    const winCfg = h.submission?.winnerReveal || {};
+    const announced = Array.isArray(winCfg.winners) ? winCfg.winners : [];
+    if(announced.length){
+      return announced.map((w, idx) => {
+        const reg = regs.find(x => (w.uid && x.uid === w.uid) || (w.regId && x.id === w.regId))
+          || { id: w.regId || `${h.id}_${w.uid}`, uid: w.uid, name: w.leaderName || w.teamName || 'Winner', teamName: w.teamName || '', teamMode: w.teamName ? 'team' : 'solo', college: w.college || '', email: '' };
+        const sub = subOf(reg.uid);
+        return {
+          reg,
+          rank: idx + 1,
+          defaultRankTitle: w.place || HC.rankLabelForIndex(idx),
+          prize: w.prize || '',
+          projectTitle: w.projectTitle || sub?.title || '',
+          scoreLabel: w.scoreLabel || '',
+          isAnnounced: true
+        };
+      }).filter(x => x.reg?.uid);
+    }
+    const finalists = regs.filter(r => r.status === 'selected')
+      .map(r => ({ r, em: evalMetrics(r.uid) }))
+      .sort((a, b) => b.em.combined - a.em.combined || (b.em.subScore ?? -1) - (a.em.subScore ?? -1));
+    return finalists.map((x, idx) => ({
+      reg: x.r,
+      rank: idx + 1,
+      defaultRankTitle: HC.rankLabelForIndex(idx),
+      prize: '',
+      projectTitle: x.em.sub?.title || '',
+      scoreLabel: x.em.combined >= 0 ? `${x.em.combined}%` : '',
+      isAnnounced: false
+    }));
+  };
+
+  function certsTab(){
+    const sig = getSavedSignatory();
+    const hasSig = !!sig.name;
+    const winnerList = getWinnerCandidates();
+    if(!certWinInit && winnerList.length){
+      winnerList.forEach(w => certWinSel.add(w.reg.uid));
+      certWinInit = true;
+    }
+
+    const activeRegs = regs.filter(r => r.status !== 'rejected');
+    const pq = certPartQ.trim().toLowerCase();
+    const filteredParts = activeRegs.filter(r => !pq || [r.name, r.teamName, r.email, r.college].join(' ').toLowerCase().includes(pq));
+
+    const sigBanner = (hasSig && !editingSig) ? `<section class="hkc-sig-banner">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div class="hkc-sig-preview">${HC.signatureSvgHtml(sig.name, '#0C5535')}</div>
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <b>${esc(sig.name)}</b>
+            <span class="hk-chip hkc-green"><i data-lucide="badge-check"></i>Digital Signature Saved</span>
+          </div>
+          <div class="hk-xs hk-muted">${esc(sig.title)} &middot; Automatically saved for this &amp; future hackathons</div>
+        </div>
+      </div>
+      <button type="button" class="hk-btn sm" id="editSigBtn"><i data-lucide="pencil"></i>Edit Signatory</button>
+    </section>` : `<section class="hk-card-s hk-stack">
+      <div class="hk-sub-head">
+        <div class="dh" style="margin-bottom:0">
+          <i data-lucide="pen-tool"></i>
+          <div>
+            <h3>${hasSig ? 'Update Saved Digital Signature' : 'One-Time Digital Signatory Setup'}</h3>
+            <div class="hk-xs hk-muted">Enter your full name once. It will be digitally signed on every certificate &amp; saved permanently for future hackathons.</div>
+          </div>
+        </div>
+        ${hasSig ? `<button type="button" class="hk-btn sm ghost" id="cancelSigBtn">Cancel</button>` : ''}
+      </div>
+      <form id="sigSetupForm" class="hk-form">
+        <div class="hk-grid2">
+          <div class="hk-field">
+            <label for="sigNameIn">Full Signatory Name *</label>
+            <input class="hk-input" id="sigNameIn" name="sigName" required maxlength="60" value="${esc(sig.name || org.name || '')}" placeholder="e.g. Dr. Riya Sharma">
+          </div>
+          <div class="hk-field">
+            <label for="sigTitleIn">Designation / Title <small>shown below signature</small></label>
+            <input class="hk-input" id="sigTitleIn" name="sigTitle" maxlength="80" value="${esc(sig.title || '')}" placeholder="e.g. Convenor / Organiser, ${esc(org.org || h.college || 'Campus Club')}">
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end">
+          <button type="submit" class="hk-btn primary"><i data-lucide="badge-check"></i>Save Digital Signature Permanently</button>
+        </div>
+      </form>
+    </section>`;
+
+    const winnerGenHtml = winnerList.length ? `<div class="hk-stack" style="gap:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <label class="hk-check" style="margin:0;font-weight:700"><input type="checkbox" id="certWinAll" ${winnerList.every(w => certWinSel.has(w.reg.uid)) ? 'checked' : ''}><span>Select All Winners (${winnerList.length})</span></label>
+        <span class="hk-xs hk-muted">${winnerList[0]?.isAnnounced ? 'Auto-loaded from Official Announced Winners' : 'Auto-loaded from Round 2 Finalists'}</span>
+      </div>
+      <div class="hkc-check-list">${winnerList.map(w => {
+        const uid = w.reg.uid;
+        const tName = w.reg.teamMode === 'team' && w.reg.teamName ? `Team ${w.reg.teamName} · ` : '';
+        const existing = certOf(uid, 'winner');
+        const rankVal = certRankOverrides.has(uid) ? certRankOverrides.get(uid) : w.defaultRankTitle;
+        return `<div class="hkc-check-row">
+          <input type="checkbox" data-cwsel="${esc(uid)}" ${certWinSel.has(uid) ? 'checked' : ''} aria-label="Select ${esc(w.reg.name)}">
+          <span class="hk-rank top${Math.min(w.rank, 3)}">#${w.rank}</span>
+          <div style="flex:1;min-width:170px">
+            <b>${esc(w.reg.name)}</b>
+            <div class="hk-xs hk-muted">${esc(tName)}${esc(w.reg.college || '')}${w.prize ? ` · ${esc(w.prize)}` : ''}</div>
+          </div>
+          <input class="hk-input" style="max-width:240px;min-height:38px" data-cwrank="${esc(uid)}" value="${esc(rankVal)}" placeholder="Rank / Title on Certificate">
+          ${existing && existing.status !== 'revoked' ? '<span class="hk-chip hkc-green"><i data-lucide="check-circle-2"></i>Issued</span>' : '<span class="hk-chip neutral">Ready</span>'}
+        </div>`;
+      }).join('')}</div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap">
+        <button type="button" class="hk-btn gold lg" id="genWinCertsBtn" ${hasSig && certWinSel.size ? '' : 'disabled'}><i data-lucide="award"></i>Generate Winner Certificates (${certWinSel.size})</button>
+      </div>
+    </div>` : empty('trophy', 'No Winners or Finalists Selected Yet', 'Announce winners in the Next Step & Winners tab (or mark Finalists) so their ranks auto-load here.', '<button type="button" class="hk-btn primary sm" data-tab="next">Open Next Step &amp; Winners</button>');
+
+    const partGenHtml = activeRegs.length ? `<div class="hk-stack" style="gap:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div class="hk-chseg" role="group" aria-label="Participant certificate audience">
+          <button type="button" class="${certPartScope === 'all' ? 'on' : ''}" data-cpscope="all"><i data-lucide="users"></i>All Participants (${activeRegs.length})</button>
+          <button type="button" class="${certPartScope === 'specific' ? 'on' : ''}" data-cpscope="specific"><i data-lucide="user-check"></i>Specific Participants (${certPartSel.size})</button>
+        </div>
+        <span class="hk-xs hk-muted">Generates <b>Certificate of Participation</b> with Campus Connect One &amp; event branding.</span>
+      </div>
+      ${certPartScope === 'specific' ? `<div class="hk-stack" style="gap:8px">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <div class="hk-search" style="flex:1;min-width:200px"><i data-lucide="search"></i><input class="hk-input" id="cpSearch" value="${esc(certPartQ)}" placeholder="Search participant name, team, email or college…"></div>
+          <label class="hk-check" style="margin:0;font-weight:700"><input type="checkbox" id="cpSelAll" ${filteredParts.length && filteredParts.every(r => certPartSel.has(r.uid)) ? 'checked' : ''}><span>Select Matching (${filteredParts.length})</span></label>
+        </div>
+        <div class="hkc-check-list">${filteredParts.map(r => {
+          const ex = certOf(r.uid, 'participant');
+          return `<label class="hkc-check-row" style="cursor:pointer">
+            <input type="checkbox" data-cpsel="${esc(r.uid)}" ${certPartSel.has(r.uid) ? 'checked' : ''}>
+            <div style="flex:1;min-width:170px">
+              <b>${esc(r.name)}</b>${r.teamMode === 'team' && r.teamName ? ` <span class="hk-chip neutral">${esc(r.teamName)}</span>` : ''}
+              <div class="hk-xs hk-muted">${esc(r.email || '')}${r.college ? ` · ${esc(r.college)}` : ''}</div>
+            </div>
+            ${ex && ex.status !== 'revoked' ? '<span class="hk-chip hkc-green"><i data-lucide="check-circle-2"></i>Issued</span>' : '<span class="hk-chip neutral">Not issued</span>'}
+          </label>`;
+        }).join('')}</div>
+      </div>` : ''}
+      <div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap">
+        <button type="button" class="hk-btn primary lg" id="genPartCertsBtn" ${hasSig && (certPartScope === 'all' ? activeRegs.length : certPartSel.size) ? '' : 'disabled'}><i data-lucide="award"></i>Generate Participation Certificates (${certPartScope === 'all' ? activeRegs.length : certPartSel.size})</button>
+      </div>
+    </div>` : empty('users', 'No Active Participants Yet', 'Registered teams will appear here once registrations come in.');
+
+    // Symmetrical Issued Dashboard Filtering
+    const cq = certSearch.trim().toLowerCase();
+    const visibleCerts = certs.filter(c => {
+      if(certFilter === 'revoked' ? c.status !== 'revoked' : c.status === 'revoked') return false;
+      if(certFilter === 'winner' && c.category !== 'winner') return false;
+      if(certFilter === 'participant' && c.category !== 'participant') return false;
+      if(!cq) return true;
+      const reg = regOf(c.uid);
+      return [c.name, c.teamName, c.rankTitle, HC.certCode(c.id), reg?.email || '', reg?.college || ''].join(' ').toLowerCase().includes(cq);
+    });
+
+    const activeIssued = certs.filter(c => c.status !== 'revoked');
+    const winCount = activeIssued.filter(c => c.category === 'winner').length;
+    const partCount = activeIssued.filter(c => c.category === 'participant').length;
+    const revCount = certs.filter(c => c.status === 'revoked').length;
+
+    return `<div class="hk-stack">
+      ${sigBanner}
+
+      <section class="hk-card-s hk-stack">
+        <div class="hk-sub-head">
+          <div class="dh" style="margin-bottom:0">
+            <i data-lucide="award"></i>
+            <div>
+              <h3>Generate Official Hackathon Certificates</h3>
+              <div class="hk-xs hk-muted">Crisp white Canva-editorial design · Campus Connect One + ${esc(h.brandName || h.college || 'Organiser')} branding &middot; Scannable QR verify</div>
+            </div>
+          </div>
+          <div class="hk-chseg" role="group" aria-label="Certificate generation category">
+            <button type="button" class="${certMode === 'winners' ? 'on' : ''}" data-cmode="winners"><i data-lucide="trophy"></i>For Winners (${winnerList.length})</button>
+            <button type="button" class="${certMode === 'participants' ? 'on' : ''}" data-cmode="participants"><i data-lucide="users"></i>For Participants (${activeRegs.length})</button>
+          </div>
+        </div>
+
+        <div class="hk-grid2" style="align-items:end;padding:12px 14px;border-radius:14px;background:var(--hk-surface2);border:1px solid var(--hk-line)">
+          <div class="hk-field" style="margin:0">
+            <label for="certDateIn">Official Hackathon Date <small>pre-filled from event dates · editable</small></label>
+            <input class="hk-input" id="certDateIn" value="${esc(certDateLabel)}" maxlength="64" placeholder="e.g. 18 – 20 Nov 2026">
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button type="button" class="hk-btn sm" id="certResetDateBtn"><i data-lucide="rotate-ccw"></i>Use Event Date (${esc(HC.defaultEventDateLabel(h))})</button>
+            ${!hasSig ? `<span class="hk-xs" style="color:var(--hk-warn);font-weight:700">Save your Digital Signature above first to enable generation.</span>` : ''}
+          </div>
+        </div>
+
+        ${certMode === 'winners' ? winnerGenHtml : partGenHtml}
+      </section>
+
+      <section class="hk-card-s hk-stack">
+        <div class="hk-sub-head">
+          <div class="dh" style="margin-bottom:0">
+            <i data-lucide="shield-check"></i>
+            <div>
+              <h3>Issued Certificates &amp; Live Activity Tracker</h3>
+              <div class="hk-xs hk-muted">Green badges light up automatically when participants download, share, or add to LinkedIn.</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <span class="hk-chip gold">${winCount} Winner</span>
+            <span class="hk-chip">${partCount} Participant</span>
+            <span class="hk-chip hkc-green">${activeIssued.filter(c => c.certDownloadAtMs).length} Downloaded</span>
+            <span class="hk-chip hkc-green">${activeIssued.filter(c => c.certLinkedInAtMs).length} LinkedIn</span>
+          </div>
+        </div>
+
+        <div class="hk-toolbar">
+          <div class="hk-search"><i data-lucide="search"></i><input class="hk-input" id="certSearchIn" value="${esc(certSearch)}" placeholder="Search recipient, team, email, rank or certificate ID…"></div>
+          <div class="hk-chips" style="margin:0">
+            <button type="button" class="hk-chip btn ${certFilter === 'all' ? 'on' : ''}" data-cfilt="all">All (${activeIssued.length})</button>
+            <button type="button" class="hk-chip btn ${certFilter === 'winner' ? 'on' : ''}" data-cfilt="winner">Winners (${winCount})</button>
+            <button type="button" class="hk-chip btn ${certFilter === 'participant' ? 'on' : ''}" data-cfilt="participant">Participants (${partCount})</button>
+            ${revCount ? `<button type="button" class="hk-chip btn ${certFilter === 'revoked' ? 'on' : ''}" data-cfilt="revoked">Revoked (${revCount})</button>` : ''}
+          </div>
+        </div>
+
+        ${visibleCerts.length ? `<div class="hkc-host-grid">${visibleCerts.map(c => {
+          const isWin = c.category === 'winner';
+          const isRev = c.status === 'revoked';
+          const reg = regOf(c.uid);
+          const verify = HC.certVerifyUrl(c.id);
+          const code = HC.certCode(c.id);
+          const dlOn = !!c.certDownloadAtMs;
+          const shOn = !!c.certShareAtMs;
+          const liOn = !!c.certLinkedInAtMs;
+          return `<article class="hkc-host-card ${isWin ? 'is-win' : ''} ${isRev ? 'is-revoked' : ''}">
+            <div class="hkc-hc-top">
+              <span class="hk-chip ${isWin ? 'gold' : ''}"><i data-lucide="${isWin ? 'trophy' : 'award'}"></i>${esc(isWin ? c.rankTitle : 'Participant')}</span>
+              <span class="hkc-hc-id">${esc(code)}</span>
+            </div>
+            <div class="hkc-hc-meta">
+              <b>${esc(c.name)}</b>
+              <div class="hk-xs hk-muted">${c.teamName ? `Team ${esc(c.teamName)} · ` : ''}${esc(reg?.email || c.college || 'Verified Recipient')}</div>
+              <div class="hk-xs hk-muted">Date: <b>${esc(c.eventDateLabel)}</b> · Signed by ${esc(c.signatoryName)}</div>
+            </div>
+            <div class="hkc-hc-track">
+              <span class="hk-chip ${dlOn ? 'hkc-green' : 'neutral'}" title="${dlOn ? 'Downloaded ' + C.ago(c.certDownloadAtMs) : 'Not downloaded yet'}"><i data-lucide="${dlOn ? 'check-circle-2' : 'download'}"></i>Download${dlOn ? ' ✓' : ''}</span>
+              <span class="hk-chip ${shOn ? 'hkc-green' : 'neutral'}" title="${shOn ? 'Shared ' + C.ago(c.certShareAtMs) : 'Not shared yet'}"><i data-lucide="${shOn ? 'check-circle-2' : 'share-2'}"></i>Share${shOn ? ' ✓' : ''}</span>
+              <span class="hk-chip ${liOn ? 'hkc-green' : 'neutral'}" title="${liOn ? 'Added to LinkedIn ' + C.ago(c.certLinkedInAtMs) : 'Not added to LinkedIn yet'}"><i data-lucide="${liOn ? 'check-circle-2' : 'linkedin'}"></i>LinkedIn${liOn ? ' ✓' : ''}</span>
+            </div>
+            <div class="hkc-hc-url">
+              <i data-lucide="qr-code" style="width:14px;height:14px;flex:none"></i>
+              <span>${esc(verify)}</span>
+              <button type="button" class="hk-btn sm ghost" data-certcopy="${esc(c.id)}" title="Copy verify link" style="padding:2px 6px;min-height:24px"><i data-lucide="copy"></i></button>
+            </div>
+            <div class="hkc-hc-acts">
+              <button type="button" class="hk-btn sm primary" data-certprev="${esc(c.id)}"><i data-lucide="eye"></i>Preview</button>
+              <a class="hk-btn sm" href="${esc(verify)}" target="_blank" rel="noopener noreferrer"><i data-lucide="external-link"></i>Verify</a>
+              ${isRev
+                ? `<button type="button" class="hk-btn sm" data-certreissue="${esc(c.id)}"><i data-lucide="rotate-ccw"></i>Restore</button>`
+                : `<button type="button" class="hk-btn sm danger" data-certrevoke="${esc(c.id)}"><i data-lucide="ban"></i>Revoke</button>`}
+            </div>
+          </article>`;
+        }).join('')}</div>` : empty('award', certs.length ? 'No matching certificates' : 'No certificates generated yet', certs.length ? 'Try changing your filter or search query.' : 'Save your Digital Signature and click Generate above — generated certificates appear here symmetrically with live participant download/share/LinkedIn status.')}
+      </section>
+    </div>`;
+  }
+
   const updateMailerPreviewDom = () => {
     const prev = getMailerPreviewData();
     const sEl = $('#mtPrevSubj'), bEl = $('#mtPrevBody');
@@ -1267,6 +1540,7 @@ export async function manage(cx, id){
         : tab === 'mail' ? mailTab()
         : tab === 'subs' ? subsTab()
         : tab === 'next' ? nextTab()
+        : tab === 'certs' ? certsTab()
         : testTab();
     } catch(err){
       console.error('[HK Manage] Tab render error:', tab, err);
@@ -1281,6 +1555,7 @@ export async function manage(cx, id){
   const setTab = t => { if(!t) return; tab = t; paint(); };
   const paint = () => {
     const closed = h.registrationClosed, mailed = regs.filter(r => M.isMailSent(r, null, localMail)).length;
+    const issuedCount = certs.filter(c => c.status !== 'revoked').length;
     view.innerHTML = `<div class="hk-view"><a class="hk-btn ghost sm" href="${esc(cx.backHash || '#/host')}" style="margin-bottom:10px"><i data-lucide="arrow-left"></i>${cx.backLabel || 'Dashboard'}</a>
       <div class="hk-page-h"><div><span class="hk-eyebrow" style="color:var(--hk-gold)">Manage</span><h1>${esc(h.title)}</h1><p>${statusBadge(h.status)} <span class="hk-chip ${ph.tone}">${ph.label}</span></p></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">${cx.viewHref ? `<a class="hk-btn" href="${esc(cx.viewHref)}"><i data-lucide="eye"></i>View page</a>` : `<a class="hk-btn" href="#/h/${h.id}"><i data-lucide="eye"></i>View page</a>`}<button type="button" class="hk-btn" data-announce><i data-lucide="megaphone"></i>Announce</button><button type="button" class="hk-btn" data-csv><i data-lucide="file-spreadsheet"></i>CSV</button><button type="button" class="hk-btn primary" data-pdf><i data-lucide="file-down"></i>PDF</button></div></div>
@@ -1289,19 +1564,21 @@ export async function manage(cx, id){
         <div class="hk-kpi c"><div class="ki"><i data-lucide="lightbulb"></i></div><strong>${subs.length}</strong><span>Submissions</span></div>
         <div class="hk-kpi s"><div class="ki"><i data-lucide="mail-check"></i></div><strong>${mailed}</strong><span>Teams emailed</span></div></div>
       <div class="hk-card-s" style="margin:14px 0;display:flex;gap:14px;align-items:center;flex-wrap:wrap;justify-content:space-between"><div><b>Registration is ${closed ? 'closed' : 'open'}</b><div class="hk-sm hk-muted">${h.regDeadlineMs ? 'Deadline ' + C.fmtDT(h.regDeadlineMs) + '. ' : ''}Automatic emails are <b>${h.autoEmail === false ? 'off' : 'on'}</b>.</div></div><button type="button" class="hk-btn sm ${closed ? 'primary' : ''}" data-toggle>${closed ? 'Reopen registration' : 'End registration now'}</button></div>
-      <div class="hk-tabs" role="tablist">${[['regs', 'users', `Registrations (${regs.length})`], ['subs', 'trophy', `Review Submissions (${subs.length})`], ['test', 'clipboard-check', 'Test'], ['next', 'rocket', 'Next Step & Winners'], ['mail', 'mail', `Mailer & Outreach`]].map(([k, ic, l]) => `<button type="button" class="${tab === k ? 'on' : ''}" data-tab="${k}" role="tab" aria-selected="${tab === k ? 'true' : 'false'}"><i data-lucide="${ic}"></i>${l}</button>`).join('')}</div>
+      <div class="hk-tabs" role="tablist">${[['regs', 'users', `Registrations (${regs.length})`], ['subs', 'trophy', `Review Submissions (${subs.length})`], ['test', 'clipboard-check', 'Test'], ['next', 'rocket', 'Next Step & Winners'], ['mail', 'mail', `Mailer & Outreach`], ['certs', 'award', `Certificates${issuedCount ? ` (${issuedCount})` : ''}`]].map(([k, ic, l]) => `<button type="button" class="${tab === k ? 'on' : ''}" data-tab="${k}" role="tab" aria-selected="${tab === k ? 'true' : 'false'}"><i data-lucide="${ic}"></i>${l}</button>`).join('')}</div>
       <div id="tabBody">${renderActiveTab()}</div></div>`;
     icons();
     try { bindNextTabForms(); } catch(err){ console.error('[HK Manage] Form bind error:', err); }
+    try { bindCertTabForms(); } catch(err){ console.error('[HK Manage] Cert bind error:', err); }
   };
   const redrawRows = () => {
     const b = $('#tabBody');
     if(!b) return;
-    if(['regs', 'mail', 'subs', 'test', 'next'].includes(tab)){
+    if(['regs', 'mail', 'subs', 'test', 'next', 'certs'].includes(tab)){
       const k = document.activeElement?.id, pos = document.activeElement?.selectionStart;
       b.innerHTML = renderActiveTab();
       icons();
       try { bindNextTabForms(); } catch(err){ console.error('[HK Manage] Form bind error:', err); }
+      try { bindCertTabForms(); } catch(err){ console.error('[HK Manage] Cert bind error:', err); }
       if(k){ const el = $('#' + k); el?.focus(); try { el.setSelectionRange(pos, pos); } catch {} }
     }
   };
@@ -1906,6 +2183,108 @@ export async function manage(cx, id){
     }
   }
 
+  /* ---------- Certificates Tab Form & Action Bindings ---------- */
+  function bindCertTabForms(){
+    if(tab !== 'certs') return;
+    const sigForm = $('#sigSetupForm');
+    if(sigForm){
+      sigForm.onsubmit = async ev => {
+        ev.preventDefault();
+        const fd = new FormData(sigForm);
+        const sName = String(fd.get('sigName') || '').trim();
+        const sTitle = String(fd.get('sigTitle') || '').trim() || org.designation || (org.org ? `Organiser, ${org.org}` : 'Hackathon Organiser');
+        if(sName.length < 2) return toast('Enter your full name for the digital signature.', 'error');
+        const btn = $('button[type=submit]', sigForm);
+        btn.disabled = true; btn.innerHTML = '<span class="hk-spin"></span> Saving signature…';
+        try {
+          await C.updateHkProfile(S.user.uid, { digitalSignatoryName: sName, digitalSignatoryTitle: sTitle });
+          if(S.hk){ S.hk.digitalSignatoryName = sName; S.hk.digitalSignatoryTitle = sTitle; }
+          if(h.organiser && typeof h.organiser === 'object'){
+            h.organiser.signatoryName = sName;
+            h.organiser.signatoryTitle = sTitle;
+          }
+          editingSig = false;
+          toast('Digital signature saved permanently for this & future hackathons!');
+          redrawRows();
+        } catch(err){
+          toast(err.message || 'Could not save signature.', 'error');
+          btn.disabled = false; btn.innerHTML = '<i data-lucide="badge-check"></i>Save Digital Signature Permanently'; icons();
+        }
+      };
+    }
+
+    const genWinBtn = $('#genWinCertsBtn');
+    if(genWinBtn){
+      genWinBtn.onclick = async () => {
+        const sig = getSavedSignatory();
+        if(!sig.name) return toast('Save your Digital Signature first.', 'error');
+        const winners = getWinnerCandidates().filter(w => certWinSel.has(w.reg.uid));
+        if(!winners.length) return toast('Select at least one winner.', 'error');
+        genWinBtn.disabled = true; genWinBtn.innerHTML = `<span class="hk-spin"></span> Generating ${winners.length}…`;
+        try {
+          const cleanDate = ($('#certDateIn')?.value || certDateLabel || '').trim() || HC.defaultEventDateLabel(h);
+          certDateLabel = cleanDate;
+          const recs = winners.map(w => {
+            const rankTitle = (certRankOverrides.get(w.reg.uid) ?? $(`[data-cwrank="${w.reg.uid}"]`)?.value ?? w.defaultRankTitle).trim() || w.defaultRankTitle;
+            return HC.buildCertificateRecord({
+              h,
+              reg: w.reg,
+              category: 'winner',
+              rankTitle,
+              prize: w.prize,
+              projectTitle: w.projectTitle,
+              eventDateLabel: cleanDate,
+              signatoryName: sig.name,
+              signatoryTitle: sig.title,
+              hostUid
+            });
+          });
+          await HC.issueHackathonCerts(recs, S.user.uid);
+          certs = await HC.fetchHackathonCerts(id).catch(() => certs);
+          toast(`Generated ${recs.length} official Winner Certificate${recs.length === 1 ? '' : 's'}!`);
+          paint();
+        } catch(err){
+          toast(err.message || 'Could not generate certificates.', 'error');
+          genWinBtn.disabled = false; genWinBtn.innerHTML = `<i data-lucide="award"></i>Generate Winner Certificates (${winners.length})`; icons();
+        }
+      };
+    }
+
+    const genPartBtn = $('#genPartCertsBtn');
+    if(genPartBtn){
+      genPartBtn.onclick = async () => {
+        const sig = getSavedSignatory();
+        if(!sig.name) return toast('Save your Digital Signature first.', 'error');
+        const activeRegs = regs.filter(r => r.status !== 'rejected');
+        const targets = certPartScope === 'all' ? activeRegs : activeRegs.filter(r => certPartSel.has(r.uid));
+        if(!targets.length) return toast('Select at least one participant.', 'error');
+        if(certPartScope === 'all' && targets.length > 25 && !confirm(`Generate Participation Certificates for all ${targets.length} active participants?`)) return;
+        genPartBtn.disabled = true; genPartBtn.innerHTML = `<span class="hk-spin"></span> Generating ${targets.length}…`;
+        try {
+          const cleanDate = ($('#certDateIn')?.value || certDateLabel || '').trim() || HC.defaultEventDateLabel(h);
+          certDateLabel = cleanDate;
+          const recs = targets.map(r => HC.buildCertificateRecord({
+            h,
+            reg: r,
+            category: 'participant',
+            rankTitle: 'Participant',
+            eventDateLabel: cleanDate,
+            signatoryName: sig.name,
+            signatoryTitle: sig.title,
+            hostUid
+          }));
+          await HC.issueHackathonCerts(recs, S.user.uid);
+          certs = await HC.fetchHackathonCerts(id).catch(() => certs);
+          toast(`Generated ${recs.length} Participation Certificate${recs.length === 1 ? '' : 's'}!`);
+          paint();
+        } catch(err){
+          toast(err.message || 'Could not generate certificates.', 'error');
+          genPartBtn.disabled = false; genPartBtn.innerHTML = `<i data-lucide="award"></i>Generate Participation Certificates (${targets.length})`; icons();
+        }
+      };
+    }
+  }
+
   /* ---------- status / round changes ---------- */
   async function patchReg(r, patch){
     await C.updateRegistration(r.id, patch); Object.assign(r, patch);
@@ -1943,9 +2322,31 @@ export async function manage(cx, id){
     if(t.id === 'mtNote'){ mailer.note = t.value; updateMailerPreviewDom(); }
     if(t.id === 'mqSearch'){ mailer.quickQ = t.value.trim().toLowerCase(); redrawRows(); }
     if(t.id === 'recSearch'){ mailer.recSearch = t.value.trim(); redrawRows(); }
+    if(t.id === 'certDateIn'){ certDateLabel = t.value; }
+    if(t.id === 'certSearchIn'){ certSearch = t.value; redrawRows(); }
+    if(t.id === 'cpSearch'){ certPartQ = t.value; redrawRows(); }
+    if(t.dataset.cwrank){ certRankOverrides.set(t.dataset.cwrank, t.value); }
   };
   view.onchange = async e => {
     const t = e.target;
+    if(t.id === 'certWinAll'){
+      getWinnerCandidates().forEach(w => t.checked ? certWinSel.add(w.reg.uid) : certWinSel.delete(w.reg.uid));
+      return redrawRows();
+    }
+    if(t.dataset.cwsel){
+      t.checked ? certWinSel.add(t.dataset.cwsel) : certWinSel.delete(t.dataset.cwsel);
+      return redrawRows();
+    }
+    if(t.id === 'cpSelAll'){
+      const pq = certPartQ.trim().toLowerCase();
+      regs.filter(r => r.status !== 'rejected' && (!pq || [r.name, r.teamName, r.email, r.college].join(' ').toLowerCase().includes(pq)))
+        .forEach(r => t.checked ? certPartSel.add(r.uid) : certPartSel.delete(r.uid));
+      return redrawRows();
+    }
+    if(t.dataset.cpsel){
+      t.checked ? certPartSel.add(t.dataset.cpsel) : certPartSel.delete(t.dataset.cpsel);
+      return redrawRows();
+    }
     if(t.id === 'fs'){ fs = t.value; return redrawRows(); }
     if(t.id === 'fr'){ fr = t.value; return redrawRows(); }
     if(t.id === 'rs'){ regSort = t.value; return redrawRows(); }
@@ -2008,6 +2409,36 @@ export async function manage(cx, id){
       if(!t || typeof t.closest !== 'function') return;
       const pb = t.closest('[data-prof]'); if(pb){ const r = regs.find(x => x.id === pb.dataset.prof); if(r) viewApplicantModal(r); return; }
       const tb = t.closest('[data-tab]'); if(tb) return setTab(tb.dataset.tab);
+      if(t.closest('#editSigBtn')){ editingSig = true; return redrawRows(); }
+      if(t.closest('#cancelSigBtn')){ editingSig = false; return redrawRows(); }
+      if(t.closest('#certResetDateBtn')){ certDateLabel = HC.defaultEventDateLabel(h); return redrawRows(); }
+      const cm = t.closest('[data-cmode]'); if(cm){ certMode = cm.dataset.cmode; return redrawRows(); }
+      const cps = t.closest('[data-cpscope]'); if(cps){ certPartScope = cps.dataset.cpscope; return redrawRows(); }
+      const cf = t.closest('[data-cfilt]'); if(cf){ certFilter = cf.dataset.cfilt; return redrawRows(); }
+      const cp = t.closest('[data-certcopy]'); if(cp){
+        const u = HC.certVerifyUrl(cp.dataset.certcopy);
+        try { await navigator.clipboard.writeText(u); toast('Verification URL copied!'); } catch { toast(u, 'info'); }
+        return;
+      }
+      const cprev = t.closest('[data-certprev]'); if(cprev){
+        const cert = certs.find(x => x.id === cprev.dataset.certprev);
+        if(cert) HC.openCertViewerModal(cert, { isOwner: false });
+        return;
+      }
+      const crev = t.closest('[data-certrevoke]'); if(crev){
+        const cert = certs.find(x => x.id === crev.dataset.certrevoke);
+        if(!cert || !confirm(`Revoke certificate for ${cert.name}? Public QR verification will show it as Revoked.`)) return;
+        try { await HC.setCertStatus(cert.id, 'revoked'); cert.status = 'revoked'; toast('Certificate revoked.', 'info'); paint(); }
+        catch(err){ toast(err.message, 'error'); }
+        return;
+      }
+      const crei = t.closest('[data-certreissue]'); if(crei){
+        const cert = certs.find(x => x.id === crei.dataset.certreissue);
+        if(!cert) return;
+        try { await HC.setCertStatus(cert.id, 'issued'); cert.status = 'issued'; toast('Certificate restored to valid!', 'success'); paint(); }
+        catch(err){ toast(err.message, 'error'); }
+        return;
+      }
     const mb = t.closest('[data-mail]'); if(mb){ const r = regs.find(x => x.id === mb.dataset.mail); if(r) compose([r]); return; }
     const sv = t.closest('[data-subview]'); if(sv){ subsView = sv.dataset.subview; return redrawRows(); }
     const sfBtn = t.closest('[data-subf]'); if(sfBtn){ subFilter = sfBtn.dataset.subf; return redrawRows(); }

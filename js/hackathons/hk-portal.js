@@ -6,6 +6,7 @@ import { card, spot, empty, skeletonCards, detailHeader, detailBody, factsCard, 
 import { hostDash, wizard } from './hk-host.js';
 import { manage } from './hk-manage.js';
 import { dash } from './hk-dash.js';
+import * as HC from './hk-cert.js';
 import { participantForm, organiserForm } from './hk-forms.js';
 import { signOut } from 'https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js';
 
@@ -446,7 +447,7 @@ function registerModal(h){
 async function myHacks(t){
   await ensureAll(); if(stale(t)) return;
   const hMap = new Map((S.all || []).map(h => [h.id, h]));
-  let stopTimers = null, unsubRegs = null;
+  let stopTimers = null, unsubRegs = null, certById = new Map();
   const ST_MAP = {
     selected: { cls: 'selected', ic: 'award', label: 'Finalist · Selected' },
     shortlisted: { cls: 'shortlisted', ic: 'sparkles', label: 'Shortlisted · Next Round' },
@@ -465,10 +466,22 @@ async function myHacks(t){
       if(stale(t) || curPath() !== '/my') return;
     }
 
-    const subDocs = await Promise.all(regs.map(r => r.hackathonId ? C.getSubmission(r.hackathonId, S.user.uid).catch(() => null) : null));
+    const [subDocs, myCertList] = await Promise.all([
+      Promise.all(regs.map(r => r.hackathonId ? C.getSubmission(r.hackathonId, S.user.uid).catch(() => null) : null)),
+      HC.fetchMyHackathonCerts(S.user.uid).catch(() => [])
+    ]);
     if(stale(t) || curPath() !== '/my') return;
     const subMap = new Map();
     regs.forEach((r, idx) => { if(r.hackathonId && subDocs[idx]) subMap.set(r.hackathonId, subDocs[idx]); });
+
+    const certMap = new Map();
+    certById = new Map();
+    (myCertList || []).filter(c => c && c.status !== 'revoked' && c.hackathonId).forEach(c => {
+      certById.set(c.id, c);
+      if(!certMap.has(c.hackathonId)) certMap.set(c.hackathonId, []);
+      certMap.get(c.hackathonId).push(c);
+    });
+    certMap.forEach(arr => arr.sort((a, b) => (a.category === 'winner' ? -1 : 1) - (b.category === 'winner' ? -1 : 1) || (b.issuedAtMs || 0) - (a.issuedAtMs || 0)));
 
     const now = Date.now();
     const cardsHtml = regs.map(r => {
@@ -487,6 +500,8 @@ async function myHacks(t){
       const myWin = isRevealed ? winArr.find(w => w.uid === S.user.uid) : null;
       const isWinnerCard = !!(myWin || (isRevealed && !winArr.length && r.status === 'selected'));
       const mySub = subMap.get(r.hackathonId) || null;
+      const earnedCerts = certMap.get(r.hackathonId) || [];
+      const topCert = earnedCerts[0] || null;
       const stepperHtml = applicationStepperHtml({
         reg: r,
         sub: mySub,
@@ -508,6 +523,16 @@ async function myHacks(t){
         ? `<div class="hk-my-logi"><span class="hk-chip ${logi.mode === 'online' ? 'sky' : 'gold'}"><i data-lucide="${logi.mode === 'online' ? 'video' : 'map-pin'}"></i>${esc(logi.mode.toUpperCase())}</span>${logi.venueName || logi.reportingTime ? `<span class="hk-xs hk-muted">${esc(logi.venueName || '')}${logi.venueName && logi.reportingTime ? ' · ' : ''}${logi.reportingTime ? esc(C.fmtDT(logi.reportingTime) !== '—' ? C.fmtDT(logi.reportingTime) : logi.reportingTime) : ''}</span>` : ''}</div>`
         : '';
 
+      const certLine = topCert
+        ? `<div class="hk-my-logi" style="flex-wrap:wrap">
+            <span class="hk-chip ${topCert.category === 'winner' ? 'gold' : ''}"><i data-lucide="${topCert.category === 'winner' ? 'trophy' : 'award'}"></i>${topCert.category === 'winner' ? esc(topCert.rankTitle || 'Winner Certificate') : 'Participation Certificate'} Ready</span>
+            ${topCert.certDownloadAtMs ? '<span class="hk-chip hkc-green"><i data-lucide="check-circle-2"></i>Downloaded</span>' : ''}
+            ${topCert.certLinkedInAtMs ? '<span class="hk-chip hkc-green"><i data-lucide="linkedin"></i>On LinkedIn</span>' : ''}
+          </div>`
+        : '';
+
+      const certButtonsHtml = earnedCerts.map(c => `<button type="button" class="hk-btn sm ${c.category === 'winner' ? 'gold' : ''}" data-opencert-id="${esc(c.id)}"><i data-lucide="${c.category === 'winner' ? 'trophy' : 'award'}"></i>${earnedCerts.length > 1 ? (c.category === 'winner' ? 'Winner Cert' : 'Participation Cert') : 'Certificate'}</button>`).join('');
+
       return `<article class="hk-my-card ${isWinnerCard ? 'is-winner' : ''}">
         <div class="hk-my-banner ${st.cls}">
           <span style="display:inline-flex;align-items:center;gap:6px"><i data-lucide="${st.ic}"></i>${st.label}</span>
@@ -525,9 +550,11 @@ async function myHacks(t){
           </div>
           ${stepperHtml}
           ${logiLine}
+          ${certLine}
           ${r.hostNote ? `<div class="hk-msg ok" style="padding:8px 12px"><i data-lucide="message-square-text"></i><span><b>Organiser note:</b> ${esc(r.hostNote)}</span></div>` : ''}
           ${cd || ''}
           <div class="hk-my-acts">
+            ${certButtonsHtml}
             <button type="button" class="hk-btn sm" data-act="share" data-id="${esc(r.hackathonId)}" data-title="${esc(h.title || r.hackathonTitle || '')}"><i data-lucide="share-2"></i>Share</button>
             <a class="hk-btn sm" href="#/h/${esc(r.hackathonId)}"><i data-lucide="info"></i>View</a>
             <a class="hk-btn sm primary" href="#/my/${esc(r.hackathonId)}"><i data-lucide="layout-dashboard"></i>Open dashboard</a>
@@ -536,15 +563,28 @@ async function myHacks(t){
       </article>`;
     }).join('');
 
-    view.innerHTML = `<div class="hk-view"><div class="hk-page-h"><div><span class="hk-eyebrow">Your activity</span><h1>My hackathons</h1><p>Track selection updates, round progress, live countdowns, and submissions.</p></div><a class="hk-btn primary" href="#/explore"><i data-lucide="compass"></i>Find more</a></div>
+    view.innerHTML = `<div class="hk-view"><div class="hk-page-h"><div><span class="hk-eyebrow">Your activity</span><h1>My hackathons</h1><p>Track selection updates, round progress, live countdowns, certificates, and submissions.</p></div><a class="hk-btn primary" href="#/explore"><i data-lucide="compass"></i>Find more</a></div>
       ${regs.length ? `<div class="hk-stack">${cardsHtml}</div>` : empty('ticket', 'No registrations yet', 'Register for a hackathon and it will show up here.', '<a class="hk-btn primary" href="#/explore">Explore hackathons</a>')}</div>`;
     stopTimers?.();
     stopTimers = startCountdowns(view);
     icons();
   };
 
+  const onCertClick = e => {
+    const cb = e.target.closest('[data-opencert-id]');
+    if(!cb) return;
+    const cert = certById.get(cb.dataset.opencertId);
+    if(cert){
+      HC.openCertViewerModal(cert, {
+        isOwner: true,
+        onActivity: () => { if(S.regs) renderRegs(S.regs); }
+      });
+    }
+  };
+  view.addEventListener('click', onCertClick);
+
   unsubRegs = C.watchMyRegistrations(S.user.uid, regs => { renderRegs(regs); });
-  S.cleanup = () => { stopTimers?.(); unsubRegs?.(); };
+  S.cleanup = () => { stopTimers?.(); unsubRegs?.(); view.removeEventListener('click', onCertClick); };
 }
 
 /* ---------- Notifications ---------- */
@@ -553,7 +593,7 @@ async function alerts(t){
     approved: 'badge-check', rejected: 'circle-x', changes_requested: 'message-square-warning',
     registration: 'user-plus', announcement: 'megaphone', status: 'refresh-cw',
     submission: 'lightbulb', submission_review: 'message-square-text', test: 'clipboard-check',
-    verified: 'shield-check', featured: 'sparkles', closed: 'lock', reopened: 'unlock'
+    certificate: 'award', verified: 'shield-check', featured: 'sparkles', closed: 'lock', reopened: 'unlock'
   };
   const draw = () => {
     if(curPath() !== '/alerts') return;
@@ -720,7 +760,7 @@ document.addEventListener('click', async e => {
       else if(hid) nav('#/h/' + hid);
       else nav('#/host');
     } else if(hid){
-      if(['status', 'submission_review', 'test'].includes(tp)) nav('#/my/' + hid);
+      if(['status', 'submission_review', 'test', 'certificate'].includes(tp)) nav('#/my/' + hid);
       else nav('#/h/' + hid);
     }
     return;
