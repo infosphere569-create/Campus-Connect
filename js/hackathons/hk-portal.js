@@ -90,7 +90,8 @@ function locModal(){
 
 /* ---------- router ---------- */
 const ROUTES = [
-  [/^\/home$/, home], [/^\/explore$/, explore], [/^\/h\/([\w-]+)$/, detail], [/^\/my$/, myHacks], [/^\/my\/([\w-]+)$/, (t, id) => guardPart(t, () => dash(ctx(t), id))],
+  [/^\/home$/, home], [/^\/explore$/, explore], [/^\/h\/([\w-]+)$/, detail], [/^\/my$/, myHacks],
+  [/^\/my\/([\w-]+)(?:\/(cert)(?:\/([\w-]+))?)?$/, (t, id, focusSection, focusCertId) => guardPart(t, () => dash(ctx(t), id, { focusSection: focusSection || '', focusCertId: focusCertId || '' }))],
   [/^\/host$/, (t) => guardHost(t, () => hostDash(ctx(t)))], [/^\/host\/new$/, (t) => guardHost(t, () => wizard(ctx(t), null))],
   [/^\/host\/edit\/([\w-]+)$/, (t, id) => guardHost(t, () => wizard(ctx(t), id))], [/^\/host\/manage\/([\w-]+)(?:\/([\w-]+))?$/, (t, id, initTab) => guardHost(t, () => manage({ ...ctx(t), initialTab: initTab || 'regs' }, id))],
   [/^\/alerts$/, alerts], [/^\/profile$/, profile]
@@ -120,7 +121,7 @@ async function route(){
     const m = path.match(re); if(!m) continue;
     view.innerHTML = `<div class="hk-view">${skeletonCards(3)}</div>`;
     try { await fn(t, ...m.slice(1)); } catch(e){ if(!stale(t)){ view.innerHTML = fail(e); icons(); } }
-    if(!stale(t)){ icons(); scrollTo({ top: 0 }); }
+    if(!stale(t)){ icons(); if(!/\/cert(?:\/|$)/.test(path)) scrollTo({ top: 0 }); }
     return;
   }
   nav(S.role === 'host' ? '#/host' : '#/home');
@@ -447,7 +448,7 @@ function registerModal(h){
 async function myHacks(t){
   await ensureAll(); if(stale(t)) return;
   const hMap = new Map((S.all || []).map(h => [h.id, h]));
-  let stopTimers = null, unsubRegs = null, certById = new Map();
+  let stopTimers = null, unsubRegs = null;
   const ST_MAP = {
     selected: { cls: 'selected', ic: 'award', label: 'Finalist · Selected' },
     shortlisted: { cls: 'shortlisted', ic: 'sparkles', label: 'Shortlisted · Next Round' },
@@ -475,9 +476,7 @@ async function myHacks(t){
     regs.forEach((r, idx) => { if(r.hackathonId && subDocs[idx]) subMap.set(r.hackathonId, subDocs[idx]); });
 
     const certMap = new Map();
-    certById = new Map();
     (myCertList || []).filter(c => c && c.status !== 'revoked' && c.hackathonId).forEach(c => {
-      certById.set(c.id, c);
       if(!certMap.has(c.hackathonId)) certMap.set(c.hackathonId, []);
       certMap.get(c.hackathonId).push(c);
     });
@@ -531,7 +530,7 @@ async function myHacks(t){
           </div>`
         : '';
 
-      const certButtonsHtml = earnedCerts.map(c => `<button type="button" class="hk-btn sm ${c.category === 'winner' ? 'gold' : ''}" data-opencert-id="${esc(c.id)}"><i data-lucide="${c.category === 'winner' ? 'trophy' : 'award'}"></i>${earnedCerts.length > 1 ? (c.category === 'winner' ? 'Winner Cert' : 'Participation Cert') : 'Certificate'}</button>`).join('');
+      const certButtonsHtml = earnedCerts.map(c => `<a class="hk-btn sm ${c.category === 'winner' ? 'gold' : ''}" href="#/my/${esc(r.hackathonId)}/cert/${esc(c.id)}"><i data-lucide="${c.category === 'winner' ? 'trophy' : 'award'}"></i>${earnedCerts.length > 1 ? (c.category === 'winner' ? 'Winner Cert' : 'Participation Cert') : 'Certificate'}</a>`).join('');
 
       return `<article class="hk-my-card ${isWinnerCard ? 'is-winner' : ''}">
         <div class="hk-my-banner ${st.cls}">
@@ -570,21 +569,8 @@ async function myHacks(t){
     icons();
   };
 
-  const onCertClick = e => {
-    const cb = e.target.closest('[data-opencert-id]');
-    if(!cb) return;
-    const cert = certById.get(cb.dataset.opencertId);
-    if(cert){
-      HC.openCertViewerModal(cert, {
-        isOwner: true,
-        onActivity: () => { if(S.regs) renderRegs(S.regs); }
-      });
-    }
-  };
-  view.addEventListener('click', onCertClick);
-
   unsubRegs = C.watchMyRegistrations(S.user.uid, regs => { renderRegs(regs); });
-  S.cleanup = () => { stopTimers?.(); unsubRegs?.(); view.removeEventListener('click', onCertClick); };
+  S.cleanup = () => { stopTimers?.(); unsubRegs?.(); };
 }
 
 /* ---------- Notifications ---------- */
@@ -794,7 +780,8 @@ document.addEventListener('click', async e => {
       else if(hid) nav('#/h/' + hid);
       else nav('#/host');
     } else if(hid){
-      if(['status', 'submission_review', 'test', 'certificate'].includes(tp)) nav('#/my/' + hid);
+      if(tp === 'certificate') nav('#/my/' + hid + '/cert');
+      else if(['status', 'submission_review', 'test'].includes(tp)) nav('#/my/' + hid);
       else nav('#/h/' + hid);
     }
     return;

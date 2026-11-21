@@ -1302,6 +1302,8 @@ export async function manage(cx, id){
     }));
   };
 
+  const getParticipantOnlyRegs = () => HC.excludeWinnersFromParticipants(regs, getWinnerCandidates().map(w => w.reg.uid));
+
   function certsTab(){
     const sig = getSavedSignatory();
     const hasSig = sig.configured;
@@ -1311,9 +1313,11 @@ export async function manage(cx, id){
       certWinInit = true;
     }
 
-    const activeRegs = regs.filter(r => r.status !== 'rejected');
+    const partOnlyRegs = getParticipantOnlyRegs();
+    const partOnlyUids = new Set(partOnlyRegs.map(r => r.uid));
+    certPartSel.forEach(uid => { if(!partOnlyUids.has(uid)) certPartSel.delete(uid); });
     const pq = certPartQ.trim().toLowerCase();
-    const filteredParts = activeRegs.filter(r => !pq || [r.name, r.teamName, r.email, r.college].join(' ').toLowerCase().includes(pq));
+    const filteredParts = partOnlyRegs.filter(r => !pq || [r.name, r.teamName, r.email, r.college].join(' ').toLowerCase().includes(pq));
     const activeIssuedCount = certs.filter(c => c.status !== 'revoked').length;
     const formInitName = sig.name || org.name || S.hk?.displayName || '';
     const formInitTitle = sig.title || org.designation || (org.org ? `Organiser, ${org.org}` : 'Hackathon Organiser');
@@ -1388,13 +1392,13 @@ export async function manage(cx, id){
       </div>
     </div>` : empty('trophy', 'No Winners or Finalists Selected Yet', 'Announce winners in the Next Step & Winners tab (or mark Finalists) so their ranks auto-load here.', '<button type="button" class="hk-btn primary sm" data-tab="next">Open Next Step &amp; Winners</button>');
 
-    const partGenHtml = activeRegs.length ? `<div class="hk-stack" style="gap:10px">
+    const partGenHtml = partOnlyRegs.length ? `<div class="hk-stack" style="gap:10px">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
         <div class="hk-chseg" role="group" aria-label="Participant certificate audience">
-          <button type="button" class="${certPartScope === 'all' ? 'on' : ''}" data-cpscope="all"><i data-lucide="users"></i>All Participants (${activeRegs.length})</button>
+          <button type="button" class="${certPartScope === 'all' ? 'on' : ''}" data-cpscope="all"><i data-lucide="users"></i>All Participants (${partOnlyRegs.length})</button>
           <button type="button" class="${certPartScope === 'specific' ? 'on' : ''}" data-cpscope="specific"><i data-lucide="user-check"></i>Specific Participants (${certPartSel.size})</button>
         </div>
-        <span class="hk-xs hk-muted">Generates <b>Certificate of Participation</b> with Campus Connect One &amp; event branding.</span>
+        <span class="hk-xs hk-muted">${winnerList.length ? `Excludes ${winnerList.length} winner${winnerList.length === 1 ? '' : 's'} (awarded Winner Certificates) · ` : ''}Generates <b>Certificate of Participation</b> with Campus Connect One branding.</span>
       </div>
       ${certPartScope === 'specific' ? `<div class="hk-stack" style="gap:8px">
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -1414,9 +1418,9 @@ export async function manage(cx, id){
         }).join('')}</div>
       </div>` : ''}
       <div style="display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap">
-        <button type="button" class="hk-btn primary lg" id="genPartCertsBtn" ${hasSig && (certPartScope === 'all' ? activeRegs.length : certPartSel.size) ? '' : 'disabled'}><i data-lucide="award"></i>Generate Participation Certificates (${certPartScope === 'all' ? activeRegs.length : certPartSel.size})</button>
+        <button type="button" class="hk-btn primary lg" id="genPartCertsBtn" ${hasSig && (certPartScope === 'all' ? partOnlyRegs.length : certPartSel.size) ? '' : 'disabled'}><i data-lucide="award"></i>Generate Participation Certificates (${certPartScope === 'all' ? partOnlyRegs.length : certPartSel.size})</button>
       </div>
-    </div>` : empty('users', 'No Active Participants Yet', 'Registered teams will appear here once registrations come in.');
+    </div>` : empty('users', winnerList.length ? 'All Active Teams Are Winners' : 'No Active Participants Yet', winnerList.length ? 'Winners receive official Winner Certificates in the For Winners section — they are automatically excluded from Participation Certificates.' : 'Registered teams will appear here once registrations come in.');
 
     // Symmetrical Issued Dashboard Filtering
     const cq = certSearch.trim().toLowerCase();
@@ -1447,10 +1451,10 @@ export async function manage(cx, id){
             </div>
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <button type="button" class="hk-btn sm primary" id="openBulkGenBtn" ${activeRegs.length || winnerList.length ? '' : 'disabled'}><i data-lucide="layers"></i>Bulk Generate</button>
+            <button type="button" class="hk-btn sm primary" id="openBulkGenBtn" ${partOnlyRegs.length || winnerList.length ? '' : 'disabled'}><i data-lucide="layers"></i>Bulk Generate</button>
             <div class="hk-chseg" role="group" aria-label="Certificate generation category">
               <button type="button" class="${certMode === 'winners' ? 'on' : ''}" data-cmode="winners"><i data-lucide="trophy"></i>For Winners (${winnerList.length})</button>
-              <button type="button" class="${certMode === 'participants' ? 'on' : ''}" data-cmode="participants"><i data-lucide="users"></i>For Participants (${activeRegs.length})</button>
+              <button type="button" class="${certMode === 'participants' ? 'on' : ''}" data-cmode="participants"><i data-lucide="users"></i>For Participants (${partOnlyRegs.length})</button>
             </div>
           </div>
         </div>
@@ -2293,10 +2297,10 @@ export async function manage(cx, id){
       genPartBtn.onclick = async () => {
         const sig = getSavedSignatory();
         if(!sig.name) return toast('Save your Digital Signature first.', 'error');
-        const activeRegs = regs.filter(r => r.status !== 'rejected');
-        const targets = certPartScope === 'all' ? activeRegs : activeRegs.filter(r => certPartSel.has(r.uid));
-        if(!targets.length) return toast('Select at least one participant.', 'error');
-        if(certPartScope === 'all' && targets.length > 25 && !confirm(`Generate Participation Certificates for all ${targets.length} active participants?`)) return;
+        const partOnlyRegs = getParticipantOnlyRegs();
+        const targets = certPartScope === 'all' ? partOnlyRegs : partOnlyRegs.filter(r => certPartSel.has(r.uid));
+        if(!targets.length) return toast('Select at least one non-winner participant.', 'error');
+        if(certPartScope === 'all' && targets.length > 25 && !confirm(`Generate Participation Certificates for all ${targets.length} non-winner participants?`)) return;
         genPartBtn.disabled = true; genPartBtn.innerHTML = `<span class="hk-spin"></span> Generating ${targets.length}…`;
         try {
           const cleanDate = ($('#certDateIn')?.value || certDateLabel || '').trim() || HC.defaultEventDateLabel(h);
@@ -2377,7 +2381,7 @@ export async function manage(cx, id){
     }
     if(t.id === 'cpSelAll'){
       const pq = certPartQ.trim().toLowerCase();
-      regs.filter(r => r.status !== 'rejected' && (!pq || [r.name, r.teamName, r.email, r.college].join(' ').toLowerCase().includes(pq)))
+      getParticipantOnlyRegs().filter(r => !pq || [r.name, r.teamName, r.email, r.college].join(' ').toLowerCase().includes(pq))
         .forEach(r => t.checked ? certPartSel.add(r.uid) : certPartSel.delete(r.uid));
       return redrawRows();
     }
@@ -2450,7 +2454,7 @@ export async function manage(cx, id){
       if(t.closest('#openBulkGenBtn')){
         HC.openBulkGenerateModal({
           h, regs, subs, atts, certs, S, ownerProfile,
-          initialFilter: certMode === 'winners' && getWinnerCandidates().length ? 'winners' : 'all',
+          initialFilter: certMode === 'winners' && getWinnerCandidates().length ? 'winners' : (certMode === 'participants' && getParticipantOnlyRegs().length ? 'participants' : 'all'),
           onGenerated: fresh => { certs = fresh; paint(); }
         });
         return;

@@ -318,14 +318,18 @@ export function buildCertificateRecord({
   };
 }
 
+export function excludeWinnersFromParticipants(regs = [], winnerUids = []) {
+  const winSet = winnerUids instanceof Set ? winnerUids : new Set(winnerUids || []);
+  return (regs || []).filter(r => r && r.uid && r.status !== 'rejected' && !winSet.has(r.uid));
+}
+
 export function buildBulkCertificateRecords({
   h,
   selections = [],
   eventDateLabel = '',
   signatoryName = '',
   signatoryTitle = '',
-  hostUid = '',
-  includeParticipantCopyForWinners = false
+  hostUid = ''
 } = {}) {
   const cleanSig = String(signatoryName || '').trim();
   if (cleanSig.length < 2) {
@@ -343,7 +347,8 @@ export function buildBulkCertificateRecords({
   selections.forEach(item => {
     const reg = item?.reg || (item?.uid ? { uid: item.uid, name: item.name, teamName: item.teamName, college: item.college, teamMode: item.teamName ? 'team' : 'solo' } : null);
     if (!reg?.uid) return;
-    const cat = item.category === 'winner' ? 'winner' : 'participant';
+    // Winners strictly receive Winner Certificates — never Participation Certificates.
+    const cat = (item.isWinner || item.category === 'winner') ? 'winner' : 'participant';
     addRec(buildCertificateRecord({
       h,
       reg,
@@ -356,19 +361,6 @@ export function buildBulkCertificateRecords({
       signatoryTitle,
       hostUid
     }));
-    if (includeParticipantCopyForWinners && cat === 'winner') {
-      addRec(buildCertificateRecord({
-        h,
-        reg,
-        category: 'participant',
-        rankTitle: 'Participant',
-        projectTitle: item.projectTitle || '',
-        eventDateLabel,
-        signatoryName: cleanSig,
-        signatoryTitle,
-        hostUid
-      }));
-    }
   });
 
   return [...byId.values()];

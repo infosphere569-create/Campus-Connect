@@ -22,12 +22,14 @@ const STATUS_TXT = {
   rejected: ['Not selected', 'bad', 'circle-x']
 };
 
-export async function dash(cx, hid){
+export async function dash(cx, hid, opts = {}){
   const { S, view } = cx;
+  const { focusSection = '', focusCertId = '' } = opts || {};
   let editingSub = false, showFullIdea = false, justSubmittedSub = false;
   let editingProto = false, justSubmittedProto = false;
+  let pendingFocusCert = focusSection === 'cert', highlightCertSection = focusSection === 'cert', pendingFocusId = focusCertId || '';
   let h = null, reg = null, sub = null, meta = null, att = null, myCerts = [], selectedCertIdx = 0;
-  let stopTimer = null, unsubReg = null, unsubHack = null, unsubSub = null, unsubCerts = null, revealReloadTimer = 0;
+  let stopTimer = null, unsubReg = null, unsubHack = null, unsubSub = null, unsubCerts = null, revealReloadTimer = 0, highlightClearTimer = 0;
   const viewedCertIds = new Set();
 
   const sortCerts = list => [...(list || [])]
@@ -49,6 +51,11 @@ export async function dash(cx, hid){
     ]);
     sub = subRes; meta = metaRes; att = attRes;
     myCerts = sortCerts(allMyCerts);
+    if(pendingFocusId){
+      const idx = myCerts.findIndex(c => c.id === pendingFocusId);
+      if(idx >= 0) selectedCertIdx = idx;
+      pendingFocusId = '';
+    }
     if(selectedCertIdx >= myCerts.length) selectedCertIdx = 0;
     if(cx.stale()) return false;
     return true;
@@ -290,7 +297,8 @@ export async function dash(cx, hid){
       const switcher = myCerts.length > 1
         ? `<div class="hk-chseg" role="group" aria-label="Choose certificate">${myCerts.map((c, idx) => `<button type="button" class="${idx === selectedCertIdx ? 'on' : ''}" data-pickcert="${idx}"><i data-lucide="${c.category === 'winner' ? 'trophy' : 'award'}"></i>${esc(c.category === 'winner' ? (c.rankTitle || 'Winner') : 'Participation')}</button>`).join('')}</div>`
         : '';
-      certSection = `<section class="hk-card-s hk-dcard" id="certSection" style="margin-bottom:16px">
+      certSection = `<section class="hk-card-s hk-dcard ${highlightCertSection ? 'hkc-focus-highlight' : ''}" id="certSection" style="margin-bottom:16px">
+        ${highlightCertSection ? `<div class="hkc-focus-strip"><i data-lucide="award"></i><span>Highlighted below your progress steps &mdash; download PNG/PDF, share, or add to LinkedIn right here.</span></div>` : ''}
         <div class="hk-sub-head">
           <div class="dh" style="margin-bottom:0;flex:1">
             <i data-lucide="${isWinCert ? 'trophy' : 'award'}" style="color:${isWinCert ? 'var(--hk-gold)' : 'var(--hk-p)'}"></i>
@@ -690,7 +698,22 @@ export async function dash(cx, hid){
 
     if(activeCert){
       const stageHost = $('#dashCertPreview', view);
-      if(stageHost) HC.mountCertPreview(stageHost, activeCert);
+      const scrollCertIntoFocus = () => {
+        if(!pendingFocusCert || cx.stale()) return;
+        pendingFocusCert = false;
+        const sec = $('#certSection', view);
+        if(!sec) return;
+        requestAnimationFrame(() => {
+          sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+        clearTimeout(highlightClearTimer);
+        highlightClearTimer = setTimeout(() => {
+          highlightCertSection = false;
+          sec.classList.remove('hkc-focus-highlight');
+        }, 4200);
+      };
+      if(stageHost) HC.mountCertPreview(stageHost, activeCert).then(scrollCertIntoFocus);
+      else scrollCertIntoFocus();
       if(!viewedCertIds.has(activeCert.id)){
         viewedCertIds.add(activeCert.id);
         HC.markCertActivity(activeCert, 'certViewedAtMs');
@@ -858,7 +881,14 @@ export async function dash(cx, hid){
     const jp = e.target.closest('[data-jump]');
     if(jp){
       const el = $(jp.dataset.jump);
-      if(el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if(el){
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if(jp.dataset.jump === '#certSection'){
+          el.classList.add('hkc-focus-highlight');
+          clearTimeout(highlightClearTimer);
+          highlightClearTimer = setTimeout(() => el.classList.remove('hkc-focus-highlight'), 3200);
+        }
+      }
     }
   };
 
@@ -929,6 +959,7 @@ export async function dash(cx, hid){
   cx.S.cleanup = () => {
     stopTimer?.();
     clearTimeout(revealReloadTimer);
+    clearTimeout(highlightClearTimer);
     unsubReg?.();
     unsubHack?.();
     unsubSub?.();

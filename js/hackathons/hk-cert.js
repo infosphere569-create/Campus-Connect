@@ -270,7 +270,6 @@ export function openBulkGenerateModal({
   let filterKey = initialFilter || 'all';
   let searchQ = '';
   let eventDateLabel = CC.defaultEventDateLabel(h);
-  let includePartForWinners = false;
   let showSigEditor = !CC.resolveHostSignature(ownerProfile || S.hk, h, S.hk).configured;
 
   const currentSig = () => CC.resolveHostSignature(ownerProfile || S.hk, h, S.hk);
@@ -278,7 +277,9 @@ export function openBulkGenerateModal({
   const visibleCandidates = () => {
     const q = searchQ.trim().toLowerCase();
     return candidates.filter(c => {
-      if (filterKey === 'winners' && !c.isWinner && categoryMap.get(c.uid) !== 'winner') return false;
+      const cat = c.isWinner ? 'winner' : (categoryMap.get(c.uid) || c.defaultCategory);
+      if (filterKey === 'winners' && !c.isWinner && cat !== 'winner') return false;
+      if (filterKey === 'participants' && (c.isWinner || cat === 'winner')) return false;
       if (filterKey === 'shortlisted' && !['shortlisted', 'selected'].includes(c.status)) return false;
       if (filterKey === 'unissued' && c.hasIssuedDefault) return false;
       if (filterKey === 'issued' && !c.hasIssuedWinner && !c.hasIssuedPart) return false;
@@ -297,10 +298,11 @@ export function openBulkGenerateModal({
         const list = [];
         candidates.forEach(c => {
           if (!selected.has(c.uid)) return;
-          const cat = categoryMap.get(c.uid) || c.defaultCategory;
+          const cat = c.isWinner ? 'winner' : (categoryMap.get(c.uid) || c.defaultCategory);
           list.push({
             uid: c.uid,
             reg: c.reg,
+            isWinner: c.isWinner,
             category: cat,
             rankTitle: cat === 'winner' ? (rankMap.get(c.uid) || c.defaultRankTitle) : 'Participant',
             prize: cat === 'winner' ? c.prize : '',
@@ -314,12 +316,9 @@ export function openBulkGenerateModal({
         let win = 0, part = 0;
         candidates.forEach(c => {
           if (!selected.has(c.uid)) return;
-          if ((categoryMap.get(c.uid) || c.defaultCategory) === 'winner') {
-            win++;
-            if (includePartForWinners) part++;
-          } else {
-            part++;
-          }
+          const cat = c.isWinner ? 'winner' : (categoryMap.get(c.uid) || c.defaultCategory);
+          if (cat === 'winner') win++;
+          else part++;
         });
         return { win, part, totalCerts: win + part, people: selected.size };
       };
@@ -329,6 +328,7 @@ export function openBulkGenerateModal({
         const vis = visibleCandidates();
         const { win, part, totalCerts, people } = countBreakdown();
         const winTotal = candidates.filter(c => c.isWinner).length;
+        const partOnlyTotal = candidates.filter(c => !c.isWinner).length;
         const shortTotal = candidates.filter(c => ['shortlisted', 'selected'].includes(c.status)).length;
         const unissuedTotal = candidates.filter(c => !c.hasIssuedDefault).length;
         const issuedTotal = candidates.filter(c => c.hasIssuedWinner || c.hasIssuedPart).length;
@@ -378,10 +378,10 @@ export function openBulkGenerateModal({
                 <button type="button" class="hk-btn sm" id="hkcBulkDateReset" title="Use official hackathon dates"><i data-lucide="rotate-ccw"></i></button>
               </div>
             </div>
-            <label class="hk-check" style="margin:0;align-self:end;padding:8px 12px;border-radius:10px;background:var(--hk-surface2);border:1px solid var(--hk-line)">
-              <input type="checkbox" id="hkcBulkDualCb" ${includePartForWinners ? 'checked' : ''}>
-              <span>Also issue Participation Cert to Winners</span>
-            </label>
+            <div class="hk-xs hk-muted" style="align-self:center;padding:8px 12px;border-radius:10px;background:var(--hk-surface2);border:1px solid var(--hk-line)">
+              <i data-lucide="shield-check" style="width:14px;height:14px;vertical-align:-2px;color:var(--hk-p)"></i>
+              Winners receive <b>Winner Certificates</b> only (excluded from Participation).
+            </div>
           </div>
 
           <div class="hkc-bulk-tools">
@@ -392,6 +392,7 @@ export function openBulkGenerateModal({
             <div class="hk-chips" style="margin:0">
               <button type="button" class="hk-chip btn ${filterKey === 'all' ? 'on' : ''}" data-bgfilt="all">All (${candidates.length})</button>
               <button type="button" class="hk-chip btn ${filterKey === 'winners' ? 'on' : ''}" data-bgfilt="winners">Winners (${winTotal})</button>
+              <button type="button" class="hk-chip btn ${filterKey === 'participants' ? 'on' : ''}" data-bgfilt="participants">Participants (${partOnlyTotal})</button>
               <button type="button" class="hk-chip btn ${filterKey === 'shortlisted' ? 'on' : ''}" data-bgfilt="shortlisted">Shortlisted (${shortTotal})</button>
               <button type="button" class="hk-chip btn ${filterKey === 'unissued' ? 'on' : ''}" data-bgfilt="unissued">Unissued (${unissuedTotal})</button>
               <button type="button" class="hk-chip btn ${filterKey === 'issued' ? 'on' : ''}" data-bgfilt="issued">Already Issued (${issuedTotal})</button>
@@ -406,6 +407,7 @@ export function openBulkGenerateModal({
             <div style="display:flex;gap:6px;flex-wrap:wrap">
               <button type="button" class="hk-btn sm" data-bgq="unissued"><i data-lucide="sparkles"></i>Select Unissued (${unissuedTotal})</button>
               <button type="button" class="hk-btn sm" data-bgq="winners"><i data-lucide="trophy"></i>Winners Only (${winTotal})</button>
+              <button type="button" class="hk-btn sm" data-bgq="participants"><i data-lucide="users"></i>Participants Only (${partOnlyTotal})</button>
               <button type="button" class="hk-btn sm" data-bgq="all"><i data-lucide="list-checks"></i>Select All (${candidates.length})</button>
               <button type="button" class="hk-btn sm ghost" data-bgq="none">Clear</button>
             </div>
@@ -414,16 +416,14 @@ export function openBulkGenerateModal({
           ${vis.length ? `<div class="hkc-check-list" style="max-height:330px">
             ${vis.map(c => {
               const checked = selected.has(c.uid);
-              const cat = categoryMap.get(c.uid) || c.defaultCategory;
+              const cat = c.isWinner ? 'winner' : (categoryMap.get(c.uid) || c.defaultCategory);
               const isWinCat = cat === 'winner';
               const rankVal = rankMap.get(c.uid) ?? c.defaultRankTitle;
-              const issuedBadge = c.hasIssuedWinner && c.hasIssuedPart
-                ? '<span class="hk-chip hkc-green"><i data-lucide="check-circle-2"></i>Win + Part Issued</span>'
-                : (c.hasIssuedWinner
-                    ? '<span class="hk-chip hkc-green"><i data-lucide="trophy"></i>Winner Issued</span>'
-                    : (c.hasIssuedPart
-                        ? '<span class="hk-chip hkc-green"><i data-lucide="check-circle-2"></i>Part Issued</span>'
-                        : '<span class="hk-chip neutral">Unissued</span>'));
+              const issuedBadge = c.hasIssuedWinner
+                ? '<span class="hk-chip hkc-green"><i data-lucide="trophy"></i>Winner Issued</span>'
+                : (c.hasIssuedPart
+                    ? '<span class="hk-chip hkc-green"><i data-lucide="check-circle-2"></i>Part Issued</span>'
+                    : '<span class="hk-chip neutral">Unissued</span>');
               return `<div class="hkc-check-row hkc-bulk-row ${checked ? 'is-on' : ''}">
                 <input type="checkbox" data-bguid="${CC.escHtml(c.uid)}" ${checked ? 'checked' : ''} aria-label="Select ${CC.escHtml(c.name)}">
                 ${c.isWinner ? `<span class="hk-rank top${Math.min(c.winnerRank || 3, 3)}">#${c.winnerRank}</span>` : ''}
@@ -435,10 +435,12 @@ export function openBulkGenerateModal({
                   </div>
                   <div class="hk-xs hk-muted">${CC.escHtml(c.email || c.college || 'Verified Participant')}${c.college && c.email ? ' &middot; ' + CC.escHtml(c.college) : ''}${c.subScore != null ? ` &middot; Project ${c.subScore}` : ''}${c.hasTest ? ` &middot; Test ${c.testScore}/${c.testTotal}` : ''}</div>
                 </div>
-                <select class="hk-select sm" data-bgcat="${CC.escHtml(c.uid)}" style="width:auto;min-width:136px">
-                  <option value="participant" ${!isWinCat ? 'selected' : ''}>Participation</option>
-                  <option value="winner" ${isWinCat ? 'selected' : ''}>Winner Award</option>
-                </select>
+                ${c.isWinner
+                  ? `<span class="hk-chip gold"><i data-lucide="trophy"></i>Winner Award</span>`
+                  : `<select class="hk-select sm" data-bgcat="${CC.escHtml(c.uid)}" style="width:auto;min-width:136px">
+                      <option value="participant" ${!isWinCat ? 'selected' : ''}>Participation</option>
+                      <option value="winner" ${isWinCat ? 'selected' : ''}>Winner Award</option>
+                    </select>`}
                 ${isWinCat ? `<input class="hk-input" data-bgrank="${CC.escHtml(c.uid)}" value="${CC.escHtml(rankVal)}" placeholder="Rank / Award Title" style="max-width:190px;min-height:36px">` : ''}
                 ${issuedBadge}
               </div>`;
@@ -468,7 +470,6 @@ export function openBulkGenerateModal({
         root.querySelector('#hkcBulkCancel')?.addEventListener('click', close);
         root.querySelector('#hkcBulkDateIn')?.addEventListener('input', e => { eventDateLabel = e.target.value; });
         root.querySelector('#hkcBulkDateReset')?.addEventListener('click', () => { eventDateLabel = CC.defaultEventDateLabel(h); render(); });
-        root.querySelector('#hkcBulkDualCb')?.addEventListener('change', e => { includePartForWinners = !!e.target.checked; render(); });
 
         const sigNameIn = root.querySelector('#hkcBulkSigName');
         const sigTitleIn = root.querySelector('#hkcBulkSigTitle');
@@ -530,6 +531,9 @@ export function openBulkGenerateModal({
             else if (mode === 'winners') {
               selected.clear();
               candidates.filter(c => c.isWinner).forEach(c => { selected.add(c.uid); categoryMap.set(c.uid, 'winner'); });
+            } else if (mode === 'participants') {
+              selected.clear();
+              candidates.filter(c => !c.isWinner).forEach(c => { selected.add(c.uid); categoryMap.set(c.uid, 'participant'); });
             } else if (mode === 'unissued') {
               selected.clear();
               candidates.filter(c => !c.hasIssuedDefault).forEach(c => selected.add(c.uid));
@@ -579,8 +583,7 @@ export function openBulkGenerateModal({
               eventDateLabel: cleanDate,
               signatoryName: sig.name,
               signatoryTitle: sig.title,
-              hostUid,
-              includeParticipantCopyForWinners: includePartForWinners
+              hostUid
             });
           } catch (err) {
             return toast(err?.message || 'Invalid selection.', 'error');
