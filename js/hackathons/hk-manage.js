@@ -1264,10 +1264,7 @@ export async function manage(cx, id){
   }
 
   const certOf = (uid, category) => certs.find(c => c.uid === uid && c.category === category);
-  const getSavedSignatory = () => ({
-    name: (S.hk?.digitalSignatoryName || h.organiser?.signatoryName || '').trim(),
-    title: (S.hk?.digitalSignatoryTitle || h.organiser?.signatoryTitle || org.designation || (org.org ? `Organiser, ${org.org}` : 'Hackathon Organiser')).trim()
-  });
+  const getSavedSignatory = () => HC.resolveHostSignature(S.hk, h);
   const getWinnerCandidates = () => {
     const winCfg = h.submission?.winnerReveal || {};
     const announced = Array.isArray(winCfg.winners) ? winCfg.winners : [];
@@ -1303,7 +1300,7 @@ export async function manage(cx, id){
 
   function certsTab(){
     const sig = getSavedSignatory();
-    const hasSig = !!sig.name;
+    const hasSig = sig.configured;
     const winnerList = getWinnerCandidates();
     if(!certWinInit && winnerList.length){
       winnerList.forEach(w => certWinSel.add(w.reg.uid));
@@ -1313,6 +1310,9 @@ export async function manage(cx, id){
     const activeRegs = regs.filter(r => r.status !== 'rejected');
     const pq = certPartQ.trim().toLowerCase();
     const filteredParts = activeRegs.filter(r => !pq || [r.name, r.teamName, r.email, r.college].join(' ').toLowerCase().includes(pq));
+    const activeIssuedCount = certs.filter(c => c.status !== 'revoked').length;
+    const formInitName = sig.name || org.name || S.hk?.displayName || '';
+    const formInitTitle = sig.title || org.designation || (org.org ? `Organiser, ${org.org}` : 'Hackathon Organiser');
 
     const sigBanner = (hasSig && !editingSig) ? `<section class="hkc-sig-banner">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
@@ -1320,9 +1320,9 @@ export async function manage(cx, id){
         <div>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <b>${esc(sig.name)}</b>
-            <span class="hk-chip hkc-green"><i data-lucide="badge-check"></i>Digital Signature Saved</span>
+            <span class="hk-chip hkc-green"><i data-lucide="badge-check"></i>Digital Signature Active</span>
           </div>
-          <div class="hk-xs hk-muted">${esc(sig.title)} &middot; Automatically saved for this &amp; future hackathons</div>
+          <div class="hk-xs hk-muted">${esc(sig.title)} &middot; Automatically stamps all future certificates in this &amp; upcoming hackathons</div>
         </div>
       </div>
       <button type="button" class="hk-btn sm" id="editSigBtn"><i data-lucide="pencil"></i>Edit Signatory</button>
@@ -1332,21 +1332,25 @@ export async function manage(cx, id){
           <i data-lucide="pen-tool"></i>
           <div>
             <h3>${hasSig ? 'Update Saved Digital Signature' : 'One-Time Digital Signatory Setup'}</h3>
-            <div class="hk-xs hk-muted">Enter your full name once. It will be digitally signed on every certificate &amp; saved permanently for future hackathons.</div>
+            <div class="hk-xs hk-muted">Enter your full name once below. It stays saved on your host profile and automatically updates all future certificates with your digital signature.</div>
           </div>
         </div>
         ${hasSig ? `<button type="button" class="hk-btn sm ghost" id="cancelSigBtn">Cancel</button>` : ''}
       </div>
       <form id="sigSetupForm" class="hk-form">
-        <div class="hk-grid2">
-          <div class="hk-field">
-            <label for="sigNameIn">Full Signatory Name *</label>
-            <input class="hk-input" id="sigNameIn" name="sigName" required maxlength="60" value="${esc(sig.name || org.name || '')}" placeholder="e.g. Dr. Riya Sharma">
+        <div class="hk-grid2" style="align-items:start">
+          <div class="hk-stack" style="gap:12px">
+            <div class="hk-field">
+              <label for="sigNameIn">Full Signatory Name *</label>
+              <input class="hk-input" id="sigNameIn" name="sigName" required maxlength="60" value="${esc(formInitName)}" placeholder="e.g. Dr. Riya Sharma">
+            </div>
+            <div class="hk-field">
+              <label for="sigTitleIn">Designation / Title <small>shown below signature</small></label>
+              <input class="hk-input" id="sigTitleIn" name="sigTitle" maxlength="80" value="${esc(formInitTitle)}" placeholder="e.g. Convenor / Organiser, ${esc(org.org || h.college || 'Campus Club')}">
+            </div>
+            ${activeIssuedCount ? `<label class="hk-check"><input type="checkbox" id="sigSyncExistingCb"><span>Also re-sign all ${activeIssuedCount} active certificate${activeIssuedCount === 1 ? '' : 's'} already issued in this hackathon</span></label>` : ''}
           </div>
-          <div class="hk-field">
-            <label for="sigTitleIn">Designation / Title <small>shown below signature</small></label>
-            <input class="hk-input" id="sigTitleIn" name="sigTitle" maxlength="80" value="${esc(sig.title || '')}" placeholder="e.g. Convenor / Organiser, ${esc(org.org || h.college || 'Campus Club')}">
-          </div>
+          <div id="sigLiveStamp">${HC.signatureStampPreviewHtml(formInitName, formInitTitle)}</div>
         </div>
         <div style="display:flex;justify-content:flex-end">
           <button type="submit" class="hk-btn primary"><i data-lucide="badge-check"></i>Save Digital Signature Permanently</button>
@@ -2188,23 +2192,46 @@ export async function manage(cx, id){
     if(tab !== 'certs') return;
     const sigForm = $('#sigSetupForm');
     if(sigForm){
+      const nameIn = $('#sigNameIn', sigForm);
+      const titleIn = $('#sigTitleIn', sigForm);
+      const stampEl = $('#sigLiveStamp', sigForm);
+      const updateStamp = () => {
+        if(stampEl) stampEl.innerHTML = HC.signatureStampPreviewHtml(nameIn?.value, titleIn?.value);
+      };
+      nameIn?.addEventListener('input', updateStamp);
+      titleIn?.addEventListener('input', updateStamp);
+
       sigForm.onsubmit = async ev => {
         ev.preventDefault();
         const fd = new FormData(sigForm);
         const sName = String(fd.get('sigName') || '').trim();
-        const sTitle = String(fd.get('sigTitle') || '').trim() || org.designation || (org.org ? `Organiser, ${org.org}` : 'Hackathon Organiser');
+        const sTitle = String(fd.get('sigTitle') || '').trim();
+        const alsoSync = !!$('#sigSyncExistingCb', sigForm)?.checked;
         if(sName.length < 2) return toast('Enter your full name for the digital signature.', 'error');
         const btn = $('button[type=submit]', sigForm);
         btn.disabled = true; btn.innerHTML = '<span class="hk-spin"></span> Saving signature…';
         try {
-          await C.updateHkProfile(S.user.uid, { digitalSignatoryName: sName, digitalSignatoryTitle: sTitle });
-          if(S.hk){ S.hk.digitalSignatoryName = sName; S.hk.digitalSignatoryTitle = sTitle; }
-          if(h.organiser && typeof h.organiser === 'object'){
-            h.organiser.signatoryName = sName;
-            h.organiser.signatoryTitle = sTitle;
+          const saved = await HC.saveHostSignature({
+            uid: S.user.uid,
+            hk: S.hk,
+            signatoryName: sName,
+            signatoryTitle: sTitle,
+            hackathon: h
+          });
+          if(alsoSync){
+            const activeCerts = certs.filter(c => c.status !== 'revoked');
+            if(activeCerts.length){
+              const stamped = activeCerts.map(c => ({
+                ...c,
+                signatoryName: saved.name,
+                signatoryTitle: saved.title
+              }));
+              await HC.issueHackathonCerts(stamped);
+              certs = await HC.fetchHackathonCerts(id).catch(() => certs);
+            }
           }
           editingSig = false;
-          toast('Digital signature saved permanently for this & future hackathons!');
+          toast(alsoSync ? 'Signature saved & re-stamped onto active certificates!' : 'Digital signature saved! All future certificates will use it automatically.');
           redrawRows();
         } catch(err){
           toast(err.message || 'Could not save signature.', 'error');

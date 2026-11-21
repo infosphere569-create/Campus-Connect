@@ -650,6 +650,25 @@ async function profile(t){
           ? `<div class="hk-card-s" style="padding:12px 14px"><small class="hk-eyebrow" style="display:block;margin-bottom:4px">Bio</small><p class="hk-sm hk-prose" style="margin:0">${esc(S.role === 'host' ? (h.about || h.bio) : (h.bio || S.site?.bio))}</p></div>`
           : ''}
 
+        ${S.role === 'host' ? `
+          <div class="hkc-sig-banner" style="padding:12px 14px">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              ${h.digitalSignatoryName
+                ? `<div class="hkc-sig-preview">${HC.signatureSvgHtml(h.digitalSignatoryName, '#0C5535')}</div>`
+                : `<div class="hk-kpi g" style="padding:8px;border-radius:10px;width:40px;height:40px;display:grid;place-items:center;flex:none"><i data-lucide="pen-tool"></i></div>`}
+              <div>
+                <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                  <small class="hk-eyebrow" style="margin:0">Certificate Digital Signature</small>
+                  ${h.digitalSignatoryName ? '<span class="hk-chip hkc-green"><i data-lucide="badge-check"></i>Configured</span>' : '<span class="hk-chip warn">Not set</span>'}
+                </div>
+                <div class="hk-sm" style="font-weight:700;margin-top:2px">${h.digitalSignatoryName ? esc(h.digitalSignatoryName) : 'Not configured yet'}</div>
+                <div class="hk-xs hk-muted">${esc(h.digitalSignatoryTitle || h.designation || (h.org ? `Organiser, ${h.org}` : 'Automatically applies to all future certificates'))}</div>
+              </div>
+            </div>
+            <button type="button" class="hk-btn sm ${h.digitalSignatoryName ? '' : 'primary'}" id="profSigBtn"><i data-lucide="${h.digitalSignatoryName ? 'pencil' : 'pen-tool'}"></i>${h.digitalSignatoryName ? 'Edit Signature' : 'Set Signature'}</button>
+          </div>
+        ` : ''}
+
         <div>
           <small class="hk-eyebrow" style="display:block;margin-bottom:8px">Links</small>
           <div class="hk-prof-links">
@@ -684,6 +703,7 @@ async function profile(t){
 
         ${S.role === 'host' ? `
           <div class="hk-grid2"><div class="hk-field"><label>Organiser name <small>signed on emails</small></label><input class="hk-input" name="organiserName" value="${esc(h.organiserName || '')}"></div><div class="hk-field"><label>Designation</label><input class="hk-input" name="designation" value="${esc(h.designation || '')}"></div></div>
+          <div class="hk-grid2"><div class="hk-field"><label>Digital signatory name <small>auto-stamps all future certificates</small></label><input class="hk-input" name="digitalSignatoryName" maxlength="60" value="${esc(h.digitalSignatoryName || '')}" placeholder="e.g. Dr. Riya Sharma"></div><div class="hk-field"><label>Certificate signatory title <small>shown below signature</small></label><input class="hk-input" name="digitalSignatoryTitle" maxlength="80" value="${esc(h.digitalSignatoryTitle || '')}" placeholder="e.g. Convenor, Coding Club"></div></div>
           <div class="hk-grid2"><div class="hk-field"><label>Organisation / club</label><input class="hk-input" name="org" value="${esc(h.org || '')}"></div><div class="hk-field"><label>Contact email</label><input class="hk-input" name="orgEmail" type="email" value="${esc(h.orgEmail || email)}"></div></div>
           <div class="hk-grid2"><div class="hk-field"><label>Contact phone</label><input class="hk-input" name="orgPhone" inputmode="tel" value="${esc(h.orgPhone || '')}"></div><div class="hk-field"><label>Website <small>optional</small></label><input class="hk-input" name="website" type="url" placeholder="https://…" value="${esc(h.website || '')}"></div></div>
           <div class="hk-grid2"><div class="hk-field"><label>Instagram / LinkedIn <small>optional</small></label><input class="hk-input" name="social" type="url" placeholder="https://…" value="${esc(h.social || '')}"></div><div class="hk-field"><label>Affiliation link <small>optional</small></label><input class="hk-input" name="proofUrl" type="url" placeholder="https://…" value="${esc(h.proofUrl || '')}"></div></div>
@@ -711,6 +731,7 @@ async function profile(t){
 
     if(!editing){
       $('#editProfBtn')?.addEventListener('click', () => { editing = true; paintProfile(); });
+      $('#profSigBtn')?.addEventListener('click', () => HC.openSignatureConfigModal({ S, onSaved: paintProfile }));
       return;
     }
     const cancel = () => { editing = false; paintProfile(); };
@@ -725,7 +746,20 @@ async function profile(t){
       const btn = $('button[type=submit]', e.target);
       btn.disabled = true;
       const extra = S.role === 'host'
-        ? { organiserName: T('organiserName'), designation: T('designation'), org: T('org'), orgEmail: T('orgEmail'), orgPhone: T('orgPhone').replace(/\D/g, '').slice(-10), website: T('website'), social: T('social'), proofUrl: T('proofUrl'), about: T('about') }
+        ? {
+            organiserName: T('organiserName'),
+            designation: T('designation'),
+            digitalSignatoryName: T('digitalSignatoryName'),
+            digitalSignatoryTitle: T('digitalSignatoryTitle'),
+            ...(T('digitalSignatoryName') ? { digitalSignatoryUpdatedAtMs: Date.now() } : {}),
+            org: T('org'),
+            orgEmail: T('orgEmail'),
+            orgPhone: T('orgPhone').replace(/\D/g, '').slice(-10),
+            website: T('website'),
+            social: T('social'),
+            proofUrl: T('proofUrl'),
+            about: T('about')
+          }
         : { course: T('course'), branch: T('branch'), year: T('year'), skills: T('skills'), level: T('level'), github: T('github'), linkedin: T('linkedin'), portfolio: T('portfolio'), bio: T('bio') };
       const patch = { phone: T('phone').replace(/\D/g, '').slice(-10), college: T('college'), city: T('city'), ...extra };
       try {

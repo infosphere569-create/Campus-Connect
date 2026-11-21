@@ -501,7 +501,17 @@ export async function saveHackathon(h, user, hk){
       hostVerified: !!hk?.hostVerified,
       coHostEmails: Array.isArray(rest.coHostEmails) ? rest.coHostEmails : [],
       coHostUids: [],
-      organiser: { name: hostDisplay, designation: hk?.designation || '', org: hk?.org || '', type: hk?.orgType || '', email: hostMail, phone: hk?.orgPhone || hk?.phone || '', photoURL: hostPhoto },
+      organiser: {
+        name: hostDisplay,
+        designation: hk?.designation || '',
+        org: hk?.org || '',
+        type: hk?.orgType || '',
+        email: hostMail,
+        phone: hk?.orgPhone || hk?.phone || '',
+        photoURL: hostPhoto,
+        signatoryName: hk?.digitalSignatoryName || '',
+        signatoryTitle: hk?.digitalSignatoryTitle || ''
+      },
       regCount: 0,
       featured: false,
       autoEmail: rest.autoEmail !== false,
@@ -514,6 +524,12 @@ export async function saveHackathon(h, user, hk){
   } else {
     const existing = ex.data();
     const isOwner = existing.hostUid === user.uid;
+    const baseOrg = existing.organiser || { name: hostDisplay, designation: hk?.designation || '', org: hk?.org || '', type: hk?.orgType || '', email: hostMail, phone: hk?.orgPhone || hk?.phone || '', photoURL: hostPhoto };
+    const mergedOrg = isOwner ? {
+      ...baseOrg,
+      signatoryName: baseOrg.signatoryName || hk?.digitalSignatoryName || '',
+      signatoryTitle: baseOrg.signatoryTitle || hk?.digitalSignatoryTitle || ''
+    } : baseOrg;
     const data = {
       ...normalizedRest,
       bannerURL: bannerImg,
@@ -524,7 +540,7 @@ export async function saveHackathon(h, user, hk){
       hostEmail: existing.hostEmail || (isOwner ? hostMail : '') || existing.organiser?.email || '',
       hostPhotoURL: (isOwner && hostPhoto ? hostPhoto : existing.hostPhotoURL) || existing.organiser?.photoURL || '',
       hostVerified: !!existing.hostVerified,
-      organiser: existing.organiser || { name: hostDisplay, designation: hk?.designation || '', org: hk?.org || '', type: hk?.orgType || '', email: hostMail, phone: hk?.orgPhone || hk?.phone || '', photoURL: hostPhoto },
+      organiser: mergedOrg,
       updatedAtMs: Date.now(),
       updatedAt: FS.serverTimestamp()
     };

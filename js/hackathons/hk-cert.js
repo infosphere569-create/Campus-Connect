@@ -92,6 +92,128 @@ export async function markCertActivity(cert, field) {
   }
 }
 
+/* ---------------- Host Digital Signature Management ---------------- */
+export async function saveHostSignature({ uid, hk, signatoryName, signatoryTitle = '', hackathon = null }) {
+  const cleanName = String(signatoryName || '').trim();
+  if (cleanName.length < 2) throw new Error('Enter your full name (at least 2 characters) for the digital signature.');
+  const orgLabel = String(hk?.org || hackathon?.organiser?.org || hackathon?.brandName || '').trim();
+  const cleanTitle = String(signatoryTitle || '').trim()
+    || String(hk?.designation || hackathon?.organiser?.designation || '').trim()
+    || (orgLabel ? `Organiser, ${orgLabel}` : 'Hackathon Organiser');
+  const now = Date.now();
+  const patch = {
+    digitalSignatoryName: cleanName,
+    digitalSignatoryTitle: cleanTitle,
+    digitalSignatoryUpdatedAtMs: now
+  };
+  await C.updateHkProfile(uid, patch);
+  if (hk && typeof hk === 'object') Object.assign(hk, patch);
+  if (hackathon && typeof hackathon === 'object') {
+    if (!hackathon.organiser || typeof hackathon.organiser !== 'object') hackathon.organiser = {};
+    hackathon.organiser.signatoryName = cleanName;
+    hackathon.organiser.signatoryTitle = cleanTitle;
+    if (hackathon.id) {
+      FS.updateDoc(FS.doc(db, 'hkHackathons', hackathon.id), {
+        'organiser.signatoryName': cleanName,
+        'organiser.signatoryTitle': cleanTitle
+      }).catch(() => {});
+    }
+  }
+  return { name: cleanName, title: cleanTitle, configured: true, updatedAtMs: now };
+}
+
+export function signatureStampPreviewHtml(name = '', title = '') {
+  const displayName = String(name || '').trim() || 'Your Full Name';
+  const displayTitle = String(title || '').trim() || 'Hackathon Organiser';
+  const isPlaceholder = !String(name || '').trim();
+  return `<div class="hkc-stamp-card">
+    <div class="hkc-stamp-label">LIVE CERTIFICATE SIGNATURE STAMP</div>
+    <div class="hkc-sig-block" style="width:100%;max-width:300px;margin:0 auto">
+      <div class="hkc-sig-art" style="opacity:${isPlaceholder ? '.45' : '1'}">${CC.signatureSvgHtml(displayName, '#0C5535')}</div>
+      <div class="hkc-sig-line"></div>
+      <div class="hkc-sig-name">${CC.escHtml(displayName)}</div>
+      <div class="hkc-sig-role">${CC.escHtml(displayTitle)}</div>
+      <div class="hkc-ds-box">
+        <svg viewBox="0 0 24 24" width="18" height="18"><path d="M12 2 4 5v6c0 5 3.4 9.3 8 11 4.6-1.7 8-6 8-11V5z" fill="#16A34A"/><path d="m8.5 12 2.6 2.6L16 9.7" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div><b>Digitally signed</b> &middot; Campus Connect One<br>${CC.escHtml(displayName)} &middot; Verified Host</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+export function openSignatureConfigModal({ S, h = null, onSaved } = {}) {
+  if (!S?.user?.uid) return;
+  const cur = CC.resolveHostSignature(S.hk, h);
+  const initName = cur.name || S.hk?.organiserName || S.hk?.displayName || '';
+  const initTitle = cur.title || S.hk?.designation || (S.hk?.org ? `Organiser, ${S.hk.org}` : 'Hackathon Organiser');
+
+  modal(cur.configured ? 'Manage Digital Signature' : 'Digital Signature Setup', `<form id="hkcSigModalForm" class="hk-form">
+    <div class="hk-msg ok">
+      <i data-lucide="shield-check"></i>
+      <span>Enter your full name once below. It saves permanently to your host account and <b>automatically stamps every future generated certificate</b> with your digital signature.</span>
+    </div>
+    <div class="hk-grid2" style="align-items:start">
+      <div class="hk-stack" style="gap:12px">
+        <div class="hk-field">
+          <label for="hkcModalSigName">Full Signatory Name *</label>
+          <input class="hk-input" id="hkcModalSigName" name="sigName" required maxlength="60" value="${CC.escHtml(initName)}" placeholder="e.g. Dr. Riya Sharma">
+        </div>
+        <div class="hk-field">
+          <label for="hkcModalSigTitle">Designation / Title <small>optional</small></label>
+          <input class="hk-input" id="hkcModalSigTitle" name="sigTitle" maxlength="80" value="${CC.escHtml(initTitle)}" placeholder="e.g. Convenor, Coding Club">
+        </div>
+      </div>
+      <div id="hkcModalSigPrev">${signatureStampPreviewHtml(initName, initTitle)}</div>
+    </div>
+    <div id="hkcSigModalErr" class="hk-msg err hk-hidden"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap">
+      <button type="submit" class="hk-btn primary"><i data-lucide="badge-check"></i>Save Signature Permanently</button>
+    </div>
+  </form>`, {
+    wide: true,
+    onMount(b, close) {
+      const f = b.querySelector('#hkcSigModalForm');
+      const nameIn = b.querySelector('#hkcModalSigName');
+      const titleIn = b.querySelector('#hkcModalSigTitle');
+      const prev = b.querySelector('#hkcModalSigPrev');
+      const errBox = b.querySelector('#hkcSigModalErr');
+      const updatePrev = () => {
+        if (prev) prev.innerHTML = signatureStampPreviewHtml(nameIn?.value, titleIn?.value || initTitle);
+      };
+      nameIn?.addEventListener('input', updatePrev);
+      titleIn?.addEventListener('input', updatePrev);
+      f.onsubmit = async ev => {
+        ev.preventDefault();
+        if (errBox) { errBox.classList.add('hk-hidden'); errBox.innerHTML = ''; }
+        const btn = f.querySelector('button[type=submit]');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="hk-spin"></span> Saving signature…';
+        try {
+          const saved = await saveHostSignature({
+            uid: S.user.uid,
+            hk: S.hk,
+            signatoryName: nameIn?.value || '',
+            signatoryTitle: titleIn?.value || '',
+            hackathon: h
+          });
+          toast('Digital signature saved! All future certificates will use it automatically.');
+          close();
+          onSaved?.(saved);
+        } catch (err) {
+          if (errBox) {
+            errBox.classList.remove('hk-hidden');
+            errBox.innerHTML = `<i data-lucide="circle-alert"></i><span>${CC.escHtml(err?.message || 'Could not save signature.')}</span>`;
+            icons(errBox);
+          }
+          btn.disabled = false;
+          btn.innerHTML = '<i data-lucide="badge-check"></i>Save Signature Permanently';
+          icons(btn);
+        }
+      };
+    }
+  });
+}
+
 /* ---------------- Lazy External Vendors (QRCode, html2canvas, jsPDF) ---------------- */
 const scriptCache = new Map();
 function loadScriptOnce(src, globalCheck) {

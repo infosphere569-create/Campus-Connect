@@ -1,5 +1,6 @@
 // Host side of the portal: dashboard, create/edit wizard (→ submit for approval), registrations manager.
 import * as C from './hk-core.js';
+import * as HC from './hk-cert.js';
 import { card, empty, statusBadge, mediaStyle } from './hk-ui.js';
 
 const { $, $$, esc, icons, toast, modal, FS } = C;
@@ -36,6 +37,27 @@ export async function hostDash(cx){
 
   const blockedBanner = blocked ? `<div class="hk-msg err" style="margin-bottom:16px"><i data-lucide="shield-alert"></i><div style="flex:1"><b>Hosting actions paused by admin</b><div class="hk-sm" style="margin-top:2px;color:var(--hk-ink)">You can still view your dashboard and manage live events, but creating new hackathons and publishing drafts are disabled.${S.hk?.banReason ? ' <b>Reason:</b> ' + esc(S.hk.banReason) + '.' : ''} To resolve this, email <a href="mailto:support@campusconnectone.online" style="text-decoration:underline;font-weight:700">support@campusconnectone.online</a> or visit <a href="contact.html" style="text-decoration:underline;font-weight:700">Support</a>.</div></div></div>` : '';
 
+  const sig = HC.resolveHostSignature(S.hk);
+  const sigConfigPanel = `<section class="hkc-sig-banner" style="margin:14px 0">
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;flex:1;min-width:240px">
+      ${sig.configured
+        ? `<div class="hkc-sig-preview">${HC.signatureSvgHtml(sig.name, '#0C5535')}</div>`
+        : `<div class="hk-kpi g" style="padding:10px;border-radius:12px;width:46px;height:46px;display:grid;place-items:center;flex:none"><i data-lucide="pen-tool" style="width:20px;height:20px;color:var(--hk-p)"></i></div>`}
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <b>${sig.configured ? esc(sig.name) : 'Certificate Digital Signature'}</b>
+          ${sig.configured
+            ? '<span class="hk-chip hkc-green"><i data-lucide="badge-check"></i>Configured &middot; Auto-applies to all future certificates</span>'
+            : '<span class="hk-chip warn"><i data-lucide="pen-tool"></i>One-Time Setup Needed</span>'}
+        </div>
+        <div class="hk-xs hk-muted" style="margin-top:2px">${sig.configured
+          ? `${esc(sig.title)} &middot; Saved permanently across all hackathons you host.`
+          : 'Input your full name once here — every certificate you generate automatically carries your digital signature.'}</div>
+      </div>
+    </div>
+    <button type="button" class="hk-btn ${sig.configured ? 'sm' : 'primary sm'}" data-sig-cfg><i data-lucide="${sig.configured ? 'pencil' : 'pen-tool'}"></i>${sig.configured ? 'Manage Signature' : 'Configure Signature'}</button>
+  </section>`;
+
   view.innerHTML = `<div class="hk-view">
     <div class="hk-page-h"><div><span class="hk-eyebrow" style="color:var(--hk-gold)">Host dashboard</span><h1>Your hackathons</h1><p>Create, get approved, go live and manage registrations.</p></div>${blocked ? `<button type="button" class="hk-btn" data-blocked-info><i data-lucide="shield-alert"></i>Creation paused</button>` : `<a class="hk-btn gold lg" href="#/host/new"><i data-lucide="circle-plus"></i>Create hackathon</a>`}</div>
     ${blockedBanner}
@@ -45,10 +67,15 @@ export async function hostDash(cx){
       <div class="hk-kpi c"><div class="ki"><i data-lucide="hourglass"></i></div><strong>${pendN}</strong><span>Awaiting approval</span></div>
       <div class="hk-kpi"><div class="ki"><i data-lucide="radio"></i></div><strong>${liveN}</strong><span>Live / upcoming</span></div>
       <div class="hk-kpi s"><div class="ki"><i data-lucide="users"></i></div><strong>${regs}</strong><span>Total registrations</span></div></div>
+    ${sigConfigPanel}
     <div class="hk-sec"><h2><i data-lucide="list-checks"></i>All hackathons</h2></div>
     ${mine.length ? `<div class="hk-stack">${mine.map(row).join('')}</div>` : empty('rocket', 'Create your first hackathon', blocked ? 'Creating new hackathons is currently paused for your account.' : 'Add a banner, the details, schedule and prizes, then publish your event. It takes about 10 minutes.', blocked ? '' : '<a class="hk-btn gold" href="#/host/new">Start creating</a>')}</div>`;
 
   view.onclick = async e => {
+    if(e.target.closest('[data-sig-cfg]')){
+      HC.openSignatureConfigModal({ S, onSaved: () => hostDash(cx).then(icons) });
+      return;
+    }
     if(e.target.closest('[data-blocked-info]')){
       modal('Hosting paused', `<div class="hk-stack">
         <div class="hk-msg err"><i data-lucide="shield-alert"></i><span>Creating new hackathons and publishing drafts have been paused by an admin.${S.hk?.banReason ? ' Reason: ' + esc(S.hk.banReason) : ''}</span></div>

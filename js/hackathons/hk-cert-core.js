@@ -101,6 +101,19 @@ export function rankLabelForIndex(idx) {
   return `Top ${idx + 1} · Finalist Winner`;
 }
 
+export function resolveHostSignature(hk = null, h = null) {
+  const name = String(hk?.digitalSignatoryName || h?.organiser?.signatoryName || '').trim();
+  const orgLabel = String(hk?.org || h?.organiser?.org || h?.brandName || '').trim();
+  const fallbackTitle = String(hk?.designation || h?.organiser?.designation || (orgLabel ? `Organiser, ${orgLabel}` : 'Hackathon Organiser')).trim();
+  const title = String(hk?.digitalSignatoryTitle || h?.organiser?.signatoryTitle || fallbackTitle).trim();
+  return {
+    name,
+    title,
+    configured: name.length >= 2,
+    updatedAtMs: toMs(hk?.digitalSignatoryUpdatedAtMs) || 0
+  };
+}
+
 export function buildCertificateRecord({
   h,
   reg,
