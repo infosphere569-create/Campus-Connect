@@ -2,6 +2,7 @@
 // deep hackathon process inspection, confirmed Host View workspace, hosts & participants management (view/edit/ban).
 import { initBg } from './hk-bg.js';
 import * as C from './hk-core.js';
+import * as HC from './hk-cert.js';
 import { empty, statusBadge, mediaStyle, detailHeader, detailBody, factsCard, bindTabs, countdownHtml, startCountdowns } from './hk-ui.js';
 import { manage } from './hk-manage.js';
 import { wizard } from './hk-host.js';
@@ -189,13 +190,15 @@ const ROUTES = [
   [/^\/approved$/, approvedList],
   [/^\/all$/, allList],
   [/^\/view\/([\w-]+)$/, viewOne],
-  [/^\/manage\/([\w-]+)$/, (t, id) => {
+  [/^\/manage\/([\w-]+)(?:\/([\w-]+))?$/, (t, id, tab) => {
     if(!can('view_delete')){
       toast('Permission required: Inspection & Delete to enter Host View', 'error');
       nav('#/view/' + id);
       return;
     }
-    return manage({ ...adminCtx(t), backHash: `#/view/${id}`, backLabel: 'Back to Hackathon View', viewHref: `#/view/${id}` }, id);
+    const hackDoc = S.all.find(x => x.id === id);
+    const ownerProfile = hackDoc ? (S.hosts.find(x => x.uid === hackDoc.hostUid) || null) : null;
+    return manage({ ...adminCtx(t), initialTab: tab || '', ownerProfile, backHash: `#/view/${id}`, backLabel: 'Back to Hackathon View', viewHref: `#/view/${id}` }, id);
   }],
   [/^\/edit\/([\w-]+)$/, (t, id) => {
     if(!can('edit_hackathon')){
@@ -519,11 +522,12 @@ async function viewOne(t, id){
   if(!h){ view.innerHTML = `<div class="hk-view">${empty('search-x', 'Not found', 'This hackathon no longer exists.', '<a class="hk-btn" href="#/approved">Back</a>')}</div>`; return; }
 
   const host = S.hosts.find(x => x.uid === h.hostUid);
-  const [regs, subs, atts, testMeta] = await Promise.all([
+  let [regs, subs, atts, testMeta, certs] = await Promise.all([
     C.hackathonRegistrations(id, h.hostUid).catch(() => S.regs.filter(r => r.hackathonId === id)),
     C.hackathonSubmissions(id, h.hostUid).catch(() => S.subs.filter(s => s.hackathonId === id)),
     C.hackathonAttempts(id, h.hostUid).catch(() => S.atts.filter(a => a.hackathonId === id)),
-    C.getTestMeta(id).catch(() => null)
+    C.getTestMeta(id).catch(() => null),
+    HC.fetchHackathonCerts(id).catch(() => [])
   ]);
   if(stale(t)) return;
 
@@ -532,6 +536,7 @@ async function viewOne(t, id){
   const roundName = i => rounds[i]?.name || (rounds.length ? 'Completed' : 'Registered');
   const subOf = uid => subs.find(x => x.uid === uid);
   const attOf = uid => atts.find(x => x.uid === uid);
+  const regOf = uid => regs.find(x => x.uid === uid);
   const shortlistedN = regs.filter(r => r.status === 'shortlisted').length;
   const selectedN = regs.filter(r => r.status === 'selected').length;
   const testDone = atts.filter(a => a.submittedAtMs).sort((a, b) => (b.score || 0) - (a.score || 0));
@@ -539,7 +544,7 @@ async function viewOne(t, id){
   const approvedTs = h.approvedAtMs || h.reviewedAtMs || (h.status === 'approved' ? h.updatedAtMs : 0);
   const cd = countdownHtml(h, null, false);
 
-  let activeTab = 'process', pq = '', pSt = '';
+  let activeTab = 'process', pq = '', pSt = '', cq = '', cFilt = 'all';
 
   const renderProcessTab = () => {
     const flt = regs.filter(r => (!pSt || r.status === pSt) && (!pq || [r.name, r.email, r.phone, r.college, r.teamName].join(' ').toLowerCase().includes(pq.toLowerCase())));
@@ -597,16 +602,169 @@ async function viewOne(t, id){
 
   const renderDetailsTab = () => `<div class="hk-detail"><div>${detailBody(hh)}</div>${factsCard(hh)}</div>`;
 
+  const openAdminBulkModal = (initialFilter = 'all') => {
+    if(!C.isStaff(S.site)) return toast('Platform Admin or Moderator role required to issue certificates.', 'error');
+    HC.openBulkGenerateModal({
+      h, regs, subs, atts, certs, S, ownerProfile: host || null, initialFilter,
+      onGenerated: fresh => {
+        certs = fresh;
+        const tabBtn = $('#vTabs [data-vtab="certs"]');
+        const activeN = certs.filter(c => c.status !== 'revoked').length;
+        if(tabBtn) tabBtn.textContent = `Certificates (${activeN})`;
+        activeTab = 'certs';
+        $$('#vTabs button').forEach(x => x.classList.toggle('on', x.dataset.vtab === 'certs'));
+        drawBody();
+      }
+    });
+  };
+
+  const renderCertsTab = () => {
+    const sig = HC.resolveHostSignature(host, h, S.hk);
+    const candidates = HC.buildBulkCertCandidates({ h, regs, subs, atts, certs });
+    const unissuedN = candidates.filter(c => !c.hasIssuedDefault).length;
+    const winnersN = candidates.filter(c => c.isWinner).length;
+    const activeCerts = certs.filter(c => c.status !== 'revoked');
+    const winCertsN = activeCerts.filter(c => c.category === 'winner').length;
+    const partCertsN = activeCerts.filter(c => c.category === 'participant').length;
+    const revCertsN = certs.filter(c => c.status === 'revoked').length;
+
+    const qLower = cq.trim().toLowerCase();
+    const visible = certs.filter(c => {
+      if(cFilt === 'revoked' ? c.status !== 'revoked' : c.status === 'revoked') return false;
+      if(cFilt === 'winner' && c.category !== 'winner') return false;
+      if(cFilt === 'participant' && c.category !== 'participant') return false;
+      if(!qLower) return true;
+      const r = regOf(c.uid);
+      return [c.name, c.teamName, c.rankTitle, HC.certCode(c.id), r?.email || '', r?.college || ''].join(' ').toLowerCase().includes(qLower);
+    });
+
+    return `<div class="hk-stack">
+      <div class="hkc-sig-banner">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div class="hkc-sig-preview">${HC.signatureSvgHtml(sig.name || 'Host Signature', '#0C5535')}</div>
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <b>${sig.configured ? esc(sig.name) : 'Host Digital Signature Not Set Yet'}</b>
+              ${sig.configured
+                ? '<span class="hk-chip hkc-green"><i data-lucide="badge-check"></i>Stored Host Signature Active</span>'
+                : '<span class="hk-chip warn"><i data-lucide="circle-alert"></i>Signature Pending</span>'}
+            </div>
+            <div class="hk-xs hk-muted">${sig.configured ? `${esc(sig.title)} &middot; Automatically stamped onto all bulk-generated certificates` : 'Set the host signatory name once below to enable Bulk Generate for this hackathon.'}</div>
+          </div>
+        </div>
+        ${C.isStaff(S.site) ? `<button type="button" class="hk-btn sm" id="vEditHostSigBtn"><i data-lucide="pencil"></i>${sig.configured ? 'Edit Host Signature' : 'Set Host Signature'}</button>` : ''}
+      </div>
+
+      <div class="hk-card-s" style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap">
+        <div>
+          <b style="font-size:1.02rem">Bulk Generate Certificates</b>
+          <div class="hk-xs hk-muted">${candidates.length} eligible recipients (${winnersN} Winner${winnersN === 1 ? '' : 's'} &middot; ${unissuedN} Unissued) &middot; Generates Winner &amp; Participation certificates in one batch using the stored host signature.</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${winnersN ? `<button type="button" class="hk-btn sm gold" id="vBulkWinBtn"><i data-lucide="trophy"></i>Winners (${winnersN})</button>` : ''}
+          ${unissuedN ? `<button type="button" class="hk-btn sm" id="vBulkUnissuedBtn"><i data-lucide="sparkles"></i>Unissued (${unissuedN})</button>` : ''}
+          <button type="button" class="hk-btn sm primary" id="vBulkAllBtn" ${candidates.length ? '' : 'disabled'}><i data-lucide="layers"></i>Bulk Generate (${candidates.length})</button>
+        </div>
+      </div>
+
+      <div class="hk-toolbar">
+        <div class="hk-search"><i data-lucide="search"></i><input class="hk-input" id="vcQ" value="${esc(cq)}" placeholder="Search issued certificate recipient, team, rank or code…"></div>
+        <div class="hk-chips" style="margin:0">
+          <button type="button" class="hk-chip btn ${cFilt === 'all' ? 'on' : ''}" data-vcfilt="all">All (${activeCerts.length})</button>
+          <button type="button" class="hk-chip btn ${cFilt === 'winner' ? 'on' : ''}" data-vcfilt="winner">Winners (${winCertsN})</button>
+          <button type="button" class="hk-chip btn ${cFilt === 'participant' ? 'on' : ''}" data-vcfilt="participant">Participants (${partCertsN})</button>
+          ${revCertsN ? `<button type="button" class="hk-chip btn ${cFilt === 'revoked' ? 'on' : ''}" data-vcfilt="revoked">Revoked (${revCertsN})</button>` : ''}
+        </div>
+      </div>
+
+      ${visible.length ? `<div class="hkc-host-grid">${visible.map(c => {
+        const isWin = c.category === 'winner';
+        const isRev = c.status === 'revoked';
+        const reg = regOf(c.uid);
+        const verify = HC.certVerifyUrl(c.id);
+        const code = HC.certCode(c.id);
+        const dlOn = !!c.certDownloadAtMs;
+        const shOn = !!c.certShareAtMs;
+        const liOn = !!c.certLinkedInAtMs;
+        return `<article class="hkc-host-card ${isWin ? 'is-win' : ''} ${isRev ? 'is-revoked' : ''}">
+          <div class="hkc-hc-top">
+            <span class="hk-chip ${isWin ? 'gold' : ''}"><i data-lucide="${isWin ? 'trophy' : 'award'}"></i>${esc(isWin ? c.rankTitle : 'Participant')}</span>
+            <span class="hkc-hc-id">${esc(code)}</span>
+          </div>
+          <div class="hkc-hc-meta">
+            <b>${esc(c.name)}</b>
+            <div class="hk-xs hk-muted">${c.teamName ? `Team ${esc(c.teamName)} · ` : ''}${esc(reg?.email || c.college || 'Verified Recipient')}</div>
+            <div class="hk-xs hk-muted">Date: <b>${esc(c.eventDateLabel)}</b> · Signed by ${esc(c.signatoryName)}</div>
+          </div>
+          <div class="hkc-hc-track">
+            <span class="hk-chip ${dlOn ? 'hkc-green' : 'neutral'}"><i data-lucide="${dlOn ? 'check-circle-2' : 'download'}"></i>Download${dlOn ? ' ✓' : ''}</span>
+            <span class="hk-chip ${shOn ? 'hkc-green' : 'neutral'}"><i data-lucide="${shOn ? 'check-circle-2' : 'share-2'}"></i>Share${shOn ? ' ✓' : ''}</span>
+            <span class="hk-chip ${liOn ? 'hkc-green' : 'neutral'}"><i data-lucide="${liOn ? 'check-circle-2' : 'linkedin'}"></i>LinkedIn${liOn ? ' ✓' : ''}</span>
+          </div>
+          <div class="hkc-hc-url">
+            <i data-lucide="qr-code" style="width:14px;height:14px;flex:none"></i>
+            <span>${esc(verify)}</span>
+            <button type="button" class="hk-btn sm ghost" data-vcertcopy="${esc(c.id)}" title="Copy verify link" style="padding:2px 6px;min-height:24px"><i data-lucide="copy"></i></button>
+          </div>
+          <div class="hkc-hc-acts">
+            <button type="button" class="hk-btn sm primary" data-vcertprev="${esc(c.id)}"><i data-lucide="eye"></i>Preview</button>
+            <a class="hk-btn sm" href="${esc(verify)}" target="_blank" rel="noopener noreferrer"><i data-lucide="external-link"></i>Verify</a>
+            ${C.isStaff(S.site) ? (isRev
+              ? `<button type="button" class="hk-btn sm" data-vcertreissue="${esc(c.id)}"><i data-lucide="rotate-ccw"></i>Restore</button>`
+              : `<button type="button" class="hk-btn sm danger" data-vcertrevoke="${esc(c.id)}"><i data-lucide="ban"></i>Revoke</button>`) : ''}
+          </div>
+        </article>`;
+      }).join('')}</div>` : empty('award', certs.length ? 'No matching certificates' : 'No certificates issued yet', candidates.length ? 'Use Bulk Generate above to issue official certificates for multiple winners or participants at once.' : 'Registrations are needed before generating certificates.')}
+    </div>`;
+  };
+
   const drawBody = () => {
     const bodyEl = $('#vBody');
     if(!bodyEl) return;
     if(activeTab === 'process') bodyEl.innerHTML = renderProcessTab();
     else if(activeTab === 'tests') bodyEl.innerHTML = renderTestsTab();
     else if(activeTab === 'subs') bodyEl.innerHTML = renderSubsTab();
+    else if(activeTab === 'certs') bodyEl.innerHTML = renderCertsTab();
     else { bodyEl.innerHTML = renderDetailsTab(); bindTabs(bodyEl); }
     icons();
     $('#vpQ')?.addEventListener('input', C.debounce(e => { pq = e.target.value.trim(); keepFocus('vpQ', drawBody); }, 200));
     $('#vpSt')?.addEventListener('change', e => { pSt = e.target.value; drawBody(); });
+    $('#vcQ')?.addEventListener('input', C.debounce(e => { cq = e.target.value.trim(); keepFocus('vcQ', drawBody); }, 180));
+    $('#vEditHostSigBtn')?.addEventListener('click', () => {
+      HC.openSignatureConfigModal({ S, h, targetUid: h.hostUid, targetProfile: host || null, onSaved: () => drawBody() });
+    });
+    $('#vBulkAllBtn')?.addEventListener('click', () => openAdminBulkModal('all'));
+    $('#vBulkWinBtn')?.addEventListener('click', () => openAdminBulkModal('winners'));
+    $('#vBulkUnissuedBtn')?.addEventListener('click', () => openAdminBulkModal('unissued'));
+    $$('[data-vcfilt]', bodyEl).forEach(b => { b.onclick = () => { cFilt = b.dataset.vcfilt; drawBody(); }; });
+    $$('[data-vcertcopy]', bodyEl).forEach(b => {
+      b.onclick = async () => {
+        const u = HC.certVerifyUrl(b.dataset.vcertcopy);
+        try { await navigator.clipboard.writeText(u); toast('Verification URL copied!'); } catch { toast(u, 'info'); }
+      };
+    });
+    $$('[data-vcertprev]', bodyEl).forEach(b => {
+      b.onclick = () => {
+        const cert = certs.find(x => x.id === b.dataset.vcertprev);
+        if(cert) HC.openCertViewerModal(cert, { isOwner: false });
+      };
+    });
+    $$('[data-vcertrevoke]', bodyEl).forEach(b => {
+      b.onclick = async () => {
+        const cert = certs.find(x => x.id === b.dataset.vcertrevoke);
+        if(!cert || !confirm(`Revoke certificate for ${cert.name}?`)) return;
+        try { await HC.setCertStatus(cert.id, 'revoked'); cert.status = 'revoked'; toast('Certificate revoked.', 'info'); drawBody(); }
+        catch(err){ toast(err.message, 'error'); }
+      };
+    });
+    $$('[data-vcertreissue]', bodyEl).forEach(b => {
+      b.onclick = async () => {
+        const cert = certs.find(x => x.id === b.dataset.vcertreissue);
+        if(!cert) return;
+        try { await HC.setCertStatus(cert.id, 'issued'); cert.status = 'issued'; toast('Certificate restored to valid!', 'success'); drawBody(); }
+        catch(err){ toast(err.message, 'error'); }
+      };
+    });
   };
 
   view.innerHTML = `<div class="hk-view">
@@ -616,6 +774,7 @@ async function viewOne(t, id){
         ${h.status === 'pending' ? `<button class="hk-btn sm primary" data-dec="approved" data-id="${h.id}">Approve</button><button class="hk-btn sm" data-dec="changes_requested" data-id="${h.id}">Request changes</button><button class="hk-btn sm danger" data-dec="rejected" data-id="${h.id}">Reject</button>` : ''}
         ${h.status === 'approved' ? `<button class="hk-btn sm" data-feat="${h.id}">${h.featured ? 'Unfeature' : 'Feature'}</button><button class="hk-btn sm danger" data-close="${h.id}">Close</button>` : ''}
         ${h.status === 'closed' ? `<button class="hk-btn sm" data-reopen="${h.id}">Reopen</button>` : ''}
+        <button type="button" class="hk-btn sm primary" id="openAdminBulkGen"><i data-lucide="layers"></i>Bulk Generate Certs</button>
         <button type="button" class="hk-btn sm" id="enterHostEdit"><i data-lucide="pencil"></i>Host Edit</button>
         <button type="button" class="hk-btn sm gold" id="enterHostView"><i data-lucide="shield-check"></i>Host View</button>
       </div>
@@ -668,6 +827,7 @@ async function viewOne(t, id){
       <button class="on" data-vtab="process" role="tab">Registrations &amp; Process (${regs.length})</button>
       <button data-vtab="tests" role="tab">Tests (${testDone.length})</button>
       <button data-vtab="subs" role="tab">Submissions (${subs.length})</button>
+      <button data-vtab="certs" role="tab">Certificates (${certs.filter(c => c.status !== 'revoked').length})</button>
       <button data-vtab="details" role="tab">Hackathon Info</button>
     </div>
     <div id="vBody"></div>
@@ -679,6 +839,7 @@ async function viewOne(t, id){
     $$('#vTabs button').forEach(x => x.classList.toggle('on', x === b));
     drawBody();
   };
+  $('#openAdminBulkGen').onclick = () => openAdminBulkModal('all');
   $('#enterHostView').onclick = () => {
     if(!can('view_delete')) return toast('Permission required: Inspection & Delete to enter Host View', 'error');
     confirmHostModeModal(h, 'manage');

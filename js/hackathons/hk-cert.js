@@ -31,15 +31,20 @@ export async function fetchCertById(cid) {
   return s.exists() ? { id: s.id, ...s.data() } : null;
 }
 
-export async function issueHackathonCerts(records = [], issuerUid = '') {
+export async function issueHackathonCerts(records = [], issuerUid = '', { onProgress } = {}) {
   if (!records.length) return [];
   const prepared = await Promise.all(records.map(async rec => {
     const fp = await CC.computeFingerprint(rec);
     return { ...rec, fingerprint: fp, status: 'issued', issuedAtMs: rec.issuedAtMs || Date.now(), updatedAtMs: Date.now() };
   }));
 
-  for (let i = 0; i < prepared.length; i += 350) {
-    const chunk = prepared.slice(i, i + 350);
+  const chunkSize = 350;
+  const totalBatches = Math.ceil(prepared.length / chunkSize);
+  let issuedCount = 0;
+
+  for (let i = 0; i < prepared.length; i += chunkSize) {
+    const batchIndex = Math.floor(i / chunkSize) + 1;
+    const chunk = prepared.slice(i, i + chunkSize);
     const wb = FS.writeBatch(db);
     chunk.forEach(cert => {
       wb.set(FS.doc(db, 'hkCertificates', cert.id), {
@@ -65,6 +70,8 @@ export async function issueHackathonCerts(records = [], issuerUid = '') {
       }
     });
     await wb.commit();
+    issuedCount += chunk.length;
+    onProgress?.({ batchIndex, totalBatches, issuedCount, totalCount: prepared.length });
   }
   return prepared;
 }
@@ -93,12 +100,13 @@ export async function markCertActivity(cert, field) {
 }
 
 /* ---------------- Host Digital Signature Management ---------------- */
-export async function saveHostSignature({ uid, hk, signatoryName, signatoryTitle = '', hackathon = null }) {
+export async function saveHostSignature({ uid, hk, signatoryName, signatoryTitle = '', hackathon = null, targetProfile = null, canPatchHackathon = false }) {
   const cleanName = String(signatoryName || '').trim();
-  if (cleanName.length < 2) throw new Error('Enter your full name (at least 2 characters) for the digital signature.');
-  const orgLabel = String(hk?.org || hackathon?.organiser?.org || hackathon?.brandName || '').trim();
+  if (cleanName.length < 2) throw new Error('Enter full name (at least 2 characters) for the digital signature.');
+  const refProfile = targetProfile || hk;
+  const orgLabel = String(refProfile?.org || hackathon?.organiser?.org || hackathon?.brandName || '').trim();
   const cleanTitle = String(signatoryTitle || '').trim()
-    || String(hk?.designation || hackathon?.organiser?.designation || '').trim()
+    || String(refProfile?.designation || hackathon?.organiser?.designation || '').trim()
     || (orgLabel ? `Organiser, ${orgLabel}` : 'Hackathon Organiser');
   const now = Date.now();
   const patch = {
@@ -106,13 +114,19 @@ export async function saveHostSignature({ uid, hk, signatoryName, signatoryTitle
     digitalSignatoryTitle: cleanTitle,
     digitalSignatoryUpdatedAtMs: now
   };
-  await C.updateHkProfile(uid, patch);
-  if (hk && typeof hk === 'object') Object.assign(hk, patch);
+  try {
+    await C.updateHkProfile(uid, patch);
+  } catch (err) {
+    // Fallback if profile doc hasn't been initialized yet (allowed when self or staff)
+    await FS.setDoc(FS.doc(db, 'hkProfiles', uid), { uid, ...patch, updatedAt: FS.serverTimestamp() }, { merge: true });
+  }
+  if (hk && typeof hk === 'object' && (!hk.uid || hk.uid === uid)) Object.assign(hk, patch);
+  if (targetProfile && typeof targetProfile === 'object') Object.assign(targetProfile, patch);
   if (hackathon && typeof hackathon === 'object') {
     if (!hackathon.organiser || typeof hackathon.organiser !== 'object') hackathon.organiser = {};
     hackathon.organiser.signatoryName = cleanName;
     hackathon.organiser.signatoryTitle = cleanTitle;
-    if (hackathon.id) {
+    if (hackathon.id && (canPatchHackathon || hackathon.status !== 'approved')) {
       FS.updateDoc(FS.doc(db, 'hkHackathons', hackathon.id), {
         'organiser.signatoryName': cleanName,
         'organiser.signatoryTitle': cleanTitle
@@ -141,16 +155,19 @@ export function signatureStampPreviewHtml(name = '', title = '') {
   </div>`;
 }
 
-export function openSignatureConfigModal({ S, h = null, onSaved } = {}) {
+export function openSignatureConfigModal({ S, h = null, targetUid = '', targetProfile = null, onSaved } = {}) {
   if (!S?.user?.uid) return;
-  const cur = CC.resolveHostSignature(S.hk, h);
-  const initName = cur.name || S.hk?.organiserName || S.hk?.displayName || '';
-  const initTitle = cur.title || S.hk?.designation || (S.hk?.org ? `Organiser, ${S.hk.org}` : 'Hackathon Organiser');
+  const saveUid = targetUid || h?.hostUid || S.user.uid;
+  const isStaffUser = typeof C.isStaff === 'function' ? C.isStaff(S.site) : false;
+  const refProfile = targetProfile || (saveUid === S.user.uid ? S.hk : null);
+  const cur = CC.resolveHostSignature(refProfile || S.hk, h, S.hk);
+  const initName = cur.name || refProfile?.organiserName || refProfile?.displayName || h?.hostName || '';
+  const initTitle = cur.title || refProfile?.designation || (refProfile?.org ? `Organiser, ${refProfile.org}` : (h?.brandName ? `Organiser, ${h.brandName}` : 'Hackathon Organiser'));
 
   modal(cur.configured ? 'Manage Digital Signature' : 'Digital Signature Setup', `<form id="hkcSigModalForm" class="hk-form">
     <div class="hk-msg ok">
       <i data-lucide="shield-check"></i>
-      <span>Enter your full name once below. It saves permanently to your host account and <b>automatically stamps every future generated certificate</b> with your digital signature.</span>
+      <span>Enter the host's full name once below. It saves permanently to the host profile and <b>automatically stamps all future generated certificates</b> with this digital signature.</span>
     </div>
     <div class="hk-grid2" style="align-items:start">
       <div class="hk-stack" style="gap:12px">
@@ -189,12 +206,15 @@ export function openSignatureConfigModal({ S, h = null, onSaved } = {}) {
         btn.disabled = true;
         btn.innerHTML = '<span class="hk-spin"></span> Saving signature…';
         try {
+          const effectiveUid = (saveUid === S.user.uid || isStaffUser) ? saveUid : S.user.uid;
           const saved = await saveHostSignature({
-            uid: S.user.uid,
+            uid: effectiveUid,
             hk: S.hk,
+            targetProfile: effectiveUid === targetProfile?.uid ? targetProfile : null,
             signatoryName: nameIn?.value || '',
             signatoryTitle: titleIn?.value || '',
-            hackathon: h
+            hackathon: h,
+            canPatchHackathon: isStaffUser
           });
           toast('Digital signature saved! All future certificates will use it automatically.');
           close();
@@ -210,6 +230,392 @@ export function openSignatureConfigModal({ S, h = null, onSaved } = {}) {
           icons(btn);
         }
       };
+    }
+  });
+}
+
+/* ---------------- Bulk Generate Certificates Modal Studio ---------------- */
+export function openBulkGenerateModal({
+  h,
+  regs = [],
+  subs = [],
+  atts = [],
+  certs = [],
+  S,
+  ownerProfile = null,
+  preselectedUids = null,
+  initialFilter = 'all',
+  onGenerated
+} = {}) {
+  if (!h || !S?.user?.uid) return;
+  const hostUid = h.hostUid || S.user.uid;
+  const isStaffUser = typeof C.isStaff === 'function' ? C.isStaff(S.site) : false;
+  const canEditSig = isStaffUser || S.user.uid === hostUid;
+  const candidates = CC.buildBulkCertCandidates({ h, regs, subs, atts, certs });
+
+  const selected = new Set();
+  const categoryMap = new Map();
+  const rankMap = new Map();
+
+  candidates.forEach(c => {
+    categoryMap.set(c.uid, c.defaultCategory);
+    rankMap.set(c.uid, c.defaultRankTitle);
+    if (Array.isArray(preselectedUids) && preselectedUids.length) {
+      if (preselectedUids.includes(c.uid)) selected.add(c.uid);
+    } else if (!c.hasIssuedDefault) {
+      selected.add(c.uid);
+    }
+  });
+
+  let filterKey = initialFilter || 'all';
+  let searchQ = '';
+  let eventDateLabel = CC.defaultEventDateLabel(h);
+  let includePartForWinners = false;
+  let showSigEditor = !CC.resolveHostSignature(ownerProfile || S.hk, h, S.hk).configured;
+
+  const currentSig = () => CC.resolveHostSignature(ownerProfile || S.hk, h, S.hk);
+
+  const visibleCandidates = () => {
+    const q = searchQ.trim().toLowerCase();
+    return candidates.filter(c => {
+      if (filterKey === 'winners' && !c.isWinner && categoryMap.get(c.uid) !== 'winner') return false;
+      if (filterKey === 'shortlisted' && !['shortlisted', 'selected'].includes(c.status)) return false;
+      if (filterKey === 'unissued' && c.hasIssuedDefault) return false;
+      if (filterKey === 'issued' && !c.hasIssuedWinner && !c.hasIssuedPart) return false;
+      if (!q) return true;
+      return [c.name, c.teamName, c.email, c.college, c.projectTitle, rankMap.get(c.uid) || ''].join(' ').toLowerCase().includes(q);
+    });
+  };
+
+  modal(`Bulk Generate Certificates · ${h.title || 'Hackathon'}`, `<div id="hkcBulkRoot" class="hkc-bulk-wrap"></div>`, {
+    wide: true,
+    onMount(box, close) {
+      const root = box.querySelector('#hkcBulkRoot');
+      if (!root) return;
+
+      const buildSelectionsPayload = () => {
+        const list = [];
+        candidates.forEach(c => {
+          if (!selected.has(c.uid)) return;
+          const cat = categoryMap.get(c.uid) || c.defaultCategory;
+          list.push({
+            uid: c.uid,
+            reg: c.reg,
+            category: cat,
+            rankTitle: cat === 'winner' ? (rankMap.get(c.uid) || c.defaultRankTitle) : 'Participant',
+            prize: cat === 'winner' ? c.prize : '',
+            projectTitle: c.projectTitle
+          });
+        });
+        return list;
+      };
+
+      const countBreakdown = () => {
+        let win = 0, part = 0;
+        candidates.forEach(c => {
+          if (!selected.has(c.uid)) return;
+          if ((categoryMap.get(c.uid) || c.defaultCategory) === 'winner') {
+            win++;
+            if (includePartForWinners) part++;
+          } else {
+            part++;
+          }
+        });
+        return { win, part, totalCerts: win + part, people: selected.size };
+      };
+
+      const render = () => {
+        const sig = currentSig();
+        const vis = visibleCandidates();
+        const { win, part, totalCerts, people } = countBreakdown();
+        const winTotal = candidates.filter(c => c.isWinner).length;
+        const shortTotal = candidates.filter(c => ['shortlisted', 'selected'].includes(c.status)).length;
+        const unissuedTotal = candidates.filter(c => !c.hasIssuedDefault).length;
+        const issuedTotal = candidates.filter(c => c.hasIssuedWinner || c.hasIssuedPart).length;
+        const allVisSelected = vis.length > 0 && vis.every(c => selected.has(c.uid));
+
+        const initSigName = sig.name || ownerProfile?.organiserName || ownerProfile?.displayName || h?.hostName || '';
+        const initSigTitle = sig.title || ownerProfile?.designation || (ownerProfile?.org ? `Organiser, ${ownerProfile.org}` : (h?.brandName ? `Organiser, ${h.brandName}` : 'Hackathon Organiser'));
+
+        root.innerHTML = `
+          <div class="hkc-sig-banner">
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+              <div class="hkc-sig-preview" id="hkcBulkSigMini">${CC.signatureSvgHtml(sig.name || 'Host Signature', '#0C5535')}</div>
+              <div>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <b>${sig.configured ? CC.escHtml(sig.name) : 'Host Digital Signature Required'}</b>
+                  ${sig.configured
+                    ? '<span class="hk-chip hkc-green"><i data-lucide="badge-check"></i>Stored Signature Active</span>'
+                    : '<span class="hk-chip warn"><i data-lucide="circle-alert"></i>Not Configured</span>'}
+                </div>
+                <div class="hk-xs hk-muted">${sig.configured ? `${CC.escHtml(sig.title)} &middot; Applied automatically to every certificate in this batch` : 'Save the host full signatory name once below to generate all selected certificates.'}</div>
+              </div>
+            </div>
+            ${canEditSig ? `<button type="button" class="hk-btn sm" id="hkcBulkToggleSig"><i data-lucide="${showSigEditor ? 'x' : 'pencil'}"></i>${showSigEditor ? 'Close Signature' : (sig.configured ? 'Change Signature' : 'Set Signature')}</button>` : ''}
+          </div>
+
+          ${showSigEditor && canEditSig ? `<div class="hk-card-s hkc-bulk-sigbox" style="padding:14px">
+            <div class="hk-grid2" style="align-items:end">
+              <div class="hk-field" style="margin:0">
+                <label for="hkcBulkSigName">Host Signatory Full Name *</label>
+                <input class="hk-input" id="hkcBulkSigName" maxlength="60" value="${CC.escHtml(initSigName)}" placeholder="e.g. Dr. Riya Sharma">
+              </div>
+              <div class="hk-field" style="margin:0">
+                <label for="hkcBulkSigTitle">Designation / Title</label>
+                <input class="hk-input" id="hkcBulkSigTitle" maxlength="80" value="${CC.escHtml(initSigTitle)}" placeholder="e.g. Convenor, Coding Club">
+              </div>
+            </div>
+            <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px">
+              <button type="button" class="hk-btn sm primary" id="hkcBulkSaveSigBtn"><i data-lucide="badge-check"></i>Save Stored Signature</button>
+            </div>
+          </div>` : ''}
+
+          <div class="hkc-bulk-head">
+            <div class="hk-field" style="margin:0;flex:1;min-width:210px">
+              <label for="hkcBulkDateIn">Official Event Date <small>printed on all certificates</small></label>
+              <div style="display:flex;gap:6px">
+                <input class="hk-input" id="hkcBulkDateIn" maxlength="64" value="${CC.escHtml(eventDateLabel)}" placeholder="e.g. 18 – 20 Nov 2026">
+                <button type="button" class="hk-btn sm" id="hkcBulkDateReset" title="Use official hackathon dates"><i data-lucide="rotate-ccw"></i></button>
+              </div>
+            </div>
+            <label class="hk-check" style="margin:0;align-self:end;padding:8px 12px;border-radius:10px;background:var(--hk-surface2);border:1px solid var(--hk-line)">
+              <input type="checkbox" id="hkcBulkDualCb" ${includePartForWinners ? 'checked' : ''}>
+              <span>Also issue Participation Cert to Winners</span>
+            </label>
+          </div>
+
+          <div class="hkc-bulk-tools">
+            <div class="hk-search" style="flex:1;min-width:200px">
+              <i data-lucide="search"></i>
+              <input class="hk-input" id="hkcBulkSearch" value="${CC.escHtml(searchQ)}" placeholder="Search winner or participant by name, team, email, college…">
+            </div>
+            <div class="hk-chips" style="margin:0">
+              <button type="button" class="hk-chip btn ${filterKey === 'all' ? 'on' : ''}" data-bgfilt="all">All (${candidates.length})</button>
+              <button type="button" class="hk-chip btn ${filterKey === 'winners' ? 'on' : ''}" data-bgfilt="winners">Winners (${winTotal})</button>
+              <button type="button" class="hk-chip btn ${filterKey === 'shortlisted' ? 'on' : ''}" data-bgfilt="shortlisted">Shortlisted (${shortTotal})</button>
+              <button type="button" class="hk-chip btn ${filterKey === 'unissued' ? 'on' : ''}" data-bgfilt="unissued">Unissued (${unissuedTotal})</button>
+              <button type="button" class="hk-chip btn ${filterKey === 'issued' ? 'on' : ''}" data-bgfilt="issued">Already Issued (${issuedTotal})</button>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+            <label class="hk-check" style="margin:0;font-weight:700">
+              <input type="checkbox" id="hkcBulkMasterCb" ${allVisSelected ? 'checked' : ''}>
+              <span>Select Visible (${vis.length})</span>
+            </label>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button type="button" class="hk-btn sm" data-bgq="unissued"><i data-lucide="sparkles"></i>Select Unissued (${unissuedTotal})</button>
+              <button type="button" class="hk-btn sm" data-bgq="winners"><i data-lucide="trophy"></i>Winners Only (${winTotal})</button>
+              <button type="button" class="hk-btn sm" data-bgq="all"><i data-lucide="list-checks"></i>Select All (${candidates.length})</button>
+              <button type="button" class="hk-btn sm ghost" data-bgq="none">Clear</button>
+            </div>
+          </div>
+
+          ${vis.length ? `<div class="hkc-check-list" style="max-height:330px">
+            ${vis.map(c => {
+              const checked = selected.has(c.uid);
+              const cat = categoryMap.get(c.uid) || c.defaultCategory;
+              const isWinCat = cat === 'winner';
+              const rankVal = rankMap.get(c.uid) ?? c.defaultRankTitle;
+              const issuedBadge = c.hasIssuedWinner && c.hasIssuedPart
+                ? '<span class="hk-chip hkc-green"><i data-lucide="check-circle-2"></i>Win + Part Issued</span>'
+                : (c.hasIssuedWinner
+                    ? '<span class="hk-chip hkc-green"><i data-lucide="trophy"></i>Winner Issued</span>'
+                    : (c.hasIssuedPart
+                        ? '<span class="hk-chip hkc-green"><i data-lucide="check-circle-2"></i>Part Issued</span>'
+                        : '<span class="hk-chip neutral">Unissued</span>'));
+              return `<div class="hkc-check-row hkc-bulk-row ${checked ? 'is-on' : ''}">
+                <input type="checkbox" data-bguid="${CC.escHtml(c.uid)}" ${checked ? 'checked' : ''} aria-label="Select ${CC.escHtml(c.name)}">
+                ${c.isWinner ? `<span class="hk-rank top${Math.min(c.winnerRank || 3, 3)}">#${c.winnerRank}</span>` : ''}
+                <div style="flex:1;min-width:170px">
+                  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                    <b>${CC.escHtml(c.name)}</b>
+                    ${c.teamName ? `<span class="hk-chip neutral">${CC.escHtml(c.teamName)}</span>` : ''}
+                    ${c.status === 'shortlisted' ? '<span class="hk-chip">Shortlisted</span>' : ''}
+                  </div>
+                  <div class="hk-xs hk-muted">${CC.escHtml(c.email || c.college || 'Verified Participant')}${c.college && c.email ? ' &middot; ' + CC.escHtml(c.college) : ''}${c.subScore != null ? ` &middot; Project ${c.subScore}` : ''}${c.hasTest ? ` &middot; Test ${c.testScore}/${c.testTotal}` : ''}</div>
+                </div>
+                <select class="hk-select sm" data-bgcat="${CC.escHtml(c.uid)}" style="width:auto;min-width:136px">
+                  <option value="participant" ${!isWinCat ? 'selected' : ''}>Participation</option>
+                  <option value="winner" ${isWinCat ? 'selected' : ''}>Winner Award</option>
+                </select>
+                ${isWinCat ? `<input class="hk-input" data-bgrank="${CC.escHtml(c.uid)}" value="${CC.escHtml(rankVal)}" placeholder="Rank / Award Title" style="max-width:190px;min-height:36px">` : ''}
+                ${issuedBadge}
+              </div>`;
+            }).join('')}
+          </div>` : `<div class="hk-card-s" style="text-align:center;padding:24px"><span class="hk-sm hk-muted">${candidates.length ? 'No candidates match this search or filter.' : 'No eligible participants or winners found yet.'}</span></div>`}
+
+          <div class="hkc-bulk-foot">
+            <div>
+              <b id="hkcBulkCountLbl">${people} recipient${people === 1 ? '' : 's'} selected</b>
+              <div class="hk-xs hk-muted">${totalCerts ? `Will generate ${totalCerts} certificate${totalCerts === 1 ? '' : 's'} (${win} Winner${win === 1 ? '' : 's'}, ${part} Participation) with stored signature` : 'Pick winners or participants above to generate'}</div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button type="button" class="hk-btn" id="hkcBulkCancel">Cancel</button>
+              <button type="button" class="hk-btn primary lg" id="hkcBulkRunBtn" ${sig.configured && totalCerts ? '' : 'disabled'}>
+                <i data-lucide="award"></i>Bulk Generate (${totalCerts})
+              </button>
+            </div>
+          </div>
+        `;
+
+        icons(root);
+        bindEvents();
+      };
+
+      const bindEvents = () => {
+        root.querySelector('#hkcBulkToggleSig')?.addEventListener('click', () => { showSigEditor = !showSigEditor; render(); });
+        root.querySelector('#hkcBulkCancel')?.addEventListener('click', close);
+        root.querySelector('#hkcBulkDateIn')?.addEventListener('input', e => { eventDateLabel = e.target.value; });
+        root.querySelector('#hkcBulkDateReset')?.addEventListener('click', () => { eventDateLabel = CC.defaultEventDateLabel(h); render(); });
+        root.querySelector('#hkcBulkDualCb')?.addEventListener('change', e => { includePartForWinners = !!e.target.checked; render(); });
+
+        const sigNameIn = root.querySelector('#hkcBulkSigName');
+        const sigTitleIn = root.querySelector('#hkcBulkSigTitle');
+        const sigMini = root.querySelector('#hkcBulkSigMini');
+        sigNameIn?.addEventListener('input', () => {
+          if (sigMini) sigMini.innerHTML = CC.signatureSvgHtml(sigNameIn.value || 'Host Signature', '#0C5535');
+        });
+
+        root.querySelector('#hkcBulkSaveSigBtn')?.addEventListener('click', async ev => {
+          const btn = ev.currentTarget;
+          const sName = String(sigNameIn?.value || '').trim();
+          const sTitle = String(sigTitleIn?.value || '').trim();
+          if (sName.length < 2) return toast('Enter host full name (at least 2 characters).', 'error');
+          btn.disabled = true;
+          btn.innerHTML = '<span class="hk-spin"></span> Saving…';
+          try {
+            const effectiveUid = (hostUid === S.user.uid || isStaffUser) ? hostUid : S.user.uid;
+            await saveHostSignature({
+              uid: effectiveUid,
+              hk: S.hk,
+              targetProfile: ownerProfile,
+              signatoryName: sName,
+              signatoryTitle: sTitle,
+              hackathon: h,
+              canPatchHackathon: isStaffUser
+            });
+            showSigEditor = false;
+            toast('Stored host digital signature updated!');
+            render();
+          } catch (err) {
+            toast(err?.message || 'Could not save signature.', 'error');
+            btn.disabled = false;
+            btn.innerHTML = '<i data-lucide="badge-check"></i>Save Stored Signature';
+            icons(btn);
+          }
+        });
+
+        const sEl = root.querySelector('#hkcBulkSearch');
+        sEl?.addEventListener('input', e => {
+          const pos = e.target.selectionStart;
+          searchQ = e.target.value;
+          render();
+          const nextIn = root.querySelector('#hkcBulkSearch');
+          if (nextIn) {
+            nextIn.focus();
+            if (pos != null) try { nextIn.setSelectionRange(pos, pos); } catch {}
+          }
+        });
+
+        root.querySelectorAll('[data-bgfilt]').forEach(b => {
+          b.onclick = () => { filterKey = b.dataset.bgfilt; render(); };
+        });
+
+        root.querySelectorAll('[data-bgq]').forEach(b => {
+          b.onclick = () => {
+            const mode = b.dataset.bgq;
+            if (mode === 'none') selected.clear();
+            else if (mode === 'all') candidates.forEach(c => selected.add(c.uid));
+            else if (mode === 'winners') {
+              selected.clear();
+              candidates.filter(c => c.isWinner).forEach(c => { selected.add(c.uid); categoryMap.set(c.uid, 'winner'); });
+            } else if (mode === 'unissued') {
+              selected.clear();
+              candidates.filter(c => !c.hasIssuedDefault).forEach(c => selected.add(c.uid));
+            }
+            render();
+          };
+        });
+
+        root.querySelector('#hkcBulkMasterCb')?.addEventListener('change', e => {
+          const vis = visibleCandidates();
+          vis.forEach(c => e.target.checked ? selected.add(c.uid) : selected.delete(c.uid));
+          render();
+        });
+
+        root.querySelectorAll('[data-bguid]').forEach(cb => {
+          cb.onchange = () => {
+            cb.checked ? selected.add(cb.dataset.bguid) : selected.delete(cb.dataset.bguid);
+            render();
+          };
+        });
+
+        root.querySelectorAll('[data-bgcat]').forEach(sel => {
+          sel.onchange = () => {
+            categoryMap.set(sel.dataset.bgcat, sel.value);
+            selected.add(sel.dataset.bgcat);
+            render();
+          };
+        });
+
+        root.querySelectorAll('[data-bgrank]').forEach(inp => {
+          inp.oninput = () => { rankMap.set(inp.dataset.bgrank, inp.value); };
+        });
+
+        root.querySelector('#hkcBulkRunBtn')?.addEventListener('click', async ev => {
+          const btn = ev.currentTarget;
+          const sig = currentSig();
+          if (!sig.configured) return toast('Save the host digital signature first.', 'error');
+          const selections = buildSelectionsPayload();
+          if (!selections.length) return toast('Select at least one recipient.', 'error');
+
+          const cleanDate = String(eventDateLabel || '').trim() || CC.defaultEventDateLabel(h);
+          let records;
+          try {
+            records = CC.buildBulkCertificateRecords({
+              h,
+              selections,
+              eventDateLabel: cleanDate,
+              signatoryName: sig.name,
+              signatoryTitle: sig.title,
+              hostUid,
+              includeParticipantCopyForWinners: includePartForWinners
+            });
+          } catch (err) {
+            return toast(err?.message || 'Invalid selection.', 'error');
+          }
+
+          btn.disabled = true;
+          btn.innerHTML = `<span class="hk-spin"></span> Generating 0/${records.length}…`;
+          try {
+            await issueHackathonCerts(records, S.user.uid, {
+              onProgress({ issuedCount, totalCount }) {
+                btn.innerHTML = `<span class="hk-spin"></span> Generating ${issuedCount}/${totalCount}…`;
+              }
+            });
+            if (isStaffUser && typeof C.audit === 'function') {
+              C.audit(S.user.uid, 'certificates.bulk_generate', h.id, {
+                title: h.title,
+                count: records.length,
+                note: `Bulk generated ${records.length} certificate(s) with signature "${sig.name}"`
+              }).catch(() => {});
+            }
+            const freshCerts = await fetchHackathonCerts(h.id).catch(() => records);
+            toast(`Bulk generated ${records.length} official certificate${records.length === 1 ? '' : 's'} using "${sig.name}"!`);
+            close();
+            onGenerated?.(freshCerts, records);
+          } catch (err) {
+            console.error('[HK Cert] Bulk generate error:', err);
+            toast(err?.message || 'Bulk generation failed. Check permissions and try again.', 'error');
+            btn.disabled = false;
+            btn.innerHTML = `<i data-lucide="award"></i>Bulk Generate (${records.length})`;
+            icons(btn);
+          }
+        });
+      };
+
+      render();
     }
   });
 }

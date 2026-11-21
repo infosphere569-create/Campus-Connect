@@ -22,23 +22,26 @@ export async function manage(cx, id){
   const h = await C.fetchOne(id, { fresh: true }); if(cx.stale()) return;
   if(!h || (!C.isHackHost(h, S.user) && !C.isStaff(S.site))){ view.innerHTML = `<div class="hk-view">${empty('search-x', 'Hackathon not found', 'You can only manage hackathons you host.', `<a class="hk-btn" href="${esc(cx.backHash || '#/host')}">Back to dashboard</a>`)}</div>`; return; }
   const hostUid = h.hostUid, rounds = C.roundsOf(h);
-  let [regs, subs, atts, meta, keys, serverMailLogs, certs] = await Promise.all([
+  let [regs, subs, atts, meta, keys, serverMailLogs, certs, ownerProfile] = await Promise.all([
     C.hackathonRegistrations(id, hostUid),
     C.hackathonSubmissions(id, hostUid).catch(() => []),
     C.hackathonAttempts(id, hostUid).catch(() => []),
     C.getTestMeta(id),
     C.getTestKeys(id).catch(() => null),
     C.hackathonMailLogs(id, hostUid).catch(() => []),
-    HC.fetchHackathonCerts(id).catch(() => [])
+    HC.fetchHackathonCerts(id).catch(() => []),
+    cx.ownerProfile
+      ? Promise.resolve(cx.ownerProfile)
+      : (S.user?.uid === hostUid ? Promise.resolve(S.hk) : C.fetchParticipantProfile(hostUid).catch(() => null))
   ]);
   if(cx.stale()) return;
 
   const org = {
-    name: S.hk?.organiserName || S.hk?.displayName || h.organiser?.name || S.site?.displayName || 'The organiser',
-    designation: S.hk?.designation || h.organiser?.designation || '',
-    org: S.hk?.org || h.brandName || h.hostName || '',
-    email: S.hk?.orgEmail || h.contactEmail || h.hostEmail || S.user?.email || '',
-    phone: S.hk?.orgPhone || h.contactPhone || h.organiser?.phone || ''
+    name: ownerProfile?.organiserName || ownerProfile?.displayName || S.hk?.organiserName || S.hk?.displayName || h.organiser?.name || S.site?.displayName || 'The organiser',
+    designation: ownerProfile?.designation || S.hk?.designation || h.organiser?.designation || '',
+    org: ownerProfile?.org || S.hk?.org || h.brandName || h.hostName || '',
+    email: ownerProfile?.orgEmail || S.hk?.orgEmail || h.contactEmail || h.hostEmail || S.user?.email || '',
+    phone: ownerProfile?.orgPhone || S.hk?.orgPhone || h.contactPhone || h.organiser?.phone || ''
   };
   const subOf = uid => subs.find(x => x.uid === uid), attOf = uid => atts.find(x => x.uid === uid), regOf = uid => regs.find(x => x.uid === uid);
   let subWeight = '50_50'; // '50_50' | '30_70' | '70_30'
@@ -243,7 +246,8 @@ export async function manage(cx, id){
       <select class="hk-select sm" id="bSt"><option value="">Set status…</option>${STS.map(x => `<option>${x}</option>`).join('')}</select>
       ${rounds.length ? `<select class="hk-select sm" id="bRd"><option value="">Move to round…</option>${rounds.map((x, i) => `<option value="${i}">${esc(x.name)}</option>`).join('')}</select>` : ''}
       <button class="hk-btn sm" data-bulkmail="regs"><i data-lucide="mail"></i>Compose email (${sel.size})</button>
-      <button class="hk-btn sm" data-bulkqueue="regs"><i data-lucide="list-plus"></i>Load into Mailer</button></div>
+      <button class="hk-btn sm" data-bulkqueue="regs"><i data-lucide="list-plus"></i>Load into Mailer</button>
+      <button class="hk-btn sm gold" data-bulkcerts="regs"><i data-lucide="award"></i>Bulk Generate Certs (${sel.size})</button></div>
     ${l.length ? `<div class="hk-tablewrap"><table class="hk-table"><thead><tr><th><input type="checkbox" id="selAll" ${l.length && l.every(r => sel.has(r.id)) ? 'checked' : ''} aria-label="Select all"></th><th>Team leader</th><th>Team</th><th>College</th><th>Round</th><th>Status</th><th>Work &amp; Rank</th><th class="act" style="text-align:right">Profile &amp; mail</th></tr></thead><tbody id="rb">${l.map((r, i) => row(r, i)).join('')}</tbody></table></div>` : empty('users', regs.length ? 'No matches' : 'No registrations yet', regs.length ? 'Try clearing the filters.' : 'Registrations appear here as soon as teams sign up. Share your hackathon link to get started.', regs.length ? '' : '<button class="hk-btn gold" data-share>Copy link</button>')}`; };
 
   const link = (u, l) => C.safeUrl(u) ? `<a class="hk-chip btn" href="${esc(C.safeUrl(u))}" target="_blank" rel="noopener noreferrer"><i data-lucide="external-link"></i>${esc(l)}</a>` : '';
@@ -1264,7 +1268,7 @@ export async function manage(cx, id){
   }
 
   const certOf = (uid, category) => certs.find(c => c.uid === uid && c.category === category);
-  const getSavedSignatory = () => HC.resolveHostSignature(S.hk, h);
+  const getSavedSignatory = () => HC.resolveHostSignature(ownerProfile || S.hk, h, S.hk);
   const getWinnerCandidates = () => {
     const winCfg = h.submission?.winnerReveal || {};
     const announced = Array.isArray(winCfg.winners) ? winCfg.winners : [];
@@ -1442,9 +1446,12 @@ export async function manage(cx, id){
               <div class="hk-xs hk-muted">Crisp white Canva-editorial design · Campus Connect One + ${esc(h.brandName || h.college || 'Organiser')} branding &middot; Scannable QR verify</div>
             </div>
           </div>
-          <div class="hk-chseg" role="group" aria-label="Certificate generation category">
-            <button type="button" class="${certMode === 'winners' ? 'on' : ''}" data-cmode="winners"><i data-lucide="trophy"></i>For Winners (${winnerList.length})</button>
-            <button type="button" class="${certMode === 'participants' ? 'on' : ''}" data-cmode="participants"><i data-lucide="users"></i>For Participants (${activeRegs.length})</button>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button type="button" class="hk-btn sm primary" id="openBulkGenBtn" ${activeRegs.length || winnerList.length ? '' : 'disabled'}><i data-lucide="layers"></i>Bulk Generate</button>
+            <div class="hk-chseg" role="group" aria-label="Certificate generation category">
+              <button type="button" class="${certMode === 'winners' ? 'on' : ''}" data-cmode="winners"><i data-lucide="trophy"></i>For Winners (${winnerList.length})</button>
+              <button type="button" class="${certMode === 'participants' ? 'on' : ''}" data-cmode="participants"><i data-lucide="users"></i>For Participants (${activeRegs.length})</button>
+            </div>
           </div>
         </div>
 
@@ -2211,12 +2218,16 @@ export async function manage(cx, id){
         const btn = $('button[type=submit]', sigForm);
         btn.disabled = true; btn.innerHTML = '<span class="hk-spin"></span> Saving signature…';
         try {
+          const isStaffUser = C.isStaff(S.site);
+          const effectiveSigUid = (hostUid === S.user.uid || isStaffUser) ? hostUid : S.user.uid;
           const saved = await HC.saveHostSignature({
-            uid: S.user.uid,
+            uid: effectiveSigUid,
             hk: S.hk,
+            targetProfile: ownerProfile,
             signatoryName: sName,
             signatoryTitle: sTitle,
-            hackathon: h
+            hackathon: h,
+            canPatchHackathon: isStaffUser
           });
           if(alsoSync){
             const activeCerts = certs.filter(c => c.status !== 'revoked');
@@ -2436,6 +2447,14 @@ export async function manage(cx, id){
       if(!t || typeof t.closest !== 'function') return;
       const pb = t.closest('[data-prof]'); if(pb){ const r = regs.find(x => x.id === pb.dataset.prof); if(r) viewApplicantModal(r); return; }
       const tb = t.closest('[data-tab]'); if(tb) return setTab(tb.dataset.tab);
+      if(t.closest('#openBulkGenBtn')){
+        HC.openBulkGenerateModal({
+          h, regs, subs, atts, certs, S, ownerProfile,
+          initialFilter: certMode === 'winners' && getWinnerCandidates().length ? 'winners' : 'all',
+          onGenerated: fresh => { certs = fresh; paint(); }
+        });
+        return;
+      }
       if(t.closest('#editSigBtn')){ editingSig = true; return redrawRows(); }
       if(t.closest('#cancelSigBtn')){ editingSig = false; return redrawRows(); }
       if(t.closest('#certResetDateBtn')){ certDateLabel = HC.defaultEventDateLabel(h); return redrawRows(); }
@@ -2607,6 +2626,18 @@ export async function manage(cx, id){
       const added = queueAddRegs(l);
       toast(`${added} team${added === 1 ? '' : 's'} loaded into Mailer queue`);
       return setTab('mail');
+    }
+    const bc = t.closest('[data-bulkcerts]');
+    if(bc){
+      const src = bc.dataset.bulkcerts === 'subs' ? subSel : (bc.dataset.bulkcerts === 'test' ? testSel : sel);
+      const uids = regs.filter(r => src.has(r.id) && r.status !== 'rejected').map(r => r.uid).filter(Boolean);
+      if(!uids.length) return toast('Select at least one eligible participant or winner first.', 'error');
+      HC.openBulkGenerateModal({
+        h, regs, subs, atts, certs, S, ownerProfile,
+        preselectedUids: uids,
+        onGenerated: fresh => { certs = fresh; tab = 'certs'; paint(); }
+      });
+      return;
     }
 
     // Mailer Tab events

@@ -1759,9 +1759,18 @@ i[data-lucide]>svg{width:100%;height:100%;display:block}
 .hkc-stamp-card{padding:14px 16px;border-radius:14px;background:#FFFFFF;border:1.5px solid #CBD5E1;box-shadow:var(--hk-shadow-sm);color:#0F172A}
 .hkc-stamp-label{font-size:.64rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#64748B;text-align:center;margin-bottom:6px}
 
+/* Bulk Generate Certificates Studio */
+.hkc-bulk-wrap{display:flex;flex-direction:column;gap:12px}
+.hkc-bulk-sigbox{border-style:dashed;background:var(--hk-surface2)}
+.hkc-bulk-head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:10px 12px;border-radius:12px;background:var(--hk-surface2);border:1px solid var(--hk-line)}
+.hkc-bulk-tools{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.hkc-bulk-row.is-on{background:color-mix(in srgb,var(--hk-p) 7%,var(--hk-surface2));border-color:color-mix(in srgb,var(--hk-p) 38%,var(--hk-line))}
+.hkc-bulk-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-top:12px;margin-top:4px;border-top:1px solid var(--hk-line)}
+
 @media (max-width:640px){
   .hkc-stage-wrap{padding:6px}
   .hkc-host-grid{grid-template-columns:1fr}
   .hkc-act-bar .hk-btn{min-width:100%}
+  .hkc-bulk-foot .hk-btn{flex:1}
 }
 

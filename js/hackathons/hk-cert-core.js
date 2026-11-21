@@ -101,17 +101,162 @@ export function rankLabelForIndex(idx) {
   return `Top ${idx + 1} · Finalist Winner`;
 }
 
-export function resolveHostSignature(hk = null, h = null) {
-  const name = String(hk?.digitalSignatoryName || h?.organiser?.signatoryName || '').trim();
-  const orgLabel = String(hk?.org || h?.organiser?.org || h?.brandName || '').trim();
-  const fallbackTitle = String(hk?.designation || h?.organiser?.designation || (orgLabel ? `Organiser, ${orgLabel}` : 'Hackathon Organiser')).trim();
-  const title = String(hk?.digitalSignatoryTitle || h?.organiser?.signatoryTitle || fallbackTitle).trim();
+export function resolveHostSignature(hk = null, h = null, fallbackHk = null) {
+  const name = String(
+    hk?.digitalSignatoryName
+    || h?.organiser?.signatoryName
+    || fallbackHk?.digitalSignatoryName
+    || ''
+  ).trim();
+  const orgLabel = String(hk?.org || h?.organiser?.org || h?.brandName || fallbackHk?.org || '').trim();
+  const fallbackTitle = String(
+    hk?.designation
+    || h?.organiser?.designation
+    || fallbackHk?.designation
+    || (orgLabel ? `Organiser, ${orgLabel}` : 'Hackathon Organiser')
+  ).trim();
+  const primaryTitle = hk?.digitalSignatoryName
+    ? hk?.digitalSignatoryTitle
+    : (h?.organiser?.signatoryName
+        ? h?.organiser?.signatoryTitle
+        : fallbackHk?.digitalSignatoryTitle);
+  const title = String(primaryTitle || h?.organiser?.signatoryTitle || hk?.digitalSignatoryTitle || fallbackHk?.digitalSignatoryTitle || fallbackTitle).trim();
   return {
     name,
     title,
     configured: name.length >= 2,
-    updatedAtMs: toMs(hk?.digitalSignatoryUpdatedAtMs) || 0
+    updatedAtMs: toMs(hk?.digitalSignatoryUpdatedAtMs || fallbackHk?.digitalSignatoryUpdatedAtMs) || 0
   };
+}
+
+export function buildBulkCertCandidates({ h, regs = [], subs = [], atts = [], certs = [] } = {}) {
+  const hid = h?.id || '';
+  const subByUid = new Map();
+  (subs || []).forEach(s => { if (s?.uid) subByUid.set(s.uid, s); });
+  const attByUid = new Map();
+  (atts || []).forEach(a => { if (a?.uid) attByUid.set(a.uid, a); });
+  const regByUid = new Map();
+  (regs || []).forEach(r => { if (r?.uid) regByUid.set(r.uid, r); });
+
+  const winCertByUid = new Map();
+  const partCertByUid = new Map();
+  (certs || []).forEach(c => {
+    if (!c?.uid) return;
+    if (c.category === 'winner') winCertByUid.set(c.uid, c);
+    else if (c.category === 'participant') partCertByUid.set(c.uid, c);
+  });
+
+  const winCfg = h?.submission?.winnerReveal || {};
+  const announced = Array.isArray(winCfg.winners) ? winCfg.winners : [];
+  const winnerMetaByUid = new Map();
+
+  announced.forEach((w, idx) => {
+    if (!w?.uid) return;
+    winnerMetaByUid.set(w.uid, {
+      rank: idx + 1,
+      defaultRankTitle: String(w.place || rankLabelForIndex(idx)).trim(),
+      prize: String(w.prize || '').trim(),
+      projectTitle: String(w.projectTitle || '').trim(),
+      isAnnounced: true
+    });
+    if (!regByUid.has(w.uid)) {
+      regByUid.set(w.uid, {
+        id: w.regId || (hid ? `${hid}_${w.uid}` : ''),
+        uid: w.uid,
+        hackathonId: hid,
+        hostUid: h?.hostUid || '',
+        name: w.leaderName || w.teamName || 'Winner',
+        teamName: w.teamName || '',
+        teamMode: w.teamName ? 'team' : 'solo',
+        college: w.college || '',
+        email: '',
+        status: 'selected'
+      });
+    }
+  });
+
+  const finalists = [...regByUid.values()]
+    .filter(r => r.status === 'selected' && !winnerMetaByUid.has(r.uid))
+    .sort((a, b) => {
+      const sa = subByUid.get(a.uid)?.score ?? -1;
+      const sb = subByUid.get(b.uid)?.score ?? -1;
+      if (sb !== sa) return sb - sa;
+      const aa = attByUid.get(a.uid)?.submittedAtMs ? (attByUid.get(a.uid).score ?? 0) : -1;
+      const ab = attByUid.get(b.uid)?.submittedAtMs ? (attByUid.get(b.uid).score ?? 0) : -1;
+      return ab - aa;
+    });
+
+  let nextRank = announced.length + 1;
+  finalists.forEach(r => {
+    const idx = nextRank - 1;
+    winnerMetaByUid.set(r.uid, {
+      rank: nextRank++,
+      defaultRankTitle: rankLabelForIndex(idx),
+      prize: '',
+      projectTitle: subByUid.get(r.uid)?.title || '',
+      isAnnounced: false
+    });
+  });
+
+  const candidates = [];
+  regByUid.forEach(reg => {
+    if (!reg?.uid || reg.status === 'rejected') return;
+    const uid = reg.uid;
+    const sub = subByUid.get(uid) || null;
+    const att = attByUid.get(uid) || null;
+    const wm = winnerMetaByUid.get(uid) || null;
+    const existingWinnerCert = winCertByUid.get(uid) || null;
+    const existingPartCert = partCertByUid.get(uid) || null;
+    const isWinner = !!wm;
+    const defaultCategory = isWinner ? 'winner' : 'participant';
+    const hasIssuedWinner = existingWinnerCert?.status === 'issued';
+    const hasIssuedPart = existingPartCert?.status === 'issued';
+    const hasIssuedDefault = defaultCategory === 'winner' ? hasIssuedWinner : hasIssuedPart;
+
+    candidates.push({
+      uid,
+      reg,
+      sub,
+      att,
+      name: String(reg.name || reg.leaderName || 'Participant').trim() || 'Participant',
+      teamName: reg.teamMode === 'team' && reg.teamName ? String(reg.teamName).trim() : '',
+      email: String(reg.email || '').trim(),
+      college: String(reg.college || '').trim(),
+      status: reg.status || 'registered',
+      stage: reg.stage || 0,
+      isWinner,
+      winnerRank: wm?.rank || null,
+      defaultRankTitle: wm ? wm.defaultRankTitle : 'Official Participant',
+      prize: wm?.prize || '',
+      projectTitle: wm?.projectTitle || sub?.title || '',
+      isAnnounced: !!wm?.isAnnounced,
+      defaultCategory,
+      existingWinnerCert,
+      existingPartCert,
+      hasIssuedWinner,
+      hasIssuedPart,
+      hasIssuedDefault,
+      hasSub: !!sub,
+      hasTest: !!att?.submittedAtMs,
+      subScore: sub?.score != null ? Number(sub.score) : null,
+      testScore: att?.submittedAtMs ? Number(att.score ?? 0) : null,
+      testTotal: att?.total ?? 0
+    });
+  });
+
+  const statusOrder = { selected: 1, shortlisted: 2, waitlisted: 3, registered: 4 };
+  candidates.sort((a, b) => {
+    if (a.isWinner !== b.isWinner) return a.isWinner ? -1 : 1;
+    if (a.isWinner && b.isWinner) return (a.winnerRank || 999) - (b.winnerRank || 999);
+    const sa = statusOrder[a.status] || 5;
+    const sb = statusOrder[b.status] || 5;
+    if (sa !== sb) return sa - sb;
+    if ((b.hasSub ? 1 : 0) !== (a.hasSub ? 1 : 0)) return b.hasSub ? 1 : -1;
+    if ((b.hasTest ? 1 : 0) !== (a.hasTest ? 1 : 0)) return b.hasTest ? 1 : -1;
+    return String(a.name).localeCompare(String(b.name));
+  });
+
+  return candidates;
 }
 
 export function buildCertificateRecord({
@@ -171,6 +316,62 @@ export function buildCertificateRecord({
     certShareAtMs: 0,
     certLinkedInAtMs: 0
   };
+}
+
+export function buildBulkCertificateRecords({
+  h,
+  selections = [],
+  eventDateLabel = '',
+  signatoryName = '',
+  signatoryTitle = '',
+  hostUid = '',
+  includeParticipantCopyForWinners = false
+} = {}) {
+  const cleanSig = String(signatoryName || '').trim();
+  if (cleanSig.length < 2) {
+    throw new Error('Configure and save the host digital signature before bulk generating certificates.');
+  }
+  if (!Array.isArray(selections) || !selections.length) {
+    throw new Error('Select at least one winner or participant to bulk generate certificates.');
+  }
+  const byId = new Map();
+  const addRec = rec => {
+    if (!rec?.id || !rec?.uid) return;
+    if (!byId.has(rec.id)) byId.set(rec.id, rec);
+  };
+
+  selections.forEach(item => {
+    const reg = item?.reg || (item?.uid ? { uid: item.uid, name: item.name, teamName: item.teamName, college: item.college, teamMode: item.teamName ? 'team' : 'solo' } : null);
+    if (!reg?.uid) return;
+    const cat = item.category === 'winner' ? 'winner' : 'participant';
+    addRec(buildCertificateRecord({
+      h,
+      reg,
+      category: cat,
+      rankTitle: cat === 'winner' ? (item.rankTitle || item.defaultRankTitle || 'Official Winner') : 'Participant',
+      prize: cat === 'winner' ? (item.prize || '') : '',
+      projectTitle: item.projectTitle || '',
+      eventDateLabel,
+      signatoryName: cleanSig,
+      signatoryTitle,
+      hostUid
+    }));
+    if (includeParticipantCopyForWinners && cat === 'winner') {
+      addRec(buildCertificateRecord({
+        h,
+        reg,
+        category: 'participant',
+        rankTitle: 'Participant',
+        projectTitle: item.projectTitle || '',
+        eventDateLabel,
+        signatoryName: cleanSig,
+        signatoryTitle,
+        hostUid
+      }));
+    }
+  });
+
+  return [...byId.values()];
 }
 
 export function buildLinkedInAddUrl(cert, originOverride = '') {
