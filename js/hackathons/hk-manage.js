@@ -1428,6 +1428,7 @@ export async function manage(cx, id){
       if(certFilter === 'revoked' ? c.status !== 'revoked' : c.status === 'revoked') return false;
       if(certFilter === 'winner' && c.category !== 'winner') return false;
       if(certFilter === 'participant' && c.category !== 'participant') return false;
+      if(certFilter === 'engaged' && !c.certDownloadAtMs && !c.certShareAtMs && !c.certLinkedInAtMs) return false;
       if(!cq) return true;
       const reg = regOf(c.uid);
       return [c.name, c.teamName, c.rankTitle, HC.certCode(c.id), reg?.email || '', reg?.college || ''].join(' ').toLowerCase().includes(cq);
@@ -1436,6 +1437,10 @@ export async function manage(cx, id){
     const activeIssued = certs.filter(c => c.status !== 'revoked');
     const winCount = activeIssued.filter(c => c.category === 'winner').length;
     const partCount = activeIssued.filter(c => c.category === 'participant').length;
+    const dlCount = activeIssued.filter(c => c.certDownloadAtMs).length;
+    const shCount = activeIssued.filter(c => c.certShareAtMs).length;
+    const liCount = activeIssued.filter(c => c.certLinkedInAtMs).length;
+    const engagedCount = activeIssued.filter(c => c.certDownloadAtMs || c.certShareAtMs || c.certLinkedInAtMs).length;
     const revCount = certs.filter(c => c.status === 'revoked').length;
 
     return `<div class="hk-stack">
@@ -1479,14 +1484,15 @@ export async function manage(cx, id){
             <i data-lucide="shield-check"></i>
             <div>
               <h3>Issued Certificates &amp; Live Activity Tracker</h3>
-              <div class="hk-xs hk-muted">Green badges light up automatically when participants download, share, or add to LinkedIn.</div>
+              <div class="hk-xs hk-muted">Green indicators light up live whenever recipients download, share, or add to LinkedIn.</div>
             </div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <span class="hk-chip gold">${winCount} Winner</span>
             <span class="hk-chip">${partCount} Participant</span>
-            <span class="hk-chip hkc-green">${activeIssued.filter(c => c.certDownloadAtMs).length} Downloaded</span>
-            <span class="hk-chip hkc-green">${activeIssued.filter(c => c.certLinkedInAtMs).length} LinkedIn</span>
+            <span class="hk-chip ${dlCount ? 'hkc-green' : 'neutral'}"><span class="hkc-dot ${dlCount ? 'on' : ''}"></span>${dlCount} Downloaded</span>
+            <span class="hk-chip ${shCount ? 'hkc-green' : 'neutral'}"><span class="hkc-dot ${shCount ? 'on' : ''}"></span>${shCount} Shared</span>
+            <span class="hk-chip ${liCount ? 'hkc-green' : 'neutral'}"><span class="hkc-dot ${liCount ? 'on' : ''}"></span>${liCount} LinkedIn</span>
           </div>
         </div>
 
@@ -1496,6 +1502,7 @@ export async function manage(cx, id){
             <button type="button" class="hk-chip btn ${certFilter === 'all' ? 'on' : ''}" data-cfilt="all">All (${activeIssued.length})</button>
             <button type="button" class="hk-chip btn ${certFilter === 'winner' ? 'on' : ''}" data-cfilt="winner">Winners (${winCount})</button>
             <button type="button" class="hk-chip btn ${certFilter === 'participant' ? 'on' : ''}" data-cfilt="participant">Participants (${partCount})</button>
+            <button type="button" class="hk-chip btn ${certFilter === 'engaged' ? 'on' : ''}" data-cfilt="engaged">Engaged (${engagedCount})</button>
             ${revCount ? `<button type="button" class="hk-chip btn ${certFilter === 'revoked' ? 'on' : ''}" data-cfilt="revoked">Revoked (${revCount})</button>` : ''}
           </div>
         </div>
@@ -1509,21 +1516,29 @@ export async function manage(cx, id){
           const dlOn = !!c.certDownloadAtMs;
           const shOn = !!c.certShareAtMs;
           const liOn = !!c.certLinkedInAtMs;
-          return `<article class="hkc-host-card ${isWin ? 'is-win' : ''} ${isRev ? 'is-revoked' : ''}">
+          const doneCount = (dlOn ? 1 : 0) + (shOn ? 1 : 0) + (liOn ? 1 : 0);
+          return `<article class="hkc-host-card ${isWin ? 'is-win' : ''} ${isRev ? 'is-revoked' : ''} ${doneCount > 0 ? 'has-activity' : ''} ${doneCount === 3 ? 'all-engaged' : ''}">
             <div class="hkc-hc-top">
               <span class="hk-chip ${isWin ? 'gold' : ''}"><i data-lucide="${isWin ? 'trophy' : 'award'}"></i>${esc(isWin ? c.rankTitle : 'Participant')}</span>
-              <span class="hkc-hc-id">${esc(code)}</span>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span class="hk-chip ${doneCount > 0 ? 'hkc-green' : 'neutral'}" style="font-size:.68rem;padding:2px 8px" title="${doneCount} of 3 actions completed (Downloaded, Shared, LinkedIn)">
+                  <span class="hkc-dot ${doneCount > 0 ? 'on' : ''}"></span>
+                  ${doneCount === 3 ? '3/3 Active ✓' : doneCount > 0 ? `${doneCount}/3 Active` : 'Issued'}
+                </span>
+                <span class="hkc-hc-id">${esc(code)}</span>
+              </div>
             </div>
             <div class="hkc-hc-meta">
               <b>${esc(c.name)}</b>
               <div class="hk-xs hk-muted">${c.teamName ? `Team ${esc(c.teamName)} · ` : ''}${esc(reg?.email || c.college || 'Verified Recipient')}</div>
               <div class="hk-xs hk-muted">Date: <b>${esc(c.eventDateLabel)}</b> · Signed by ${esc(c.signatoryName)}</div>
             </div>
-            <div class="hkc-hc-track">
-              <span class="hk-chip ${dlOn ? 'hkc-green' : 'neutral'}" title="${dlOn ? 'Downloaded ' + C.ago(c.certDownloadAtMs) : 'Not downloaded yet'}"><i data-lucide="${dlOn ? 'check-circle-2' : 'download'}"></i>Download${dlOn ? ' ✓' : ''}</span>
-              <span class="hk-chip ${shOn ? 'hkc-green' : 'neutral'}" title="${shOn ? 'Shared ' + C.ago(c.certShareAtMs) : 'Not shared yet'}"><i data-lucide="${shOn ? 'check-circle-2' : 'share-2'}"></i>Share${shOn ? ' ✓' : ''}</span>
-              <span class="hk-chip ${liOn ? 'hkc-green' : 'neutral'}" title="${liOn ? 'Added to LinkedIn ' + C.ago(c.certLinkedInAtMs) : 'Not added to LinkedIn yet'}"><i data-lucide="${liOn ? 'check-circle-2' : 'linkedin'}"></i>LinkedIn${liOn ? ' ✓' : ''}</span>
+            <div class="hkc-seg-bar" aria-label="Certificate activity progress">
+              <span class="${dlOn ? 'on' : ''}" title="${dlOn ? 'Downloaded ' + C.ago(c.certDownloadAtMs) : 'Pending download'}"></span>
+              <span class="${shOn ? 'on' : ''}" title="${shOn ? 'Shared ' + C.ago(c.certShareAtMs) : 'Pending share'}"></span>
+              <span class="${liOn ? 'on' : ''}" title="${liOn ? 'Added to LinkedIn ' + C.ago(c.certLinkedInAtMs) : 'Pending LinkedIn'}"></span>
             </div>
+            <div class="hkc-hc-track">${HC.certStatusChipsHtml(c, { compact: true })}</div>
             <div class="hkc-hc-url">
               <i data-lucide="qr-code" style="width:14px;height:14px;flex:none"></i>
               <span>${esc(verify)}</span>
@@ -2879,5 +2894,24 @@ export async function manage(cx, id){
       toast(err?.message || 'Could not complete action', 'error');
     }
   };
-  cx.S.cleanup = () => { view.oninput = view.onchange = view.onclick = null; };
+  const certTrackKey = list => JSON.stringify((list || []).map(c => [c.id, c.status, c.updatedAtMs, c.certDownloadAtMs, c.certShareAtMs, c.certLinkedInAtMs]));
+  const unsubCerts = FS.onSnapshot(FS.query(FS.collection(C.db, 'hkCertificates'), FS.where('hackathonId', '==', id)), snap => {
+    if(cx.stale()) return;
+    const nextCerts = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (a.category === 'winner' ? -1 : 1) - (b.category === 'winner' ? -1 : 1) || (b.issuedAtMs || 0) - (a.issuedAtMs || 0));
+    if(certTrackKey(nextCerts) !== certTrackKey(certs)){
+      certs = nextCerts;
+      const activeTag = document.activeElement?.tagName;
+      if(!['INPUT', 'TEXTAREA'].includes(activeTag)){
+        if(tab === 'certs') redrawRows();
+        else {
+          const badgeBtn = $('.hk-tab[data-tab="certs"]', view);
+          const n = certs.filter(c => c.status !== 'revoked').length;
+          if(badgeBtn) badgeBtn.innerHTML = `<i data-lucide="award"></i>Certificates (${n})`;
+          icons(badgeBtn);
+        }
+      }
+    }
+  }, () => {});
+  cx.S.cleanup = () => { unsubCerts?.(); view.oninput = view.onchange = view.onclick = null; };
 }

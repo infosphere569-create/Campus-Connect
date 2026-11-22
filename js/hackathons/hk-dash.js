@@ -322,18 +322,14 @@ export async function dash(cx, hid, opts = {}){
           <a class="hk-btn sm" href="${esc(certVerify)}" target="_blank" rel="noopener noreferrer"><i data-lucide="external-link"></i>Verify Page</a>
         </div>
 
-        <div class="hkc-act-bar" style="margin-top:10px">
-          <button type="button" class="hk-btn primary" id="dashCertPng"><i data-lucide="image"></i>Download Image (PNG)</button>
-          <button type="button" class="hk-btn" id="dashCertPdf"><i data-lucide="file-down"></i>Download PDF</button>
-          <button type="button" class="hk-btn" id="dashCertShare"><i data-lucide="share-2"></i>Share Certificate</button>
-          <button type="button" class="hk-btn hkc-li-btn" id="dashCertLi"><i data-lucide="linkedin"></i>Add to LinkedIn</button>
+        <div class="hkc-act-bar" id="dashCertActs" style="margin-top:10px">
+          <button type="button" class="hk-btn primary" id="dashCertPng"><i data-lucide="image"></i><span>Download PNG</span>${activeCert.certDownloadAtMs ? '<span class="hkc-btn-badge"><i data-lucide="check"></i></span>' : ''}</button>
+          <button type="button" class="hk-btn" id="dashCertPdf"><i data-lucide="file-down"></i><span>Download PDF</span></button>
+          <button type="button" class="hk-btn ${activeCert.certShareAtMs ? 'hkc-btn-done' : ''}" id="dashCertShare"><i data-lucide="share-2"></i><span>${activeCert.certShareAtMs ? 'Shared ✓' : 'Share Certificate'}</span></button>
+          <button type="button" class="hk-btn hkc-li-btn" id="dashCertLi"><i data-lucide="linkedin"></i><span>${activeCert.certLinkedInAtMs ? 'Add to LinkedIn ✓' : 'Add to LinkedIn'}</span></button>
         </div>
 
-        <div class="hkc-track-strip" id="dashCertTrack" style="margin-top:10px">
-          <span class="hk-chip ${activeCert.certDownloadAtMs ? 'hkc-green' : 'neutral'}"><i data-lucide="${activeCert.certDownloadAtMs ? 'check-circle-2' : 'download'}"></i>${activeCert.certDownloadAtMs ? 'Downloaded ✓' : 'Download'}</span>
-          <span class="hk-chip ${activeCert.certShareAtMs ? 'hkc-green' : 'neutral'}"><i data-lucide="${activeCert.certShareAtMs ? 'check-circle-2' : 'share-2'}"></i>${activeCert.certShareAtMs ? 'Shared ✓' : 'Share'}</span>
-          <span class="hk-chip ${activeCert.certLinkedInAtMs ? 'hkc-green' : 'neutral'}"><i data-lucide="${activeCert.certLinkedInAtMs ? 'check-circle-2' : 'linkedin'}"></i>${activeCert.certLinkedInAtMs ? 'Added to LinkedIn ✓' : 'Add to LinkedIn'}</span>
-        </div>
+        <div class="hkc-track-strip" id="dashCertTrack" style="margin-top:10px">${HC.certStatusChipsHtml(activeCert)}</div>
       </section>`;
     }
 
@@ -720,22 +716,36 @@ export async function dash(cx, hid, opts = {}){
       }
       const refreshDashTrack = () => {
         const strip = $('#dashCertTrack', view);
-        if(!strip) return;
-        strip.innerHTML = `
-          <span class="hk-chip ${activeCert.certDownloadAtMs ? 'hkc-green' : 'neutral'}"><i data-lucide="${activeCert.certDownloadAtMs ? 'check-circle-2' : 'download'}"></i>${activeCert.certDownloadAtMs ? 'Downloaded ✓' : 'Download'}</span>
-          <span class="hk-chip ${activeCert.certShareAtMs ? 'hkc-green' : 'neutral'}"><i data-lucide="${activeCert.certShareAtMs ? 'check-circle-2' : 'share-2'}"></i>${activeCert.certShareAtMs ? 'Shared ✓' : 'Share'}</span>
-          <span class="hk-chip ${activeCert.certLinkedInAtMs ? 'hkc-green' : 'neutral'}"><i data-lucide="${activeCert.certLinkedInAtMs ? 'check-circle-2' : 'linkedin'}"></i>${activeCert.certLinkedInAtMs ? 'Added to LinkedIn ✓' : 'Add to LinkedIn'}</span>`;
-        icons(strip);
+        if(strip){
+          strip.innerHTML = HC.certStatusChipsHtml(activeCert);
+          icons(strip);
+        }
+        const pngBtn = $('#dashCertPng', view);
+        if(pngBtn){
+          pngBtn.innerHTML = `<i data-lucide="image"></i><span>Download PNG</span>${activeCert.certDownloadAtMs ? '<span class="hkc-btn-badge"><i data-lucide="check"></i></span>' : ''}`;
+          icons(pngBtn);
+        }
+        const shBtn = $('#dashCertShare', view);
+        if(shBtn){
+          shBtn.classList.toggle('hkc-btn-done', !!activeCert.certShareAtMs);
+          shBtn.innerHTML = `<i data-lucide="share-2"></i><span>${activeCert.certShareAtMs ? 'Shared ✓' : 'Share Certificate'}</span>`;
+          icons(shBtn);
+        }
+        const liBtn = $('#dashCertLi', view);
+        if(liBtn){
+          liBtn.innerHTML = `<i data-lucide="linkedin"></i><span>${activeCert.certLinkedInAtMs ? 'Add to LinkedIn ✓' : 'Add to LinkedIn'}</span>`;
+          icons(liBtn);
+        }
       };
       const verifyLink = HC.certVerifyUrl(activeCert.id);
       $('#dashCertCopy', view)?.addEventListener('click', async () => {
-        try { await navigator.clipboard.writeText(verifyLink); toast('Verification link copied!'); }
-        catch { toast(verifyLink, 'info'); }
+        const ok = await HC.copyTextSafe(verifyLink);
+        toast(ok ? 'Verification link copied!' : verifyLink, ok ? 'success' : 'info');
       });
       $('#dashCertPng', view)?.addEventListener('click', ev => HC.downloadCertPng(activeCert, ev.currentTarget, refreshDashTrack));
       $('#dashCertPdf', view)?.addEventListener('click', ev => HC.downloadCertPdf(activeCert, ev.currentTarget, refreshDashTrack));
       $('#dashCertShare', view)?.addEventListener('click', ev => HC.shareCertImage(activeCert, ev.currentTarget, refreshDashTrack));
-      $('#dashCertLi', view)?.addEventListener('click', () => HC.openLinkedInAdd(activeCert, refreshDashTrack));
+      $('#dashCertLi', view)?.addEventListener('click', ev => HC.openLinkedInAdd(activeCert, ev.currentTarget, refreshDashTrack));
     }
 
     const sf = $('#subForm');

@@ -686,21 +686,29 @@ async function viewOne(t, id){
         const dlOn = !!c.certDownloadAtMs;
         const shOn = !!c.certShareAtMs;
         const liOn = !!c.certLinkedInAtMs;
-        return `<article class="hkc-host-card ${isWin ? 'is-win' : ''} ${isRev ? 'is-revoked' : ''}">
+        const doneCount = (dlOn ? 1 : 0) + (shOn ? 1 : 0) + (liOn ? 1 : 0);
+        return `<article class="hkc-host-card ${isWin ? 'is-win' : ''} ${isRev ? 'is-revoked' : ''} ${doneCount > 0 ? 'has-activity' : ''} ${doneCount === 3 ? 'all-engaged' : ''}">
           <div class="hkc-hc-top">
             <span class="hk-chip ${isWin ? 'gold' : ''}"><i data-lucide="${isWin ? 'trophy' : 'award'}"></i>${esc(isWin ? c.rankTitle : 'Participant')}</span>
-            <span class="hkc-hc-id">${esc(code)}</span>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="hk-chip ${doneCount > 0 ? 'hkc-green' : 'neutral'}" style="font-size:.68rem;padding:2px 8px">
+                <span class="hkc-dot ${doneCount > 0 ? 'on' : ''}"></span>
+                ${doneCount === 3 ? '3/3 Active ✓' : doneCount > 0 ? `${doneCount}/3 Active` : 'Issued'}
+              </span>
+              <span class="hkc-hc-id">${esc(code)}</span>
+            </div>
           </div>
           <div class="hkc-hc-meta">
             <b>${esc(c.name)}</b>
             <div class="hk-xs hk-muted">${c.teamName ? `Team ${esc(c.teamName)} · ` : ''}${esc(reg?.email || c.college || 'Verified Recipient')}</div>
             <div class="hk-xs hk-muted">Date: <b>${esc(c.eventDateLabel)}</b> · Signed by ${esc(c.signatoryName)}</div>
           </div>
-          <div class="hkc-hc-track">
-            <span class="hk-chip ${dlOn ? 'hkc-green' : 'neutral'}"><i data-lucide="${dlOn ? 'check-circle-2' : 'download'}"></i>Download${dlOn ? ' ✓' : ''}</span>
-            <span class="hk-chip ${shOn ? 'hkc-green' : 'neutral'}"><i data-lucide="${shOn ? 'check-circle-2' : 'share-2'}"></i>Share${shOn ? ' ✓' : ''}</span>
-            <span class="hk-chip ${liOn ? 'hkc-green' : 'neutral'}"><i data-lucide="${liOn ? 'check-circle-2' : 'linkedin'}"></i>LinkedIn${liOn ? ' ✓' : ''}</span>
+          <div class="hkc-seg-bar" aria-label="Certificate activity progress">
+            <span class="${dlOn ? 'on' : ''}" title="${dlOn ? 'Downloaded ' + C.ago(c.certDownloadAtMs) : 'Pending download'}"></span>
+            <span class="${shOn ? 'on' : ''}" title="${shOn ? 'Shared ' + C.ago(c.certShareAtMs) : 'Pending share'}"></span>
+            <span class="${liOn ? 'on' : ''}" title="${liOn ? 'Added to LinkedIn ' + C.ago(c.certLinkedInAtMs) : 'Pending LinkedIn'}"></span>
           </div>
+          <div class="hkc-hc-track">${HC.certStatusChipsHtml(c, { compact: true })}</div>
           <div class="hkc-hc-url">
             <i data-lucide="qr-code" style="width:14px;height:14px;flex:none"></i>
             <span>${esc(verify)}</span>

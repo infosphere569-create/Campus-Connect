@@ -99,6 +99,48 @@ export async function markCertActivity(cert, field) {
   }
 }
 
+export async function copyTextSafe(text) {
+  const val = String(text || '');
+  if (!val) return false;
+  try {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      await navigator.clipboard.writeText(val);
+      return true;
+    }
+  } catch {}
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = val;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    return !!ok;
+  } catch {
+    return false;
+  }
+}
+
+export function certStatusChipsHtml(cert, { compact = false, includeLabels = true } = {}) {
+  const dlOn = !!cert?.certDownloadAtMs;
+  const shOn = !!cert?.certShareAtMs;
+  const liOn = !!cert?.certLinkedInAtMs;
+  const fmtAgo = ms => (ms && typeof C.ago === 'function' ? C.ago(ms) : '');
+  const item = (on, icon, labelOn, labelOff, ms) => {
+    const agoTxt = on ? fmtAgo(ms) : '';
+    const title = on ? `${labelOn}${agoTxt ? ' (' + agoTxt + ')' : ''}` : labelOff;
+    const text = includeLabels ? (on ? `${labelOn} ✓` : labelOff) : '';
+    return `<span class="hk-chip ${on ? 'hkc-green' : 'neutral'}" title="${CC.escHtml(title)}"><span class="hkc-dot ${on ? 'on' : ''}"></span><i data-lucide="${on ? 'check-circle-2' : icon}"></i>${CC.escHtml(compact ? (on ? labelOn : labelOff.replace(/^Not /, '').replace(/ yet$/, '')) : text)}${!compact && agoTxt ? `<small class="hkc-ago">${CC.escHtml(agoTxt)}</small>` : ''}</span>`;
+  };
+  return [
+    item(dlOn, 'download', 'Downloaded', compact ? 'Download' : 'Download', cert?.certDownloadAtMs),
+    item(shOn, 'share-2', 'Shared', compact ? 'Share' : 'Share', cert?.certShareAtMs),
+    item(liOn, 'linkedin', compact ? 'On LinkedIn' : 'Added to LinkedIn', compact ? 'LinkedIn' : 'Add to LinkedIn', cert?.certLinkedInAtMs)
+  ].join('');
+}
+
 /* ---------------- Host Digital Signature Management ---------------- */
 export async function saveHostSignature({ uid, hk, signatoryName, signatoryTitle = '', hackathon = null, targetProfile = null, canPatchHackathon = false }) {
   const cleanName = String(signatoryName || '').trim();
@@ -860,7 +902,7 @@ export function printCert(cert, btn, onMarked) {
 }
 
 export function shareCertImage(cert, btn, onMarked) {
-  return withBusy(btn, 'Preparing Image…', async () => {
+  return withBusy(btn, 'Sharing…', async () => {
     const verify = CC.certVerifyUrl(cert.id);
     const isWin = cert.category === 'winner';
     const title = isWin
@@ -888,42 +930,49 @@ export function shareCertImage(cert, btn, onMarked) {
         } catch (shareFileErr) {
           if (shareFileErr?.name === 'AbortError') return;
         }
-        await navigator.share({ title, text: isWin ? `Honoured to receive ${cert.rankTitle} at ${cert.hackathonTitle} on Campus Connect One!` : `Completed ${cert.hackathonTitle} on Campus Connect One!`, url: verify });
-        await markCertActivity(cert, 'certShareAtMs');
-        onMarked?.('certShareAtMs');
-        toast('Certificate shared!');
-        return;
+        try {
+          await navigator.share({ title, text: isWin ? `Honoured to receive ${cert.rankTitle} at ${cert.hackathonTitle} on Campus Connect One!` : `Completed ${cert.hackathonTitle} on Campus Connect One!`, url: verify });
+          await markCertActivity(cert, 'certShareAtMs');
+          onMarked?.('certShareAtMs');
+          toast('Certificate shared!');
+          return;
+        } catch (shareUrlErr) {
+          if (shareUrlErr?.name === 'AbortError') return;
+        }
       }
-      await navigator.clipboard.writeText(textBody);
+      const copied = await copyTextSafe(textBody);
       await markCertActivity(cert, 'certShareAtMs');
       onMarked?.('certShareAtMs');
-      toast('Share message & verification link copied!');
+      toast(copied ? 'Share message & verification link copied!' : 'Shared! Verification URL ready to paste.');
     } catch (e) {
       if (e?.name === 'AbortError') return;
-      try {
-        await navigator.clipboard.writeText(textBody);
-        await markCertActivity(cert, 'certShareAtMs');
-        onMarked?.('certShareAtMs');
-        toast('Verification link copied!');
-      } catch {
-        toast('Could not copy link', 'error');
-      }
+      const copied = await copyTextSafe(textBody);
+      await markCertActivity(cert, 'certShareAtMs');
+      onMarked?.('certShareAtMs');
+      toast(copied ? 'Verification link copied!' : 'Could not copy link', copied ? 'success' : 'error');
     }
   });
 }
 
-export async function openLinkedInAdd(cert, onMarked) {
-  const url = CC.buildLinkedInAddUrl(cert);
-  const a = document.createElement('a');
-  a.href = url;
-  a.target = '_blank';
-  a.rel = 'noopener noreferrer';
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => a.remove(), 250);
-  await markCertActivity(cert, 'certLinkedInAtMs');
-  onMarked?.('certLinkedInAtMs');
-  toast('Opening LinkedIn Add Certification…');
+export async function openLinkedInAdd(cert, btnOrCb, maybeCb) {
+  const btn = (typeof btnOrCb === 'function' || !btnOrCb) ? null : btnOrCb;
+  const onMarked = typeof btnOrCb === 'function' ? btnOrCb : maybeCb;
+  const run = async () => {
+    const url = CC.buildLinkedInAddUrl(cert);
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => a.remove(), 250);
+    await copyTextSafe(CC.certVerifyUrl(cert.id)).catch(() => false);
+    await markCertActivity(cert, 'certLinkedInAtMs');
+    onMarked?.('certLinkedInAtMs');
+    toast('Opening LinkedIn Add Certification (verify link copied too)…');
+  };
+  if (btn) return withBusy(btn, 'Opening LinkedIn…', run);
+  return run();
 }
 
 /* ---------------- Full Interactive Certificate Modal Viewer ---------------- */
@@ -956,11 +1005,7 @@ export function openCertViewerModal(cert, { isOwner = true, onActivity } = {}) {
       <button type="button" class="hk-btn ghost" id="hkcPrint"><i data-lucide="printer"></i>Print</button>
     </div>
 
-    <div class="hkc-track-strip" id="hkcModalTrack">
-      <span class="hk-chip ${cert.certDownloadAtMs ? 'hkc-green' : 'neutral'}"><i data-lucide="${cert.certDownloadAtMs ? 'check-circle-2' : 'download'}"></i>${cert.certDownloadAtMs ? 'Downloaded ✓' : 'Not downloaded yet'}</span>
-      <span class="hk-chip ${cert.certShareAtMs ? 'hkc-green' : 'neutral'}"><i data-lucide="${cert.certShareAtMs ? 'check-circle-2' : 'share-2'}"></i>${cert.certShareAtMs ? 'Shared ✓' : 'Not shared yet'}</span>
-      <span class="hk-chip ${cert.certLinkedInAtMs ? 'hkc-green' : 'neutral'}"><i data-lucide="${cert.certLinkedInAtMs ? 'check-circle-2' : 'linkedin'}"></i>${cert.certLinkedInAtMs ? 'Added to LinkedIn ✓' : 'Not on LinkedIn yet'}</span>
-    </div>
+    <div class="hkc-track-strip" id="hkcModalTrack">${certStatusChipsHtml(cert)}</div>
   </div>`, {
     wide: true,
     onMount(b) {
@@ -973,22 +1018,19 @@ export function openCertViewerModal(cert, { isOwner = true, onActivity } = {}) {
         onActivity?.(field);
         const strip = b.querySelector('#hkcModalTrack');
         if (!strip) return;
-        strip.innerHTML = `
-          <span class="hk-chip ${cert.certDownloadAtMs ? 'hkc-green' : 'neutral'}"><i data-lucide="${cert.certDownloadAtMs ? 'check-circle-2' : 'download'}"></i>${cert.certDownloadAtMs ? 'Downloaded ✓' : 'Not downloaded yet'}</span>
-          <span class="hk-chip ${cert.certShareAtMs ? 'hkc-green' : 'neutral'}"><i data-lucide="${cert.certShareAtMs ? 'check-circle-2' : 'share-2'}"></i>${cert.certShareAtMs ? 'Shared ✓' : 'Not shared yet'}</span>
-          <span class="hk-chip ${cert.certLinkedInAtMs ? 'hkc-green' : 'neutral'}"><i data-lucide="${cert.certLinkedInAtMs ? 'check-circle-2' : 'linkedin'}"></i>${cert.certLinkedInAtMs ? 'Added to LinkedIn ✓' : 'Not on LinkedIn yet'}</span>`;
-        icons();
+        strip.innerHTML = certStatusChipsHtml(cert);
+        icons(strip);
       };
 
       b.querySelector('#hkcCopyUrl').onclick = async () => {
-        try { await navigator.clipboard.writeText(verify); toast('Verification URL copied!'); }
-        catch { toast(verify, 'info'); }
+        const ok = await copyTextSafe(verify);
+        toast(ok ? 'Verification URL copied!' : verify, ok ? 'success' : 'info');
       };
       b.querySelector('#hkcDlPng').onclick = ev => downloadCertPng(cert, ev.currentTarget, isOwner ? refreshBadges : null);
       b.querySelector('#hkcDlPdf').onclick = ev => downloadCertPdf(cert, ev.currentTarget, isOwner ? refreshBadges : null);
       b.querySelector('#hkcShareImg').onclick = ev => shareCertImage(cert, ev.currentTarget, isOwner ? refreshBadges : null);
       b.querySelector('#hkcPrint').onclick = ev => printCert(cert, ev.currentTarget, isOwner ? refreshBadges : null);
-      b.querySelector('#hkcLinkedIn')?.addEventListener('click', () => openLinkedInAdd(cert, isOwner ? refreshBadges : null));
+      b.querySelector('#hkcLinkedIn')?.addEventListener('click', ev => openLinkedInAdd(cert, ev.currentTarget, isOwner ? refreshBadges : null));
     }
   });
 }

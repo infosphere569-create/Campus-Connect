@@ -448,7 +448,7 @@ function registerModal(h){
 async function myHacks(t){
   await ensureAll(); if(stale(t)) return;
   const hMap = new Map((S.all || []).map(h => [h.id, h]));
-  let stopTimers = null, unsubRegs = null;
+  let stopTimers = null, unsubRegs = null, certById = new Map();
   const ST_MAP = {
     selected: { cls: 'selected', ic: 'award', label: 'Finalist · Selected' },
     shortlisted: { cls: 'shortlisted', ic: 'sparkles', label: 'Shortlisted · Next Round' },
@@ -476,7 +476,9 @@ async function myHacks(t){
     regs.forEach((r, idx) => { if(r.hackathonId && subDocs[idx]) subMap.set(r.hackathonId, subDocs[idx]); });
 
     const certMap = new Map();
+    certById = new Map();
     (myCertList || []).filter(c => c && c.status !== 'revoked' && c.hackathonId).forEach(c => {
+      certById.set(c.id, c);
       if(!certMap.has(c.hackathonId)) certMap.set(c.hackathonId, []);
       certMap.get(c.hackathonId).push(c);
     });
@@ -523,14 +525,21 @@ async function myHacks(t){
         : '';
 
       const certLine = topCert
-        ? `<div class="hk-my-logi" style="flex-wrap:wrap">
-            <span class="hk-chip ${topCert.category === 'winner' ? 'gold' : ''}"><i data-lucide="${topCert.category === 'winner' ? 'trophy' : 'award'}"></i>${topCert.category === 'winner' ? esc(topCert.rankTitle || 'Winner Certificate') : 'Participation Certificate'} Ready</span>
-            ${topCert.certDownloadAtMs ? '<span class="hk-chip hkc-green"><i data-lucide="check-circle-2"></i>Downloaded</span>' : ''}
-            ${topCert.certLinkedInAtMs ? '<span class="hk-chip hkc-green"><i data-lucide="linkedin"></i>On LinkedIn</span>' : ''}
+        ? `<div class="hkc-my-certstrip" data-certstrip="${esc(topCert.id)}">
+            <div class="hk-my-logi" style="flex-wrap:wrap;gap:6px">
+              <span class="hk-chip ${topCert.category === 'winner' ? 'gold' : ''}"><i data-lucide="${topCert.category === 'winner' ? 'trophy' : 'award'}"></i>${topCert.category === 'winner' ? esc(topCert.rankTitle || 'Winner Certificate') : 'Participation Certificate'}</span>
+              ${HC.certStatusChipsHtml(topCert, { compact: true })}
+            </div>
           </div>`
         : '';
 
-      const certButtonsHtml = earnedCerts.map(c => `<a class="hk-btn sm ${c.category === 'winner' ? 'gold' : ''}" href="#/my/${esc(r.hackathonId)}/cert/${esc(c.id)}"><i data-lucide="${c.category === 'winner' ? 'trophy' : 'award'}"></i>${earnedCerts.length > 1 ? (c.category === 'winner' ? 'Winner Cert' : 'Participation Cert') : 'Certificate'}</a>`).join('');
+      const certButtonsHtml = [
+        ...earnedCerts.map(c => `<a class="hk-btn sm ${c.category === 'winner' ? 'gold' : ''}" href="#/my/${esc(r.hackathonId)}/cert/${esc(c.id)}"><i data-lucide="${c.category === 'winner' ? 'trophy' : 'award'}"></i>${earnedCerts.length > 1 ? (c.category === 'winner' ? 'Winner Cert' : 'Participation Cert') : 'Certificate'}</a>`),
+        ...(topCert ? [
+          `<button type="button" class="hk-btn sm ${topCert.certShareAtMs ? 'hkc-btn-done' : ''}" data-cert-share="${esc(topCert.id)}"><i data-lucide="share-2"></i><span>${topCert.certShareAtMs ? 'Shared ✓' : 'Share Cert'}</span></button>`,
+          `<button type="button" class="hk-btn sm hkc-li-btn" data-cert-li="${esc(topCert.id)}"><i data-lucide="linkedin"></i><span>${topCert.certLinkedInAtMs ? 'On LinkedIn ✓' : 'Add to LinkedIn'}</span></button>`
+        ] : [])
+      ].join('');
 
       return `<article class="hk-my-card ${isWinnerCard ? 'is-winner' : ''}">
         <div class="hk-my-banner ${st.cls}">
@@ -554,7 +563,7 @@ async function myHacks(t){
           ${cd || ''}
           <div class="hk-my-acts">
             ${certButtonsHtml}
-            <button type="button" class="hk-btn sm" data-act="share" data-id="${esc(r.hackathonId)}" data-title="${esc(h.title || r.hackathonTitle || '')}"><i data-lucide="share-2"></i>Share</button>
+            <button type="button" class="hk-btn sm" data-act="share" data-id="${esc(r.hackathonId)}" data-title="${esc(h.title || r.hackathonTitle || '')}"><i data-lucide="share-2"></i>Share Event</button>
             <a class="hk-btn sm" href="#/h/${esc(r.hackathonId)}"><i data-lucide="info"></i>View</a>
             <a class="hk-btn sm primary" href="#/my/${esc(r.hackathonId)}"><i data-lucide="layout-dashboard"></i>Open dashboard</a>
           </div>
@@ -569,8 +578,45 @@ async function myHacks(t){
     icons();
   };
 
+  const refreshCardCertUi = cert => {
+    if(!cert) return;
+    const strip = view.querySelector(`[data-certstrip="${cert.id}"] .hk-my-logi`);
+    if(strip){
+      strip.innerHTML = `
+        <span class="hk-chip ${cert.category === 'winner' ? 'gold' : ''}"><i data-lucide="${cert.category === 'winner' ? 'trophy' : 'award'}"></i>${cert.category === 'winner' ? esc(cert.rankTitle || 'Winner Certificate') : 'Participation Certificate'}</span>
+        ${HC.certStatusChipsHtml(cert, { compact: true })}`;
+      icons(strip);
+    }
+    const shBtn = view.querySelector(`[data-cert-share="${cert.id}"]`);
+    if(shBtn){
+      shBtn.classList.toggle('hkc-btn-done', !!cert.certShareAtMs);
+      shBtn.innerHTML = `<i data-lucide="share-2"></i><span>${cert.certShareAtMs ? 'Shared ✓' : 'Share Cert'}</span>`;
+      icons(shBtn);
+    }
+    const liBtn = view.querySelector(`[data-cert-li="${cert.id}"]`);
+    if(liBtn){
+      liBtn.innerHTML = `<i data-lucide="linkedin"></i><span>${cert.certLinkedInAtMs ? 'On LinkedIn ✓' : 'Add to LinkedIn'}</span>`;
+      icons(liBtn);
+    }
+  };
+
+  const onCertQuickAction = e => {
+    const sh = e.target.closest('[data-cert-share]');
+    if(sh){
+      const cert = certById.get(sh.dataset.certShare);
+      if(cert) HC.shareCertImage(cert, sh, () => refreshCardCertUi(cert));
+      return;
+    }
+    const li = e.target.closest('[data-cert-li]');
+    if(li){
+      const cert = certById.get(li.dataset.certLi);
+      if(cert) HC.openLinkedInAdd(cert, li, () => refreshCardCertUi(cert));
+    }
+  };
+  view.addEventListener('click', onCertQuickAction);
+
   unsubRegs = C.watchMyRegistrations(S.user.uid, regs => { renderRegs(regs); });
-  S.cleanup = () => { stopTimers?.(); unsubRegs?.(); };
+  S.cleanup = () => { stopTimers?.(); unsubRegs?.(); view.removeEventListener('click', onCertQuickAction); };
 }
 
 /* ---------- Notifications ---------- */
